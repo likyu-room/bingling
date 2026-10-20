@@ -292,7 +292,7 @@ public sealed partial class DonutMenu
                     context.DrawGeometry(WithOpacity(SliceBrush, SliceOpacity), BorderPen(), wedge);
                     var hot = i == ActiveIndex;
                     if (hot)
-                        context.DrawGeometry(WithOpacity(AccentBrush, 0.8), null, wedge);
+                        context.DrawGeometry(WithOpacity(HotFill, 0.8), null, wedge);
                     // Labels shrink with their slice instead of vanishing when the collapse starts.
                     DrawLabel(context, Items![i], center, (r1 + r2) / 2, DonutGeometry.MidAngle(i, n),
                         DonutGeometry.Span(n) * (r1 + r2) / 2 - 10, r2 - r1 - 16, bold, regular, hot);

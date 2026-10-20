@@ -397,7 +397,7 @@ public sealed partial class DonutMenu
                 DrawToolTint(context, item, wedge);
                 var hot = k == _subHover && group == _expanded && item.IsEnabled;
                 if (hot)
-                    context.DrawGeometry(WithOpacity(AccentBrush, 0.82), null, wedge);
+                    context.DrawGeometry(WithOpacity(HotFill, 0.82), null, wedge);
                 DrawLabel(context, item, center, (inner + outer) / 2, mid, subSpan * (inner + outer) / 2 - 8,
                     SubBand - 8, bold, regular, hot);
             }

@@ -207,6 +207,7 @@ public class SelectionGuardTests
 
         var theme = new ThemePageViewModel(store, loc, AppHost.Get<IPlatformServices>());
         AssertKeeps(theme, nameof(theme.Mode), () => theme.Mode, v => theme.Mode = v);
+        AssertKeeps(theme, nameof(theme.Style), () => theme.Style, v => theme.Style = v);
 
         var general = ActivatorUtilitiesCreate<GeneralPageViewModel>();
         AssertKeeps(general, nameof(general.Language), () => general.Language, v => general.Language = v);

@@ -20,6 +20,9 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
     [ObservableProperty] private double _holeRatio = 0.42;
     [ObservableProperty] private double _sliceOpacity = 0.96;
 
+    /// <summary>The Peach Glass style is chosen (Settings → Appearance).</summary>
+    [ObservableProperty] private bool _isGlass;
+
     /// <summary>
     /// The window keeps room for the ring a group fans out. Dragging, the donut is placed before the files (and so
     /// the donut) are known: room when any donut has a group. In click mode only when this one does
@@ -195,5 +198,6 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
         OuterRadius = Math.Clamp(store.Settings.Donut.OuterRadius, 100, 240);
         HoleRatio = store.Settings.Donut.HoleRatio;
         SliceOpacity = store.Settings.Donut.Opacity;
+        IsGlass = store.Settings.Theme.Style == ThemeStyle.PeachGlass;
     }
 }

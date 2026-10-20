@@ -758,6 +758,33 @@ public class UserDataStoreTests
     }
 
     [Fact]
+    public void New_installs_start_with_peach_glass() => Assert.Equal(ThemeStyle.PeachGlass, new AppSettings().Theme.Style);
+
+    [Fact]
+    public void The_theme_style_is_saved_and_one_from_a_newer_Filee_reads_as_classic()
+    {
+        using var dir = new TempDir();
+        var store = new UserDataStore(dir.Path);
+        store.Load();
+        store.Settings.Theme.Style = ThemeStyle.Classic;
+        store.SaveSettings();
+
+        var reloaded = new UserDataStore(dir.Path);
+        reloaded.Load();
+        Assert.Equal(ThemeStyle.Classic, reloaded.Settings.Theme.Style);
+
+        // A style this Filee doesn't know falls back to the plain look, not to the default and not to a reset settings file.
+        var path = Path.Combine(dir.Path, "settings.json");
+        var json = File.ReadAllText(path);
+        Assert.Contains("\"style\": \"Classic\"", json);
+        File.WriteAllText(path, json.Replace("\"style\": \"Classic\"", "\"style\": \"Aurora\""));
+        var newer = new UserDataStore(dir.Path);
+        newer.Load();
+        Assert.Equal(ThemeStyle.Classic, newer.Settings.Theme.Style);
+        Assert.False(File.Exists(path + ".broken"));
+    }
+
+    [Fact]
     public void A_rotation_from_a_newer_Filee_reads_as_none_and_the_other_presets_still_load()
     {
         using var dir = new TempDir();

@@ -477,6 +477,76 @@ public class RenderTests
         window.Close();
     }
 
+    /// <summary>
+    /// Peach Glass colours the donut from the spec's table (light and dark), with the orange accent whatever accent
+    /// the user picked; Classic keeps the plain look and the chosen accent. The settings are put back afterwards.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    public void Peach_glass_donut_uses_the_peach_palette(string mode)
+    {
+        TestServices.EnsureInitialized("ko");
+        var light = mode == "light";
+        var store = AppHost.Get<UserDataStore>();
+        var before = store.Settings.Theme.Clone();
+        try
+        {
+            store.Settings.Theme.Style = ThemeStyle.PeachGlass;
+            store.Settings.Theme.Mode = light ? ThemeMode.Light : ThemeMode.Dark;
+            store.Settings.Theme.Accent = "#1D9E75";
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+
+            var vm = AppHost.Get<RadialViewModel>();
+            vm.Load([ImageToolWindowTests.TestImages.Png(64, 64)], clickMode: true);
+            // A wallpaper behind the translucent donut, as on a desktop (the headless frame would be black).
+            var window = new RadialWindow { DataContext = vm, Background = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse(light ? "#C9D3DC" : "#1E2630")) };
+            window.Show();
+            window.DonutControl.SetExternalHighlight(1);
+            Pump();
+
+            var donut = window.DonutControl;
+            Assert.True(vm.IsGlass);
+            Assert.True(donut.IsGlass);
+            AssertBrush(light ? "#FFE3CC" : "#3A2418", 0.7, donut.SliceBrush);
+            AssertBrush(light ? "#FFC59A" : "#6B3A1F", 1, donut.HotBrush);
+            AssertBrush(light ? "#FFF6EE" : "#2A1A10", 0.8, donut.CenterBrush);
+            AssertBrush(light ? "#3B2416" : "#FFE9D9", 1, donut.Foreground);
+            AssertBrush(light ? "#F2552C" : "#FF6A3D", 1, donut.ToolBrush);
+            // The accent is the orange in both modes, not the green picked above.
+            AssertBrush("#FF7A1A", 1, donut.AccentBrush);
+            Save(window, $"donut-peach-{mode}.png");
+            window.Close();
+
+            store.Settings.Theme.Style = ThemeStyle.Classic;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+            vm.Load([ImageToolWindowTests.TestImages.Png(64, 64)], clickMode: true);
+            window = new RadialWindow { DataContext = vm };
+            window.Show();
+            Pump();
+            Assert.False(window.DonutControl.IsGlass);
+            AssertBrush("#1D9E75", 1, window.DonutControl.AccentBrush);
+            Assert.Null(window.DonutControl.HotBrush);
+            window.Close();
+        }
+        finally
+        {
+            store.Settings.Theme.Style = before.Style;
+            store.Settings.Theme.Mode = before.Mode;
+            store.Settings.Theme.Accent = before.Accent;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+        }
+    }
+
+    /// <summary>The brush is a solid colour with the given RGB and brush opacity (alpha is the opacity, not in the colour).</summary>
+    private static void AssertBrush(string rgb, double opacity, Avalonia.Media.IBrush? brush)
+    {
+        var solid = Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(brush);
+        var expected = Avalonia.Media.Color.Parse(rgb);
+        Assert.Equal(expected, Avalonia.Media.Color.FromRgb(solid.Color.R, solid.Color.G, solid.Color.B));
+        Assert.Equal(opacity, solid.Opacity * solid.Color.A / 255.0, 2);
+    }
+
     [AvaloniaFact]
     public void LibreOffice_options_window_renders()
     {

@@ -12,6 +12,19 @@ public enum ThemeMode
     Dark,
 }
 
+/// <summary>
+/// Which look the UI and the donut have (Settings → Appearance). <see cref="Classic"/> is first, so a style from a
+/// newer Filee (read as the first value) falls back to the plain look.
+/// </summary>
+public enum ThemeStyle
+{
+    /// <summary>Filee's own colours: white slices and the accent the user picked.</summary>
+    Classic,
+
+    /// <summary>Warm peach slices (a frosted-glass donut) with an orange accent.</summary>
+    PeachGlass,
+}
+
 /// <summary>What closing the main window does (Settings → General).</summary>
 public enum CloseAction
 {
@@ -30,7 +43,11 @@ public sealed class ThemeSettings
 {
     public ThemeMode Mode { get; set; } = ThemeMode.System;
 
-    /// <summary>Accent colour as <c>#RRGGBB</c>.</summary>
+    /// <summary>The look. New installs start with Peach Glass, which fixes the accent colour to orange.</summary>
+    [JsonConverter(typeof(LenientEnumJsonConverter<ThemeStyle>))]
+    public ThemeStyle Style { get; set; } = ThemeStyle.PeachGlass;
+
+    /// <summary>Accent colour as <c>#RRGGBB</c>. Unused while <see cref="Style"/> is <see cref="ThemeStyle.PeachGlass"/>.</summary>
     public string Accent { get; set; } = "#7F77DD";
 
     /// <summary>Base corner radius in pixels. Larger = "softer" UI.</summary>

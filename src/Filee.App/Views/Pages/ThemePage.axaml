@@ -10,14 +10,23 @@
     <StackPanel Grid.Row="1" Spacing="16">
       <Border Classes="card">
         <StackPanel Spacing="8">
+          <TextBlock Classes="label" Text="{DynamicResource theme.style}" />
+          <ComboBox ItemsSource="{Binding Styles}" SelectedItem="{Binding Style}" MinWidth="220" />
+        </StackPanel>
+      </Border>
+
+      <Border Classes="card">
+        <StackPanel Spacing="8">
           <TextBlock Classes="label" Text="{DynamicResource theme.mode}" />
           <ComboBox ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}" MinWidth="220" />
         </StackPanel>
       </Border>
 
-      <Border Classes="card">
+      <!-- Peach Glass has its own orange accent: the card is off, with a line saying why. -->
+      <Border Classes="card" IsEnabled="{Binding !IsGlass}">
         <StackPanel Spacing="10">
           <TextBlock Classes="label" Text="{DynamicResource theme.accent}" />
+          <TextBlock Classes="caption" TextWrapping="Wrap" IsVisible="{Binding IsGlass}" Text="{DynamicResource theme.style_accent_note}" />
           <ItemsControl ItemsSource="{Binding Swatches}">
             <ItemsControl.ItemsPanel>
               <ItemsPanelTemplate>
@@ -66,7 +75,7 @@
     <Border Grid.Row="1" Grid.Column="2" Classes="card" VerticalAlignment="Top">
       <StackPanel Spacing="14">
         <TextBlock Classes="label" Text="{DynamicResource theme.preview}" />
-        <c:DonutMenu x:Name="PreviewDonut" Items="{Binding PreviewItems}" OuterRadius="120" CenterTitle="JPG × 3" HorizontalAlignment="Center" />
+        <c:DonutMenu x:Name="PreviewDonut" Items="{Binding PreviewItems}" OuterRadius="120" CenterTitle="JPG × 3" IsGlass="{Binding IsGlass}" HorizontalAlignment="Center" />
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
           <Button Classes="accent" Content="{DynamicResource common.save}" />
           <Button Content="{DynamicResource common.cancel}" />

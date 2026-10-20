@@ -84,6 +84,14 @@ public sealed partial class DonutMenu : Control
         AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(ToolBrush));
     public static readonly StyledProperty<IBrush?> OnAccentBrushProperty =
         AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(OnAccentBrush), Brushes.White);
+    /// <summary>Fill of the highlighted slice and the colour of its label; null uses <see cref="AccentBrush"/> / <see cref="OnAccentBrush"/>.</summary>
+    public static readonly StyledProperty<IBrush?> HotBrushProperty =
+        AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(HotBrush));
+    public static readonly StyledProperty<IBrush?> OnHotBrushProperty =
+        AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(OnHotBrush));
+    /// <summary>The Peach Glass look. Only selects the style in Soft.axaml that colours the donut peach.</summary>
+    public static readonly StyledProperty<bool> IsGlassProperty =
+        AvaloniaProperty.Register<DonutMenu, bool>(nameof(IsGlass));
     public static readonly StyledProperty<IBrush?> ForegroundProperty =
         AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(Foreground), Brushes.Black);
     public static readonly StyledProperty<IBrush?> SecondaryForegroundProperty =
@@ -133,7 +141,7 @@ public sealed partial class DonutMenu : Control
         AffectsMeasure<DonutMenu>(OuterRadiusProperty, ReserveSubRingProperty);
         AffectsRender<DonutMenu>(HoleRatioProperty, SliceOpacityProperty, CenterTitleProperty, CenterSubtitleProperty,
             IsEditModeProperty, SliceBrushProperty, SliceBorderBrushProperty, CenterBrushProperty, AccentBrushProperty,
-            ToolBrushProperty, OnAccentBrushProperty, ForegroundProperty, SecondaryForegroundProperty, SuccessBrushProperty);
+            ToolBrushProperty, OnAccentBrushProperty, HotBrushProperty, OnHotBrushProperty, ForegroundProperty, SecondaryForegroundProperty, SuccessBrushProperty);
         ItemsProperty.Changed.AddClassHandler<DonutMenu>((d, _) => d.OnItemsChanged());
     }
 
@@ -168,9 +176,17 @@ public sealed partial class DonutMenu : Control
     public IBrush? AccentBrush { get => GetValue(AccentBrushProperty); set => SetValue(AccentBrushProperty, value); }
     public IBrush? ToolBrush { get => GetValue(ToolBrushProperty); set => SetValue(ToolBrushProperty, value); }
     public IBrush? OnAccentBrush { get => GetValue(OnAccentBrushProperty); set => SetValue(OnAccentBrushProperty, value); }
+    public IBrush? HotBrush { get => GetValue(HotBrushProperty); set => SetValue(HotBrushProperty, value); }
+    public IBrush? OnHotBrush { get => GetValue(OnHotBrushProperty); set => SetValue(OnHotBrushProperty, value); }
+    public bool IsGlass { get => GetValue(IsGlassProperty); set => SetValue(IsGlassProperty, value); }
     public IBrush? Foreground { get => GetValue(ForegroundProperty); set => SetValue(ForegroundProperty, value); }
     public IBrush? SecondaryForeground { get => GetValue(SecondaryForegroundProperty); set => SetValue(SecondaryForegroundProperty, value); }
     public IBrush? DangerBrush { get => GetValue(DangerBrushProperty); set => SetValue(DangerBrushProperty, value); }
+
+    // The highlight: its own colours when the style gives them (Peach Glass: pale peach and dark text, where white on
+    // the orange accent would be hard to read), the accent otherwise. The accent stays for the progress ring and the like.
+    private IBrush? HotFill => HotBrush ?? AccentBrush;
+    private IBrush? HotText => OnHotBrush ?? OnAccentBrush;
 
     /// <summary>True while an external drag hovers the hole (drop = cancel).</summary>
     public bool IsCenterHot => _externalCenterHot;
@@ -850,7 +866,7 @@ public sealed partial class DonutMenu : Control
                 // The accent fades in and out with the highlight (no floor: a floor made it vanish with a jump).
                 var emphasis = i == _dropTargetIndex ? 1.0 : hover;
                 if (emphasis > 0.01 && item.IsEnabled)
-                    context.DrawGeometry(WithOpacity(AccentBrush, 0.82 * Math.Clamp(emphasis, 0, 1)), null, wedge);
+                    context.DrawGeometry(WithOpacity(HotFill, 0.82 * Math.Clamp(emphasis, 0, 1)), null, wedge);
 
                 var hot = (i == ActiveIndex || i == _dropTargetIndex) && item.IsEnabled;
                 DrawLabel(context, item, center, (r1 + r2) / 2, mid, span * (r1 + r2) / 2 - 10,
@@ -914,13 +930,13 @@ public sealed partial class DonutMenu : Control
     private void DrawLabel(DrawingContext context, DonutItem item, Point center, double radius, double angle,
         double maxWidth, double maxHeight, Typeface bold, Typeface regular, bool hot)
     {
-        var foreground = hot ? OnAccentBrush : item.IsEnabled ? Foreground : SecondaryForeground;
+        var foreground = hot ? HotText : item.IsEnabled ? Foreground : SecondaryForeground;
         var width = Math.Clamp(maxWidth, 30, 120);
         var label = MakeText(item.Label, bold, 13, foreground, width, maxLines: 2);
         var showCaption = !string.IsNullOrEmpty(item.Caption) &&
                           !string.Equals(item.Caption, item.Label, StringComparison.OrdinalIgnoreCase) &&
                           label.Height + 14 < maxHeight;
-        var caption = showCaption ? MakeText(item.Caption!, regular, 10.5, hot ? OnAccentBrush : SecondaryForeground, width) : null;
+        var caption = showCaption ? MakeText(item.Caption!, regular, 10.5, hot ? HotText : SecondaryForeground, width) : null;
 
         var total = label.Height + (caption?.Height ?? 0);
         var anchor = DonutGeometry.PointAt(center, radius, angle);

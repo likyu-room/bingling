@@ -16,6 +16,9 @@ public sealed class ThemeService(IPlatformServices platform)
     public static readonly IReadOnlyList<string> Swatches =
         ["#7F77DD", "#1D9E75", "#D85A30", "#378ADD", "#D4537E", "#BA7517", "#639922", "#5F5E5A"];
 
+    /// <summary>The accent of <see cref="ThemeStyle.PeachGlass"/>.</summary>
+    public static readonly Color PeachAccent = Color.Parse("#FF7A1A");
+
     /// <summary>Embedded Noto fonts (see build/fetch-fonts.ps1). Missing files fall back to system fonts.</summary>
     private const string Latin = "fonts:Filee#Noto Sans";
     private const string Korean = "fonts:Filee#Noto Sans KR";
@@ -36,8 +39,10 @@ public sealed class ThemeService(IPlatformServices platform)
             _ => ThemeVariant.Default,
         };
 
-        // Accent colour + derived shades. Fluent controls read the System* keys.
-        var accent = Color.TryParse(theme.Accent, out var parsed) ? parsed : Color.Parse("#7F77DD");
+        // Accent colour + derived shades. Fluent controls read the System* keys. Peach Glass brings its own orange
+        // (the same in light and dark) and ignores the picked one.
+        var accent = theme.Style == ThemeStyle.PeachGlass ? PeachAccent
+            : Color.TryParse(theme.Accent, out var parsed) ? parsed : Color.Parse("#7F77DD");
         res["AccentColor"] = accent;
         res["AccentBrush"] = new SolidColorBrush(accent);
         res["AccentSoftBrush"] = new SolidColorBrush(accent, 0.18);

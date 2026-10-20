@@ -27,6 +27,7 @@
                  OuterRadius="{Binding OuterRadius}"
                  HoleRatio="{Binding HoleRatio}"
                  SliceOpacity="{Binding SliceOpacity}"
+                 IsGlass="{Binding IsGlass}"
                  ReserveSubRing="{Binding ReserveSubRing}" />
   </Panel>
 </Window>

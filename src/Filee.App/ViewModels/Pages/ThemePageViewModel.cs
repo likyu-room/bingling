@@ -23,6 +23,8 @@ public sealed partial class ThemePageViewModel : ObservableObject
         var theme = store.Settings.Theme;
         Modes = Enum.GetValues<ThemeMode>().Select(m => new Choice<ThemeMode>(m, loc[$"theme.mode.{m}"])).ToList();
         Mode = Modes.First(m => m.Value == theme.Mode);
+        Styles = Enum.GetValues<ThemeStyle>().Select(s => new Choice<ThemeStyle>(s, loc[$"theme.style.{s}"])).ToList();
+        Style = Styles.First(s => s.Value == theme.Style);
         Accent = Color.TryParse(theme.Accent, out var c) ? c : Colors.MediumPurple;
         AccentHex = $"#{Accent.R:X2}{Accent.G:X2}{Accent.B:X2}";
         CornerRadius = theme.CornerRadius;
@@ -40,12 +42,17 @@ public sealed partial class ThemePageViewModel : ObservableObject
     }
 
     public IReadOnlyList<Choice<ThemeMode>> Modes { get; }
+    public IReadOnlyList<Choice<ThemeStyle>> Styles { get; }
     public IReadOnlyList<Color> Swatches { get; } = ThemeService.Swatches.Select(Color.Parse).ToList();
     public IReadOnlyList<DonutItem> PreviewItems { get; }
 
     [ObservableProperty] private Choice<ThemeMode> _mode = null!;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsGlass))] private Choice<ThemeStyle> _style = null!;
     [ObservableProperty, NotifyPropertyChangedFor(nameof(AccentBrush))] private Color _accent;
     [ObservableProperty] private string _accentHex = "";
+
+    /// <summary>Peach Glass is chosen: the preview donut is peach, and the accent colour is fixed (the card is off).</summary>
+    public bool IsGlass => Style.Value == ThemeStyle.PeachGlass;
 
     public IBrush AccentBrush => new SolidColorBrush(Accent);
     [ObservableProperty] private double _cornerRadius;
@@ -55,6 +62,11 @@ public sealed partial class ThemePageViewModel : ObservableObject
     {
         if (!Choices.Restore(oldValue, newValue, v => Mode = v))
             Save(t => t.Mode = newValue.Value);
+    }
+    partial void OnStyleChanged(Choice<ThemeStyle>? oldValue, Choice<ThemeStyle> newValue)
+    {
+        if (!Choices.Restore(oldValue, newValue, v => Style = v))
+            Save(t => t.Style = newValue.Value);
     }
     partial void OnAccentChanged(Color value)
     {
