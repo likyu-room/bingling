@@ -130,6 +130,7 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
             {
                 Id = p.Id,
                 IsAccent = IsTool(p),
+                Icon = DonutIcons.For(p),
                 // On a group's ring the group's name gives the context: "Rotate" → Left / Right / 180°.
                 Label = caption ? loc.DisplayName(p) : loc.RingName(p),
                 Caption = !caption ? null
@@ -151,6 +152,7 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
             {
                 Id = p.Id,
                 IsAccent = _subPresets[i].Any(IsTool),
+                Icon = DonutIcons.For(p),
                 Label = loc.DisplayName(p),
                 Caption = loc.Format("donut.group_caption", children.Count),
                 IsEnabled = children.Any(c => c.IsEnabled),

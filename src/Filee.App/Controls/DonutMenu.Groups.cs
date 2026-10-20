@@ -401,7 +401,7 @@ public sealed partial class DonutMenu
                     context.DrawGeometry(WithOpacity(HotFill, 0.82), null, wedge);
                 DrawGlassEdge(context, wedge);
                 DrawLabel(context, item, center, (inner + outer) / 2, mid, subSpan * (inner + outer) / 2 - 8,
-                    SubBand - 8, bold, regular, hot);
+                    SubBand - 8, SubBand, bold, regular, hot);
             }
         }
     }

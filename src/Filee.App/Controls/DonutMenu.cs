@@ -37,6 +37,12 @@ public sealed class DonutItem
     public bool IsAccent { get; init; }
 
     /// <summary>
+    /// Small picture above the name, a path in a 24×24 box (see <see cref="DonutIcons"/>), drawn in the name's colour. Left
+    /// out when the slice has no room for it, so the name alone is always there.
+    /// </summary>
+    public Geometry? Icon { get; init; }
+
+    /// <summary>
     /// A group slice: converts nothing itself; hovering it fans these out in a small ring outside the donut, where they
     /// are clicked or dropped on like ordinary slices.
     /// </summary>
@@ -875,7 +881,7 @@ public sealed partial class DonutMenu : Control
 
                 var hot = (i == ActiveIndex || i == _dropTargetIndex) && item.IsEnabled;
                 DrawLabel(context, item, center, (r1 + r2) / 2, mid, span * (r1 + r2) / 2 - 10,
-                    r2 - r1 - 16, typeface, typefaceRegular, hot);
+                    r2 - r1 - 16, r2 - r1, typeface, typefaceRegular, hot);
             }
         }
 
@@ -935,8 +941,10 @@ public sealed partial class DonutMenu : Control
             DrawCentered(context, subtitle, center.X, y + title.Height + 2);
     }
 
+    // maxWidth / maxHeight: room for the name across the slice and along the ring (the ring's thickness less a margin).
+    // thickness: the ring's thickness itself, which the icon above the name has to fit in too (LabelLayout).
     private void DrawLabel(DrawingContext context, DonutItem item, Point center, double radius, double angle,
-        double maxWidth, double maxHeight, Typeface bold, Typeface regular, bool hot)
+        double maxWidth, double maxHeight, double thickness, Typeface bold, Typeface regular, bool hot)
     {
         var foreground = hot ? HotText : item.IsEnabled ? Foreground : SecondaryForeground;
         var width = Math.Clamp(maxWidth, 30, 120);
@@ -946,12 +954,80 @@ public sealed partial class DonutMenu : Control
                           label.Height + 14 < maxHeight;
         var caption = showCaption ? MakeText(item.Caption!, regular, 10.5, hot ? HotText : SecondaryForeground, width) : null;
 
-        var total = label.Height + (caption?.Height ?? 0);
         var anchor = DonutGeometry.PointAt(center, radius, angle);
-        var y = anchor.Y - total / 2;
-        DrawCentered(context, label, anchor.X, y);
+        var layout = LabelLayout(item.Icon is not null, center, radius, angle, maxWidth, thickness,
+            width, label.Height + (caption?.Height ?? 0), hot ? HotIconScale : 1);
+        DrawCentered(context, label, anchor.X, layout.Text.Top);
         if (caption is not null)
-            DrawCentered(context, caption, anchor.X, y + label.Height);
+            DrawCentered(context, caption, anchor.X, layout.Text.Top + label.Height);
+
+        if (layout.IconShown)
+        {
+            // Same brush as the name, so the Peach Glass text colours and the greyed-out look carry over.
+            var scale = layout.Icon.Width / 24;
+            using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(layout.Icon.X, layout.Icon.Y)))
+                context.DrawGeometry(foreground, null, item.Icon!);
+        }
+    }
+
+    /// <summary>Edge of the icon's box and the gap between it and the name.</summary>
+    private const double IconSize = 18, IconGap = 3;
+
+    /// <summary>The ring's thickness left for an icon beside the name: its box and gap, and 3 px to spare.</summary>
+    private const double IconRoom = IconSize + IconGap + 3;
+
+    /// <summary>The slice must be at least this wide for an icon (it is 18 px, and a slice narrows towards the hole).</summary>
+    private const double IconMinSliceWidth = 28;
+
+    /// <summary>How much bigger the icon of the highlighted slice is.</summary>
+    private const double HotIconScale = 1.12;
+
+    /// <summary>What the callers of <see cref="DrawLabel"/> leave out of a slice's arc, as <c>maxWidth</c>, for the name.</summary>
+    private const double SliceMargin = 10;
+
+    /// <summary>
+    /// Where a slice's name and icon go. With an icon and room for it (<see cref="IconMinSliceWidth"/> across,
+    /// <see cref="IconRoom"/> of the ring left beside the name, and the icon's column down through the name inside the
+    /// slice's wedge, which a tall name on a slice at the side of the donut would not leave) the icon sits above the name
+    /// and the two together are centred on the slice; otherwise the name alone is, as if there were no icon: never an icon without
+    /// its name. The icon grows about its own centre by <paramref name="iconScale"/>, which changes nothing else, so a
+    /// slice does not lose its icon while it is highlighted.
+    /// </summary>
+    /// <param name="hasIcon">The slice has an icon.</param>
+    /// <param name="center">The middle of the donut.</param>
+    /// <param name="radius">Distance of the slice's middle (where the name is centred) from the middle of the donut.</param>
+    /// <param name="angle">Direction of the slice's middle, clockwise from the top.</param>
+    /// <param name="sliceWidth">How wide the slice is across at <paramref name="radius"/>, less a margin.</param>
+    /// <param name="ringThickness">How thick the ring is.</param>
+    /// <param name="textWidth">The width of the box the name is centred in.</param>
+    /// <param name="textHeight">The height of the name and, if shown, its caption.</param>
+    internal static (bool IconShown, Rect Icon, Rect Text) LabelLayout(bool hasIcon, Point center, double radius, double angle,
+        double sliceWidth, double ringThickness, double textWidth, double textHeight, double iconScale = 1)
+    {
+        var anchor = DonutGeometry.PointAt(center, radius, angle);
+        var withIcon = textHeight + IconSize + IconGap;
+        var shown = hasIcon && sliceWidth >= IconMinSliceWidth && ringThickness - textHeight >= IconRoom &&
+                    InsideSlice(new Rect(anchor.X - IconSize / 2, anchor.Y - withIcon / 2, IconSize, withIcon),
+                        center, radius, angle, sliceWidth, ringThickness);
+        var top = anchor.Y - (shown ? withIcon : textHeight) / 2;
+        var icon = shown ? new Rect(anchor.X - IconSize / 2, top, IconSize, IconSize).Inflate(IconSize * (iconScale - 1) / 2) : default;
+        var text = new Rect(anchor.X - textWidth / 2, shown ? top + IconSize + IconGap : top, textWidth, textHeight);
+        return (shown, icon, text);
+    }
+
+    /// <summary>
+    /// True when all four corners of <paramref name="column"/> are inside the slice: 1 px in from the ring's edges and
+    /// within the slice's width (which narrows towards the hole). The name itself may be wider than the slice, as it always was.
+    /// </summary>
+    private static bool InsideSlice(Rect column, Point center, double radius, double angle, double sliceWidth, double ringThickness)
+    {
+        // The callers took SliceMargin off the arc for the name; a narrow column may use it, less the gap between slices.
+        var halfAngle = (sliceWidth + SliceMargin - GapPixels) / (2 * radius);
+        bool Inside(Point corner) =>
+            Math.Abs(Distance(corner, center) - radius) <= ringThickness / 2 - 1 &&
+            Math.Abs(Math.IEEERemainder(DonutGeometry.AngleOf(center, corner) - angle, 2 * Math.PI)) <= halfAngle;
+        // No array of the corners: this runs for every label on every frame.
+        return Inside(column.TopLeft) && Inside(column.TopRight) && Inside(column.BottomLeft) && Inside(column.BottomRight);
     }
 
     private Point EditButtonCenter(int index)
@@ -1018,7 +1094,7 @@ public sealed partial class DonutMenu : Control
             return;
         using (context.PushOpacity(Math.Clamp((span - 0.25) / 0.3, 0, 1) * 0.9))
             DrawLabel(context, new DonutItem { Id = "", Label = _previewLabel }, center, (r1 + r2) / 2, mid,
-                span * (r1 + r2) / 2 - 10, r2 - r1 - 16, bold, regular, hot: false);
+                span * (r1 + r2) / 2 - 10, r2 - r1 - 16, r2 - r1, bold, regular, hot: false);
     }
 
     private static StreamGeometry CreateWedge(Point c, double r1, double r2, int index, int count) =>

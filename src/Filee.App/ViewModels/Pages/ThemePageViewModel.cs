@@ -31,12 +31,12 @@ public sealed partial class ThemePageViewModel : ObservableObject
         ReduceMotion = theme.ReduceMotion ?? platform.PrefersReducedMotion;
         PreviewItems =
         [
-            new DonutItem { Id = "a", Label = "PNG" },
-            new DonutItem { Id = "b", Label = "PDF" },
-            new DonutItem { Id = "c", Label = "WEBP" },
-            new DonutItem { Id = "d", Label = "HWPX" },
-            new DonutItem { Id = "e", Label = "JPG 70%", Caption = "JPG" },
-            new DonutItem { Id = "f", Label = "TIFF" },
+            new DonutItem { Id = "a", Label = "PNG", Icon = DonutIcons.ForFormat("png") },
+            new DonutItem { Id = "b", Label = "PDF", Icon = DonutIcons.ForFormat("pdf") },
+            new DonutItem { Id = "c", Label = "WEBP", Icon = DonutIcons.ForFormat("webp") },
+            new DonutItem { Id = "d", Label = "HWPX", Icon = DonutIcons.ForFormat("hwpx") },
+            new DonutItem { Id = "e", Label = "JPG 70%", Caption = "JPG", Icon = DonutIcons.ForFormat("jpg") },
+            new DonutItem { Id = "f", Label = "TIFF", Icon = DonutIcons.ForFormat("tiff") },
         ];
         _loading = false;
     }
