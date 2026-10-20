@@ -7,6 +7,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>filee-cli</AssemblyName>
+    <AssemblyTitle>Filee Plus CLI</AssemblyTitle>
     <RootNamespace>Filee.Cli</RootNamespace>
     <ApplicationIcon>..\Filee.App\Assets\Icons\filee.ico</ApplicationIcon>
   </PropertyGroup>

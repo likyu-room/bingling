@@ -17,7 +17,7 @@
 - UI 문자열은 코드에 쓰지 않는다. 새 키는 `src/Filee.App/Assets/i18n/{en,ko,es,hi,pl,zh-CN}.json` 6개에 모두 넣는다(`LocalizationResourceTests`가 검사). es/hi/pl/zh-CN은 번역해서 넣는다.
 - `Filee.Core`에는 UI·OS 코드 금지.
 - 프로젝트·네임스페이스 이름 `Filee.*`와 실행 파일 이름 `Filee.exe`는 그대로 둔다.
-- 표시 이름 "Filee Plus", 폴더 이름 `FileePlus`, 테마 이름 "피치 글래스 / Peach Glass". "Tangerine"이라는 말은 코드·UI·문서 어디에도 쓰지 않는다.
+- 표시 이름 "Filee Plus", 폴더 이름 `FileePlus`, 테마 이름 "피치 글래스 / Peach Glass". 본뜬 맥 앱의 이름은 코드·UI·문서 어디에도 쓰지 않는다.
 - 새 코드는 되도록 새 파일에. 기존 파일은 스펙 1절의 연결 지점만 고친다.
 - 설정 스키마 번호(`AppSettings.CurrentSchemaVersion = 22`)는 올리지 않는다. 새 설정 값은 모두 기본값을 가진다.
 - 커밋 전마다 `dotnet format --verify-no-changes`와 해당 테스트 프로젝트를 돌린다. 커밋 메시지 끝에 세션의 Co-Authored-By / Claude-Session 줄.
@@ -34,7 +34,7 @@
 
 ## Review Focus
 
-1. **Shift를 누르고 마우스를 가만히 있을 때.** 지금 `DetectLateModifier`는 마우스가 움직여야만 불린다. Tangerine 사용자는 끌다가 멈추고 Shift를 누른다. → Task 3에 키 입력으로도 열리는 테스트.
+1. **Shift를 누르고 마우스를 가만히 있을 때.** 지금 `DetectLateModifier`는 마우스가 움직여야만 불린다. 본뜬 맥 앱의 사용자는 끌다가 멈추고 Shift를 누른다. → Task 3에 키 입력으로도 열리는 테스트.
 2. **EXIF로 돌아간 휴대폰 사진 자르기.** 상자는 화면에 보이는 그림 기준인데 픽셀은 돌아가 있다. → Task 5에 방향 6 JPG 자르기 테스트.
 3. **크기가 다른 여러 파일을 고정 비율로 자르기.** 다른 파일에서 상자가 그림 밖으로 나가면 안 된다. → Task 4 `CropMath.Refit` 테스트.
 4. **압축했는데 더 커지는 경우.** 품질 70으로 저장된 JPG를 "품질 80"으로 다시 저장하면 커진다. → Task 5에 원본 품질 상한 테스트.

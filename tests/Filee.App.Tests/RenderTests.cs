@@ -47,6 +47,29 @@ public class RenderTests
         window.Close();
     }
 
+    /// <summary>
+    /// The GitHub and Sponsor buttons under the menu share their row; without a repository (the fork has none yet) only
+    /// Sponsor shows, and it takes the whole row instead of sitting alone in its right half.
+    /// </summary>
+    [AvaloniaFact]
+    public void The_link_buttons_share_their_row_and_a_lone_sponsor_button_fills_it()
+    {
+        TestServices.EnsureInitialized("ko");
+        var vm = new MainWindowViewModel(AppHost.Services, AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<UpdateService>());
+        var window = new MainWindow { DataContext = vm, Width = 1080, Height = 820 };
+        window.Show();
+        Pump();
+
+        var row = window.FindControl<UniformGrid>("LinkButtons")!;
+        var shown = row.Children.Where(b => b.IsVisible).ToList();
+        Assert.Equal(UpdateService.HasRepository ? 2 : 1, shown.Count);
+        var width = (row.Bounds.Width - row.ColumnSpacing * (shown.Count - 1)) / shown.Count;
+        Assert.All(shown, b => Assert.Equal(width, b.Bounds.Width, 1));
+        Assert.Equal(0, shown[0].Bounds.X, 1);
+        Save(window, "sidebar-links-ko.png");
+        window.Close();
+    }
+
     [AvaloniaTheory]
     [InlineData("en")]
     [InlineData("ko")]
