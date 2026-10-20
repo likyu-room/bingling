@@ -4,6 +4,7 @@ using Avalonia.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Filee.App.Services;
+using Filee.Core;
 using Filee.Core.Localization;
 using Filee.Core.Settings;
 
@@ -21,12 +22,21 @@ public sealed partial class AboutPageViewModel : ObservableObject, IDisposable
         _store = store;
         _updates = updates;
         Version = loc.Format("about.version", UpdateService.CurrentVersion);
+        BasedOn = loc.Format("about.based_on", AppIdentity.BasedOn);
         _checkForUpdates = store.Settings.CheckForUpdates;
         ShowUpdateState(updates.LatestVersion);
         updates.PropertyChanged += OnUpdatesChanged;
     }
 
+    public string AppName => AppIdentity.Name;
     public string Version { get; }
+
+    /// <summary>"Based on Filee 1.12.0 by KnifeLemon (MIT license)": the upstream project this fork builds on.</summary>
+    public string BasedOn { get; }
+
+    /// <summary>False while the fork has no repository: the GitHub links and the update checks are hidden.</summary>
+    public bool HasRepository => UpdateService.HasRepository;
+
     public string RepositoryUrl { get; } = UpdateService.RepositoryUrl;
 
     /// <summary>The page is rebuilt on every visit; the update service lives on.</summary>
@@ -54,7 +64,11 @@ public sealed partial class AboutPageViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    private async Task CheckNow() => ShowUpdateState(await _updates.CheckAsync(), afterCheck: true);
+    private async Task CheckNow()
+    {
+        if (UpdateService.HasRepository)
+            ShowUpdateState(await _updates.CheckAsync(), afterCheck: true);
+    }
 
     /// <summary>Downloads and runs the new installer, which updates Filee in place (a portable copy opens the download page).</summary>
     [RelayCommand]

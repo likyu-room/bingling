@@ -1,3 +1,7 @@
+> **Filee Plus**는 KnifeLemon의 [Filee](https://github.com/KnifeLemon/Filee)(MIT 라이선스) 1.12.0을 바탕으로 만든 포크예요. 원래 Filee와 나란히 설치할 수 있고, 설정·메뉴·업데이트를 따로 써요.
+>
+> 설치 파일에 아직 코드 서명이 없어서 Windows SmartScreen이 "Windows의 PC 보호" 창을 띄울 수 있어요. **추가 정보**를 누른 다음 **실행**을 누르세요.
+
 <p align="center">
   <a href="https://filee.sh/ko/"><img src="docs/media/banner-ko.jpg" alt="Filee: 끌어서 놓으면, 변환 끝." width="100%"></a>
 </p>
@@ -50,7 +54,7 @@
 
 [릴리스](https://github.com/KnifeLemon/Filee/releases/latest)에서 내려받으세요.
 
-- **Windows 10/11**: `Filee-<version>-win-Setup.exe`를 실행하거나, `win-Portable.zip`을 풀고 `Filee.exe`를 실행해요.
+- **Windows 10/11**: `FileePlus-<version>-win-Setup.exe`를 실행하거나, `win-Portable.zip`을 풀고 `Filee.exe`를 실행해요.
   설치할 때 탐색기 메뉴, 로그인 시 자동 실행, `filee` 명령, 추가 엔진을 고를 수 있어요.
 - **macOS 14 이상** (미리보기): `osx-arm64` 또는 `osx-x64` 패키지를 풀고 `./install.sh`를 실행해요.
   아직 공증 전이라, 처음 실행할 때 시스템 설정 → 개인정보 보호 및 보안 → **그래도 열기**로 허용해 주세요.

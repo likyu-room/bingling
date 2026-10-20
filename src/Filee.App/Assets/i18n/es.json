@@ -1,5 +1,5 @@
 {
-  "app.name": "Filee",
+  "app.name": "Filee Plus",
   "app.tagline": "Arrastra, suelta y convierte.",
   "nav.home": "Inicio",
   "nav.general": "General",
@@ -174,7 +174,7 @@
   "general.language_auto": "Predeterminado del sistema",
   "general.start_with_system": "Iniciar Filee al iniciar sesión",
   "general.context_menu": "Mostrar «Convertir con Filee» en el menú contextual del Explorador",
-  "general.context_menu_label": "Convertir con Filee",
+  "general.context_menu_label": "Convertir con Filee Plus",
   "general.context_menu_macos": "Mostrar «Convertir con Filee» al hacer clic derecho sobre archivos en Finder",
   "general.context_menu_linux": "Añadir «Convertir con Filee» al gestor de archivos",
   "general.integration_macos": "Finder lo muestra en el menú contextual (en Acciones rápidas o Servicios si el menú es largo).\nMantén Filee en Aplicaciones.",
@@ -575,6 +575,7 @@
   "common.retry": "Reintentar",
   "about.version": "Versión {0}",
   "about.license": "Filee es software libre bajo la licencia MIT.",
+  "about.based_on": "Basado en {0} de KnifeLemon (licencia MIT).",
   "about.notices": "Avisos de terceros",
   "about.github": "Repositorio en GitHub",
   "about.support_title": "Ayuda a Filee a crecer",

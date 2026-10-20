@@ -24,12 +24,12 @@ BEGIN
         BLOCK "040904B0"
         BEGIN
             VALUE "CompanyName", "Filee contributors"
-            VALUE "FileDescription", "Filee File Explorer context menu"
+            VALUE "FileDescription", "Filee Plus File Explorer context menu"
             VALUE "FileVersion", FILEE_VERSION_TEXT
             VALUE "InternalName", "FileeExplorerMenu"
             VALUE "LegalCopyright", "Copyright (c) Filee contributors. MIT License."
             VALUE "OriginalFilename", "FileeExplorerMenu.dll"
-            VALUE "ProductName", "Filee"
+            VALUE "ProductName", "Filee Plus"
             VALUE "ProductVersion", FILEE_VERSION_TEXT
         END
     END

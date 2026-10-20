@@ -10,7 +10,7 @@
  context    │ Home drop zone ─────────────────────────────┘                                      │
  menu       │                                              ▼                                      │
             │                                    ConversionService ──► ToastWindow (progress)     │
-            │ MainWindow (settings pages) ◄──► UserDataStore (JSON in %APPDATA%\Filee)            │
+            │ MainWindow (settings pages) ◄──► UserDataStore (JSON in %APPDATA%\FileePlus)            │
             └──────────────────────────────────────────────┬──────────────────────────────────────┘
                                                            ▼
             ┌──────────────────────────── Filee.Core ───────────────────────────────────────────┐
@@ -118,7 +118,7 @@ applied by `WindowsPlatformServices.SetContextMenu` at start-up and whenever set
     don't need a new prompt: the DLL is loaded from the install folder and updated with the app. Bump it only when the
     manifest changes; the page then offers to add the entry again ("Outdated").
   - The DLL shows the entry only for files (not folders or items inside ZIP folders) and only while
-    `%APPDATA%\Filee\explorer-menu.txt` exists. The app writes the title in the UI language there while the setting is
+    `%APPDATA%\FileePlus\explorer-menu.txt` exists. The app writes the title in the UI language there while the setting is
     on and deletes it when the setting is off, so switching the setting takes effect without re-registering. While the
     package is registered the classic verb is removed (Windows lists packaged commands under "Show more options" too).
   - Invoke starts `Filee.exe --convert "<path>"…` next to the DLL and returns at once. Selections longer than a

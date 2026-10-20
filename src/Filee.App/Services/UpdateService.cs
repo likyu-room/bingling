@@ -1,7 +1,8 @@
 // Update check against GitHub Releases. When a newer version is out the app says so (sidebar, notice, tray). In an
 // installed copy "Update" downloads the new installer, checks it against the release's SHA256SUMS file and runs it;
 // Setup closes Filee, updates it in place (settings are kept) and starts it again. A portable copy, a copy run from
-// source, or a failed download opens a download page instead. The check works in every build.
+// source, or a failed download opens a download page instead. The check works in every build that has a repository
+// (FileeRepositoryUrl in Directory.Build.props); Filee Plus has none until its fork exists, and then does nothing.
 
 using System.ComponentModel;
 using System.Diagnostics;
@@ -11,6 +12,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Filee.Core;
 using Microsoft.Extensions.Logging;
 
 namespace Filee.App.Services;
@@ -61,14 +63,26 @@ public sealed partial class UpdateService : ObservableObject
         _log = log;
         // Downloads use their own stall timeout (StallTimeout); this one covers the API call and the response headers.
         _http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
-        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("Filee", CurrentVersion));
+        _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue(AppIdentity.Folder, CurrentVersion));
         _http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
     }
 
-    /// <summary>GitHub repository from Directory.Build.props (FileeRepositoryUrl).</summary>
+    /// <summary>
+    /// GitHub repository from Directory.Build.props (FileeRepositoryUrl). Empty while Filee Plus has no repository of
+    /// its own; it must never fall back to the original Filee's, whose releases are another program.
+    /// </summary>
     public static string RepositoryUrl =>
         typeof(UpdateService).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
-            .FirstOrDefault(a => a.Key == "RepositoryUrl")?.Value ?? "https://github.com/KnifeLemon/Filee";
+            .FirstOrDefault(a => a.Key == "RepositoryUrl")?.Value ?? "";
+
+    /// <summary>Whether there is a repository to ask for releases (<paramref name="repositoryUrl"/> is not empty).</summary>
+    internal static bool CanCheck(string repositoryUrl) => !string.IsNullOrWhiteSpace(repositoryUrl);
+
+    /// <summary>
+    /// True when this build has a repository. Without one there is nothing to check, no page to open and no place
+    /// for feedback, so the update checks do nothing and the GitHub links are hidden.
+    /// </summary>
+    public static bool HasRepository => CanCheck(RepositoryUrl);
 
     public static string CurrentVersion =>
         typeof(UpdateService).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0]
@@ -80,9 +94,6 @@ public sealed partial class UpdateService : ObservableObject
     /// <summary>Release page with every file, including the portable zip.</summary>
     public static string LatestReleaseUrl => RepositoryUrl.TrimEnd('/') + "/releases/latest";
 
-    /// <summary>The website: one big download button, friendlier than the GitHub release page.</summary>
-    public const string WebsiteUrl = "https://filee.sh/";
-
     /// <summary>
     /// True when this copy was installed by Setup (Inno Setup puts its uninstaller next to Filee.exe). Only then can
     /// the new installer update it in place; the portable zip and a copy run from source have no uninstaller.
@@ -92,6 +103,9 @@ public sealed partial class UpdateService : ObservableObject
 
     /// <summary>Whether <see cref="UpdateAsync"/> installs by itself (<see cref="IsInstalled"/>; tests set it).</summary>
     internal bool InstallsItself { get; init; } = IsInstalled;
+
+    /// <summary>The repository the releases are read from (<see cref="RepositoryUrl"/>; tests give their own).</summary>
+    internal string Repository { get; init; } = RepositoryUrl;
 
     /// <summary>The newer version found by the last check (e.g. "1.0.2"), or null when up to date / unknown.</summary>
     [ObservableProperty]
@@ -146,9 +160,11 @@ public sealed partial class UpdateService : ObservableObject
     /// </summary>
     internal async Task<bool> RefreshAsync(bool announce, CancellationToken cancellationToken = default)
     {
+        if (!CanCheck(Repository))
+            return false; // the fork has no repository yet: nothing to ask
         try
         {
-            var api = RepositoryUrl.TrimEnd('/').Replace("https://github.com/", "https://api.github.com/repos/", StringComparison.OrdinalIgnoreCase)
+            var api = Repository.TrimEnd('/').Replace("https://github.com/", "https://api.github.com/repos/", StringComparison.OrdinalIgnoreCase)
                       + "/releases/latest";
             using var response = await _http.GetAsync(api, cancellationToken);
             if (!response.IsSuccessStatusCode)
@@ -216,10 +232,13 @@ public sealed partial class UpdateService : ObservableObject
         }
     }
 
-    /// <summary>Checks shortly after start and then every few hours while <paramref name="enabled"/> says so.</summary>
+    /// <summary>
+    /// Checks shortly after start and then every few hours while <paramref name="enabled"/> says so. Does nothing
+    /// without a repository (<see cref="HasRepository"/>).
+    /// </summary>
     public void StartPeriodicChecks(Func<bool> enabled, TimeSpan firstDelay)
     {
-        if (_timer is not null)
+        if (_timer is not null || !HasRepository)
             return;
         _timer = new DispatcherTimer { Interval = firstDelay };
         _timer.Tick += async (_, _) =>
@@ -264,7 +283,7 @@ public sealed partial class UpdateService : ObservableObject
         try
         {
             var progress = new Progress<int>(percent => DownloadPercent = percent);
-            installer = await DownloadInstallerAsync(Path.Combine(Path.GetTempPath(), "Filee-update"), progress);
+            installer = await DownloadInstallerAsync(Path.Combine(Path.GetTempPath(), AppIdentity.Folder + "-update"), progress);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException
                                        or InvalidDataException or UnauthorizedAccessException)
@@ -379,10 +398,12 @@ public sealed partial class UpdateService : ObservableObject
         return await response.Content.ReadAsStringAsync(cancellationToken);
     }
 
-    /// <summary>Opens a download page: the website for installed copies, the release page (portable zip) otherwise.</summary>
+    /// <summary>Opens the release page, which has the installer and the portable zip. No-op without a repository.</summary>
     public void OpenDownloadPage()
     {
-        var url = IsInstalled ? WebsiteUrl : LatestReleaseUrl;
+        if (!HasRepository)
+            return;
+        var url = LatestReleaseUrl;
         try
         {
             Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
@@ -395,7 +416,7 @@ public sealed partial class UpdateService : ObservableObject
 
     /// <summary>
     /// Raised on the UI thread when an installed copy could not download or start the new installer. The app says so
-    /// and, once the user presses OK, opens <see cref="WebsiteUrl"/> (<see cref="OpenDownloadPage"/>).
+    /// and, once the user presses OK, opens the release page (<see cref="OpenDownloadPage"/>).
     /// </summary>
     public event EventHandler? UpdateFailed;
 

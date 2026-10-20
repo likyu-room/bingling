@@ -1,4 +1,4 @@
-// Minimal file logger: %APPDATA%\Filee\logs\filee-yyyyMMdd.log, keeps the last 7 days.
+// Minimal file logger: %APPDATA%\FileePlus\logs\filee-yyyyMMdd.log, keeps the last 7 days.
 
 using Microsoft.Extensions.Logging;
 

@@ -8,6 +8,7 @@ using System.Runtime.Versioning;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Filee.App.Services;
+using Filee.Core;
 using Filee.Platform.Windows;
 
 namespace Filee.App.Tests;
@@ -80,7 +81,17 @@ public class ExplorerMenuTests
         Assert.Equal(ExplorerMenuPackage.ClassId, fromSource);
 
         Assert.Contains($"#define LIST_PREFIX L\"{CommandLine.ListFilePrefix}\"", source);
-        Assert.Contains($"#define TITLE_FILE L\"Filee\\\\{ExplorerMenuPackage.TitleFileName}\"", source);
+        // The DLL reads the title file from the data folder of Filee Plus, not from the original Filee's.
+        Assert.Contains($"#define TITLE_FILE L\"{AppIdentity.Folder}\\\\{ExplorerMenuPackage.TitleFileName}\"", source);
+    }
+
+    [Fact]
+    public void The_package_and_class_id_differ_from_the_original_Filee_so_both_can_be_installed()
+    {
+        Assert.Equal("FileePlus.ExplorerMenu", ExplorerMenuPackage.PackageName);
+        Assert.StartsWith(ExplorerMenuPackage.PackageName + "_", ExplorerMenuPackage.FamilyName);
+        Assert.NotEqual(new Guid("6DB0E670-807F-4D22-BE3F-20492D0F4AB1"), ExplorerMenuPackage.ClassId);
+        Assert.Equal(new Guid("27B50CD9-598E-4AB1-8BBD-AC36085FB4DE"), ExplorerMenuPackage.ClassId);
     }
 
     [Fact]
@@ -138,7 +149,7 @@ public class ExplorerMenuTests
         Assert.DoesNotContain("\"", script);
 
         var remove = ExplorerMenuRegistration.BuildRemoveScript(@"C:\Temp\err.txt");
-        Assert.Contains("Get-AppxPackage -Name 'Filee.ExplorerMenu' | Remove-AppxPackage", remove);
+        Assert.Contains("Get-AppxPackage -Name 'FileePlus.ExplorerMenu' | Remove-AppxPackage", remove);
     }
 
     [Fact]

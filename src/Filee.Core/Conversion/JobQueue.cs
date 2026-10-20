@@ -78,7 +78,7 @@ public sealed class JobQueue : IAsyncDisposable
         job.State = JobState.Running;
         Notify(job);
 
-        var workDir = Path.Combine(Path.GetTempPath(), "Filee", job.Id);
+        var workDir = Path.Combine(Path.GetTempPath(), AppIdentity.Folder, job.Id);
         Directory.CreateDirectory(workDir);
         try
         {

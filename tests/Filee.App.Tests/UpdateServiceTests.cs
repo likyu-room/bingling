@@ -72,16 +72,16 @@ public class UpdateServiceTests
     {
         using var release = JsonDocument.Parse($$"""
             {"tag_name": "v9.9.9", "assets": [
-              {"name": "Filee-9.9.9-SHA256SUMS.txt", "size": 189, "browser_download_url": "{{Base}}Filee-9.9.9-SHA256SUMS.txt"},
-              {"name": "Filee-9.9.9-win-Portable.zip", "size": 5, "browser_download_url": "{{Base}}Filee-9.9.9-win-Portable.zip"},
-              {"name": "Filee-9.9.9-win-Setup.exe", "size": 1234, "browser_download_url": "{{Base}}Filee-9.9.9-win-Setup.exe"}
+              {"name": "FileePlus-9.9.9-SHA256SUMS.txt", "size": 189, "browser_download_url": "{{Base}}FileePlus-9.9.9-SHA256SUMS.txt"},
+              {"name": "FileePlus-9.9.9-win-Portable.zip", "size": 5, "browser_download_url": "{{Base}}FileePlus-9.9.9-win-Portable.zip"},
+              {"name": "FileePlus-9.9.9-win-Setup.exe", "size": 1234, "browser_download_url": "{{Base}}FileePlus-9.9.9-win-Setup.exe"}
             ]}
             """);
 
         var (installer, checksums) = UpdateService.FindFiles(release.RootElement);
 
-        Assert.Equal(new UpdateService.ReleaseFile("Filee-9.9.9-win-Setup.exe", Base + "Filee-9.9.9-win-Setup.exe", 1234), installer);
-        Assert.Equal("Filee-9.9.9-SHA256SUMS.txt", checksums?.Name);
+        Assert.Equal(new UpdateService.ReleaseFile("FileePlus-9.9.9-win-Setup.exe", Base + "FileePlus-9.9.9-win-Setup.exe", 1234), installer);
+        Assert.Equal("FileePlus-9.9.9-SHA256SUMS.txt", checksums?.Name);
     }
 
     [Fact]
@@ -89,7 +89,7 @@ public class UpdateServiceTests
     {
         using var empty = JsonDocument.Parse("""{"tag_name": "v9.9.9"}""");
         using var http = JsonDocument.Parse("""
-            {"assets": [{"name": "Filee-9.9.9-win-Setup.exe", "size": 1, "browser_download_url": "http://example.test/a.exe"}]}
+            {"assets": [{"name": "FileePlus-9.9.9-win-Setup.exe", "size": 1, "browser_download_url": "http://example.test/a.exe"}]}
             """);
 
         Assert.Equal((null, null), UpdateService.FindFiles(empty.RootElement));
@@ -100,12 +100,12 @@ public class UpdateServiceTests
     public void Checksum_lines_are_matched_by_file_name()
     {
         var hash = new string('A', 64);
-        var sums = $"{new string('1', 64)}  Filee-9.9.9-win-Portable.zip\r\n{hash}  Filee-9.9.9-win-Setup.exe\r\n";
+        var sums = $"{new string('1', 64)}  FileePlus-9.9.9-win-Portable.zip\r\n{hash}  FileePlus-9.9.9-win-Setup.exe\r\n";
 
-        Assert.Equal(hash.ToLowerInvariant(), UpdateService.ParseChecksum(sums, "Filee-9.9.9-win-Setup.exe"));
-        Assert.Equal(hash.ToLowerInvariant(), UpdateService.ParseChecksum($"{hash} *Filee-9.9.9-win-Setup.exe", "Filee-9.9.9-win-Setup.exe"));
-        Assert.Null(UpdateService.ParseChecksum(sums, "Filee-9.9.8-win-Setup.exe"));
-        Assert.Null(UpdateService.ParseChecksum("tooshort  Filee-9.9.9-win-Setup.exe", "Filee-9.9.9-win-Setup.exe"));
+        Assert.Equal(hash.ToLowerInvariant(), UpdateService.ParseChecksum(sums, "FileePlus-9.9.9-win-Setup.exe"));
+        Assert.Equal(hash.ToLowerInvariant(), UpdateService.ParseChecksum($"{hash} *FileePlus-9.9.9-win-Setup.exe", "FileePlus-9.9.9-win-Setup.exe"));
+        Assert.Null(UpdateService.ParseChecksum(sums, "FileePlus-9.9.8-win-Setup.exe"));
+        Assert.Null(UpdateService.ParseChecksum("tooshort  FileePlus-9.9.9-win-Setup.exe", "FileePlus-9.9.9-win-Setup.exe"));
     }
 
     [Fact]
@@ -115,12 +115,12 @@ public class UpdateServiceTests
         var network = new FakeRelease(installer, Sha256(installer));
         var updates = Updates(network, installer.Length);
         var folder = TempFolder();
-        File.WriteAllText(Path.Combine(folder, "Filee-9.9.8-win-Setup.exe"), "an older download");
+        File.WriteAllText(Path.Combine(folder, "FileePlus-9.9.8-win-Setup.exe"), "an older download");
         var progress = new List<int>();
 
         var path = await updates.DownloadInstallerAsync(folder, new SyncProgress(progress.Add), TestContext.Current.CancellationToken);
 
-        Assert.Equal(Path.Combine(folder, "Filee-9.9.9-win-Setup.exe"), path);
+        Assert.Equal(Path.Combine(folder, "FileePlus-9.9.9-win-Setup.exe"), path);
         Assert.Equal(installer, File.ReadAllBytes(path));
         Assert.Equal([path], Directory.GetFiles(folder)); // the older download and the .part file are gone
         Assert.Equal(100, progress[^1]);
@@ -158,7 +158,7 @@ public class UpdateServiceTests
     public async Task Checksum_file_without_the_installer_fails()
     {
         var installer = RandomNumberGenerator.GetBytes(1_000);
-        var updates = Updates(new FakeRelease(installer, Sha256(installer), sumsName: "Filee-9.9.8-win-Setup.exe"), installer.Length);
+        var updates = Updates(new FakeRelease(installer, Sha256(installer), sumsName: "FileePlus-9.9.8-win-Setup.exe"), installer.Length);
 
         await Assert.ThrowsAsync<InvalidDataException>(() =>
             updates.DownloadInstallerAsync(TempFolder(), null, TestContext.Current.CancellationToken));
@@ -184,8 +184,8 @@ public class UpdateServiceTests
     private static UpdateService Updates(FakeRelease network, long installerSize)
     {
         var updates = new UpdateService(NullLogger<UpdateService>.Instance, network);
-        updates.UseRelease(new UpdateService.ReleaseFile("Filee-9.9.9-win-Setup.exe", Base + "Filee-9.9.9-win-Setup.exe", installerSize),
-            new UpdateService.ReleaseFile("Filee-9.9.9-SHA256SUMS.txt", Base + "Filee-9.9.9-SHA256SUMS.txt", 100));
+        updates.UseRelease(new UpdateService.ReleaseFile("FileePlus-9.9.9-win-Setup.exe", Base + "FileePlus-9.9.9-win-Setup.exe", installerSize),
+            new UpdateService.ReleaseFile("FileePlus-9.9.9-SHA256SUMS.txt", Base + "FileePlus-9.9.9-SHA256SUMS.txt", 100));
         return updates;
     }
 
@@ -205,7 +205,7 @@ public class UpdateServiceTests
     }
 
     /// <summary>Serves a release's checksum file and installer.</summary>
-    private sealed class FakeRelease(byte[] installer, string hash, string sumsName = "Filee-9.9.9-win-Setup.exe",
+    private sealed class FakeRelease(byte[] installer, string hash, string sumsName = "FileePlus-9.9.9-win-Setup.exe",
         HttpStatusCode installerStatus = HttpStatusCode.OK) : HttpMessageHandler
     {
         public int InstallerRequests { get; private set; }
@@ -216,7 +216,7 @@ public class UpdateServiceTests
             if (url.EndsWith("SHA256SUMS.txt", StringComparison.Ordinal))
                 return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
                 {
-                    Content = new StringContent($"{new string('1', 64)}  Filee-9.9.9-win-Portable.zip\n{hash}  {sumsName}\n", Encoding.ASCII),
+                    Content = new StringContent($"{new string('1', 64)}  FileePlus-9.9.9-win-Portable.zip\n{hash}  {sumsName}\n", Encoding.ASCII),
                 });
             if (url.EndsWith("-win-Setup.exe", StringComparison.Ordinal))
             {
@@ -247,15 +247,18 @@ public class UpdateServiceTests
     public async Task Update_installs_the_release_that_is_latest_now_not_the_one_found_earlier()
     {
         // An earlier check found 9.9.9; 9.9.10 came out before Update was pressed.
-        var updates = new UpdateService(NullLogger<UpdateService>.Instance, new LatestRelease("v9.9.10"));
-        updates.UseRelease(new UpdateService.ReleaseFile("Filee-9.9.9-win-Setup.exe", Base + "Filee-9.9.9-win-Setup.exe", 1),
-            new UpdateService.ReleaseFile("Filee-9.9.9-SHA256SUMS.txt", Base + "Filee-9.9.9-SHA256SUMS.txt", 1));
+        var updates = new UpdateService(NullLogger<UpdateService>.Instance, new LatestRelease("v9.9.10"))
+        {
+            Repository = "https://github.com/someone/filee-plus", // Filee Plus has no repository of its own yet
+        };
+        updates.UseRelease(new UpdateService.ReleaseFile("FileePlus-9.9.9-win-Setup.exe", Base + "FileePlus-9.9.9-win-Setup.exe", 1),
+            new UpdateService.ReleaseFile("FileePlus-9.9.9-SHA256SUMS.txt", Base + "FileePlus-9.9.9-SHA256SUMS.txt", 1));
         var announced = 0;
         updates.UpdateFound += (_, _) => announced++;
 
         Assert.True(await updates.RefreshAsync(announce: false));
 
-        Assert.Equal("Filee-9.9.10-win-Setup.exe", updates.Installer!.Name);
+        Assert.Equal("FileePlus-9.9.10-win-Setup.exe", updates.Installer!.Name);
         Assert.Equal("9.9.10", updates.LatestVersion);
         Assert.Equal(0, announced); // no second notice while updating
     }
@@ -268,8 +271,8 @@ public class UpdateServiceTests
             var version = tag.TrimStart('v');
             var json = $$"""
                 {"tag_name":"{{tag}}","assets":[
-                  {"name":"Filee-{{version}}-win-Setup.exe","browser_download_url":"{{Base}}Filee-{{version}}-win-Setup.exe","size":1234},
-                  {"name":"Filee-{{version}}-SHA256SUMS.txt","browser_download_url":"{{Base}}Filee-{{version}}-SHA256SUMS.txt","size":100}]}
+                  {"name":"FileePlus-{{version}}-win-Setup.exe","browser_download_url":"{{Base}}FileePlus-{{version}}-win-Setup.exe","size":1234},
+                  {"name":"FileePlus-{{version}}-SHA256SUMS.txt","browser_download_url":"{{Base}}FileePlus-{{version}}-SHA256SUMS.txt","size":100}]}
                 """;
             return Task.FromResult(request.RequestUri!.AbsolutePath.EndsWith("/releases/latest", StringComparison.Ordinal)
                 ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(json, Encoding.UTF8, "application/json") }
@@ -282,5 +285,34 @@ public class UpdateServiceTests
     {
         Assert.EndsWith("/releases/latest", UpdateService.LatestReleaseUrl);
         Assert.StartsWith(UpdateService.RepositoryUrl.TrimEnd('/'), UpdateService.LatestReleaseUrl);
+    }
+
+    [Fact]
+    public void No_repository_means_no_update_check()
+    {
+        Assert.False(UpdateService.CanCheck(""));
+        Assert.False(UpdateService.CanCheck("   "));
+        Assert.True(UpdateService.CanCheck("https://github.com/someone/filee-plus"));
+    }
+
+    [Fact]
+    public async Task A_check_without_a_repository_never_reaches_the_network()
+    {
+        var network = new CountingNetwork();
+        var updates = new UpdateService(NullLogger<UpdateService>.Instance, network) { Repository = "" };
+
+        Assert.Null(await updates.CheckAsync(TestContext.Current.CancellationToken));
+        Assert.Equal(0, network.Requests);
+    }
+
+    private sealed class CountingNetwork : HttpMessageHandler
+    {
+        public int Requests { get; private set; }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            Requests++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
     }
 }

@@ -8,6 +8,7 @@
 
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Filee.Core;
 using Filee.Core.Platform;
 
 namespace Filee.Platform.Windows;
@@ -118,7 +119,7 @@ public static class Elevation
     public static void ShowWarning(string text)
     {
         if (OperatingSystem.IsWindows())
-            NativeMethods.MessageBox(0, text, "Filee",
+            NativeMethods.MessageBox(0, text, AppIdentity.Name,
                 NativeMethods.MB_OK | NativeMethods.MB_ICONWARNING | NativeMethods.MB_SETFOREGROUND | NativeMethods.MB_TOPMOST);
     }
 

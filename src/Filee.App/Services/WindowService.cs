@@ -147,10 +147,13 @@ public sealed class WindowService(ILocalizer loc, IServiceProvider services, Mem
         notice.Show();
     }
 
-    /// <summary>Shows the one-time "Is Filee helping you?" card in the bottom-right corner.</summary>
+    /// <summary>
+    /// Shows the one-time "Is Filee helping you?" card in the bottom-right corner. Not without a repository: both of
+    /// its buttons open GitHub pages.
+    /// </summary>
     public void ShowFeedbackNotice()
     {
-        if (_feedbackNotice is not null)
+        if (_feedbackNotice is not null || !UpdateService.HasRepository)
             return;
         _feedbackNotice = new FeedbackNoticeWindow();
         _feedbackNotice.Closed += (_, _) => _feedbackNotice = null;

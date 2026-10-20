@@ -23,7 +23,7 @@ internal sealed class CliHost : IAsyncDisposable
     public JobQueue Queue { get; }
     public ILocalizer Texts { get; } = new EnglishTexts();
 
-    /// <param name="dataDirectory">Settings folder; the app's (%APPDATA%\Filee) when null.</param>
+    /// <param name="dataDirectory">Settings folder; the app's (%APPDATA%\FileePlus) when null.</param>
     public static CliHost Create(string? dataDirectory = null)
     {
         var store = new UserDataStore(dataDirectory ?? UserDataStore.DefaultDirectory);

@@ -57,9 +57,11 @@ public sealed class FormatRequestTests : IDisposable
     [Fact]
     public void The_link_opens_the_format_request_form_with_only_the_extension()
     {
-        var url = FormatRequest.Url([".ncm", ".kgm"]).AbsoluteUri;
+        // Filee Plus has no repository until the fork exists, so the test brings its own.
+        const string repository = "https://github.com/someone/filee-plus";
+        var url = FormatRequest.Url([".ncm", ".kgm"], repository).AbsoluteUri;
 
-        Assert.StartsWith(UpdateService.RepositoryUrl.TrimEnd('/') + "/issues/new?template=format_request.yml&", url);
+        Assert.StartsWith(repository + "/issues/new?template=format_request.yml&", url);
         Assert.Contains("&title=Format%20request%3A%20.ncm%2C%20.kgm", url);
         Assert.Contains("&extension=.ncm%2C%20.kgm", url);
     }

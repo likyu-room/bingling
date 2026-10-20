@@ -26,11 +26,14 @@ public static class FormatRequest
     /// <summary>".ncm" or ".ncm, .qmc".</summary>
     public static string Label(IReadOnlyList<string> extensions) => string.Join(", ", extensions);
 
-    /// <summary>The new-issue page of the "Format request" form, its title and extension field filled in.</summary>
-    public static Uri Url(IReadOnlyList<string> extensions)
+    /// <summary>
+    /// The new-issue page of the "Format request" form, its title and extension field filled in. The form belongs to
+    /// <paramref name="repositoryUrl"/>, by default this build's repository.
+    /// </summary>
+    public static Uri Url(IReadOnlyList<string> extensions, string? repositoryUrl = null)
     {
         var label = Label(extensions);
-        return new Uri(UpdateService.RepositoryUrl.TrimEnd('/') + "/issues/new?template=format_request.yml" +
+        return new Uri((repositoryUrl ?? UpdateService.RepositoryUrl).TrimEnd('/') + "/issues/new?template=format_request.yml" +
             "&title=" + Uri.EscapeDataString("Format request: " + label) +
             "&extension=" + Uri.EscapeDataString(label));
     }

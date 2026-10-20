@@ -66,7 +66,7 @@ they can be installed or removed later in Settings → *Engines*. A conversion t
   read by `build/fetch-engines.ps1`, so development and the app always use the same versions.
 - `EngineInstaller` verifies the SHA-256 before unpacking and unpacks into a staging folder that replaces the
   engine folder only when complete. Redirects to mirrors (even plain HTTP) are followed, because the hash decides.
-- Engines go to `%LOCALAPPDATA%\Filee\engines`: outside the app folder, so updates keep them, and inside Filee's
+- Engines go to `%LOCALAPPDATA%\FileePlus\engines`: outside the app folder, so updates keep them, and inside Filee's
   install root, so uninstalling removes them.
 - LibreOffice and calibre come as MSIs and are unpacked with an administrative install (`msiexec /a`): files only,
   no registry entries, no admin rights. LibreOffice's help, gallery and most dictionaries are removed afterwards
@@ -870,7 +870,7 @@ bundled with the installer), never a 7-Zip installed on the PC. It runs as a sep
 
 ## LibreOffice
 
-- Each parallel worker gets its own profile under `%APPDATA%\Filee\libreoffice-profiles` (LibreOffice silently
+- Each parallel worker gets its own profile under `%APPDATA%\FileePlus\libreoffice-profiles` (LibreOffice silently
   fails when two conversions share a profile).
 - HWP/HWPX import comes from the H2Orestart extension, which is written in Java; Filee points LibreOffice at the
   downloaded JRE (`-env:UNO_JAVA_JFW_JREHOME`).

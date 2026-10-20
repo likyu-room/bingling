@@ -1,3 +1,7 @@
+> **Filee Plus** is a fork of [Filee](https://github.com/KnifeLemon/Filee) by KnifeLemon (MIT license), based on Filee 1.12.0. It installs next to the original Filee and keeps its own settings, menus and updates.
+>
+> The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC". Choose **More info**, then **Run anyway**.
+
 <p align="center">
   <a href="https://filee.sh"><img src="docs/media/banner-en.jpg" alt="Filee: Drag. Drop. Converted." width="100%"></a>
 </p>
@@ -50,7 +54,7 @@
 
 Download from [Releases](https://github.com/KnifeLemon/Filee/releases/latest).
 
-- **Windows 10/11**: run `Filee-<version>-win-Setup.exe`, or unzip the `win-Portable.zip` and run `Filee.exe`.
+- **Windows 10/11**: run `FileePlus-<version>-win-Setup.exe`, or unzip the `win-Portable.zip` and run `Filee.exe`.
   Setup can add the Explorer menu, start at sign-in, the `filee` command and optional engines.
 - **macOS 14+** (preview): unpack the `osx-arm64` or `osx-x64` package and run `./install.sh`.
   The build isn't notarized yet, so allow the first start in System Settings → Privacy & Security → **Open Anyway**.

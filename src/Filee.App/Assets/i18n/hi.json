@@ -1,5 +1,5 @@
 {
-  "app.name": "Filee",
+  "app.name": "Filee Plus",
   "app.tagline": "खींचें, छोड़ें, कन्वर्ट हो गया।",
   "nav.home": "होम",
   "nav.general": "सामान्य",
@@ -174,7 +174,7 @@
   "general.language_auto": "सिस्टम डिफ़ॉल्ट",
   "general.start_with_system": "साइन इन करने पर Filee शुरू करें",
   "general.context_menu": "Explorer के राइट-क्लिक मेनू में “Filee से कन्वर्ट करें” दिखाएँ",
-  "general.context_menu_label": "Filee से कन्वर्ट करें",
+  "general.context_menu_label": "Filee Plus से कन्वर्ट करें",
   "general.context_menu_macos": "Finder में फ़ाइलों पर राइट-क्लिक करने पर “Filee से कन्वर्ट करें” दिखाएँ",
   "general.context_menu_linux": "फ़ाइल मैनेजर में “Filee से कन्वर्ट करें” जोड़ें",
   "general.integration_macos": "Finder इसे राइट-क्लिक मेनू में दिखाता है (मेनू लंबा होने पर Quick Actions या Services के अंदर)।\nFilee को Applications में रखें।",
@@ -575,6 +575,7 @@
   "common.retry": "फिर कोशिश करें",
   "about.version": "संस्करण {0}",
   "about.license": "Filee MIT लाइसेंस के तहत एक फ़्री सॉफ़्टवेयर है।",
+  "about.based_on": "KnifeLemon के {0} (MIT लाइसेंस) पर आधारित।",
   "about.notices": "तृतीय-पक्ष सूचनाएँ",
   "about.github": "GitHub रिपॉज़िटरी",
   "about.support_title": "Filee को आगे बढ़ाने में मदद करें",

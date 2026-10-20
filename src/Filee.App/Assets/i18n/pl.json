@@ -1,5 +1,5 @@
 {
-  "app.name": "Filee",
+  "app.name": "Filee Plus",
   "app.tagline": "Przeciągnij, upuść, gotowe.",
 
   "nav.home": "Start",
@@ -185,7 +185,7 @@
   "general.language_auto": "Domyślny systemu",
   "general.start_with_system": "Uruchamiaj Filee po zalogowaniu",
   "general.context_menu": "Pokazuj „Konwertuj w Filee” w menu kontekstowym Eksploratora",
-  "general.context_menu_label": "Konwertuj w Filee",
+  "general.context_menu_label": "Konwertuj w Filee Plus",
   "general.context_menu_macos": "Pokazuj „Konwertuj w Filee” po kliknięciu plików prawym przyciskiem w Finderze",
   "general.context_menu_linux": "Dodaj „Konwertuj w Filee” do menedżera plików",
   "general.integration_macos": "Finder pokazuje to w menu prawego przycisku (w Szybkich czynnościach lub Usługach, gdy menu jest długie).\nTrzymaj Filee w Aplikacjach.",
@@ -592,6 +592,7 @@
   "common.retry": "Ponów",
   "about.version": "Wersja {0}",
   "about.license": "Filee to wolne oprogramowanie na licencji MIT.",
+  "about.based_on": "Oparty na {0} autorstwa KnifeLemon (licencja MIT).",
   "about.notices": "Informacje o komponentach zewnętrznych",
   "about.github": "Repozytorium GitHub",
   "about.support_title": "Pomóż Filee się rozwijać",

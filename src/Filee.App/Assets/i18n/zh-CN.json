@@ -1,5 +1,5 @@
 {
-  "app.name": "Filee",
+  "app.name": "Filee Plus",
   "app.tagline": "拖一拖，放一放，转换完成。",
 
   "nav.home": "首页",
@@ -185,7 +185,7 @@
   "general.language_auto": "跟随系统",
   "general.start_with_system": "登录时启动 Filee",
   "general.context_menu": "在资源管理器右键菜单中显示“用 Filee 转换”",
-  "general.context_menu_label": "用 Filee 转换",
+  "general.context_menu_label": "用 Filee Plus 转换",
   "general.context_menu_macos": "在 Finder 中右键点按文件时显示“用 Filee 转换”",
   "general.context_menu_linux": "在文件管理器菜单中添加“用 Filee 转换”",
   "general.integration_macos": "Finder 的右键菜单中会出现此项（菜单较长时在“快速操作”或“服务”中）。\n请将 Filee 保留在“应用程序”文件夹中。",
@@ -592,6 +592,7 @@
   "common.retry": "重试",
   "about.version": "版本 {0}",
   "about.license": "Filee 是基于 MIT 许可证的免费软件。",
+  "about.based_on": "基于 KnifeLemon 的 {0}（MIT 许可证）。",
   "about.notices": "第三方声明",
   "about.github": "GitHub 仓库",
   "about.support_title": "支持 Filee",

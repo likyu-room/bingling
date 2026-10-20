@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using Avalonia.Headless.XUnit;
 using Filee.App.Services;
 using Filee.App.ViewModels;
+using Filee.Core;
 using Filee.Core.Localization;
 using Filee.Engines.Infrastructure;
 using Filee.Platform.Windows;
@@ -88,8 +89,22 @@ public class InstallerTests
         var marker = typeof(EngineInstaller).GetField("MarkerName", BindingFlags.NonPublic | BindingFlags.Static)?.GetRawConstantValue();
         Assert.Contains($"EngineMarker = '{marker}';", Script);
         Assert.Equal(
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Filee", "engines"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FileePlus", "engines"),
             EngineEnvironment.DownloadRoot);
-        Assert.Contains(@"ExpandConstant('{localappdata}\Filee\engines\')", Script);
+        Assert.Contains(@"ExpandConstant('{localappdata}\FileePlus\engines\')", Script);
+    }
+
+    [Fact]
+    public void Script_has_the_fork_identity_so_it_installs_next_to_the_original_Filee()
+    {
+        var script = Script;
+        Assert.Contains($"#define AppName \"{AppIdentity.Name}\"", script);
+        Assert.Contains("#define AppGuid \"A10409B5-6A21-4C67-9A0C-84B49B4629AF\"", script);
+        Assert.Contains($"OutputBaseFilename={AppIdentity.Folder}-{{#AppVersion}}-win-Setup", script);
+        // The original Filee's installer id, upstream address and per-user folders must not appear anywhere.
+        Assert.DoesNotContain("C8686E06-8327-40A2-B0F7-3DEDD61D9248", script);
+        Assert.DoesNotContain("KnifeLemon", script);
+        Assert.DoesNotContain(@"{localappdata}\Filee\", script);
+        Assert.DoesNotContain(@"{localappdata}\Filee'", script);
     }
 }

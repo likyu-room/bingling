@@ -1,5 +1,5 @@
 {
-  "app.name": "Filee",
+  "app.name": "Filee Plus",
   "app.tagline": "끌어서 놓으면, 변환 끝.",
 
   "nav.home": "홈",
@@ -185,7 +185,7 @@
   "general.language_auto": "시스템 기본값",
   "general.start_with_system": "로그인할 때 Filee 시작",
   "general.context_menu": "탐색기 우클릭 메뉴에 “Filee로 변환” 표시",
-  "general.context_menu_label": "Filee로 변환",
+  "general.context_menu_label": "Filee Plus로 변환",
   "general.context_menu_macos": "Finder에서 파일을 우클릭하면 “Filee로 변환” 표시",
   "general.context_menu_linux": "파일 관리자 메뉴에 “Filee로 변환” 추가",
   "general.integration_macos": "Finder 우클릭 메뉴에 나타나요(메뉴가 길면 빠른 동작 또는 서비스 안에).\nFilee는 응용 프로그램 폴더에 두세요.",
@@ -592,6 +592,7 @@
   "common.retry": "다시 시도",
   "about.version": "버전 {0}",
   "about.license": "Filee는 MIT 라이선스의 무료 소프트웨어예요.",
+  "about.based_on": "KnifeLemon의 {0}(MIT 라이선스) 기반이에요.",
   "about.notices": "서드파티 고지",
   "about.github": "GitHub 저장소",
   "about.support_title": "Filee 응원하기",

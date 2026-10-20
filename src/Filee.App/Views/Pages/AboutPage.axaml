@@ -11,10 +11,11 @@
       <StackPanel Orientation="Horizontal" Spacing="18">
         <Image Source="avares://Filee/Assets/Icons/filee.png" Width="72" Height="72" />
         <StackPanel VerticalAlignment="Center" Spacing="4">
-          <TextBlock Text="Filee" FontSize="24" FontWeight="Bold" />
+          <TextBlock Text="{Binding AppName}" FontSize="24" FontWeight="Bold" />
           <TextBlock Classes="muted" Text="{Binding Version}" />
+          <TextBlock Classes="muted" Text="{Binding BasedOn}" TextWrapping="Wrap" />
           <TextBlock Classes="muted" Text="{DynamicResource about.license}" />
-          <Button Classes="ghost" Padding="0" Click="OnOpenRepository" Margin="0,4,0,0">
+          <Button Classes="ghost" Padding="0" Click="OnOpenRepository" Margin="0,4,0,0" IsVisible="{Binding HasRepository}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Link}" Foreground="{DynamicResource AccentBrush}" />
               <TextBlock Text="{Binding RepositoryUrl}" Foreground="{DynamicResource AccentBrush}" />
@@ -30,7 +31,8 @@
         <v:SupportersView x:Name="Supporters" ShowTitle="False" LogoHeight="40" />
       </StackPanel>
     </Border>
-    <Border Classes="card">
+    <!-- Update checks need a repository to ask; the fork has none yet -->
+    <Border Classes="card" IsVisible="{Binding HasRepository}">
       <StackPanel Spacing="12">
         <TextBlock Classes="h2" Text="{DynamicResource about.updates}" />
         <ToggleSwitch Content="{DynamicResource general.check_updates}" IsChecked="{Binding CheckForUpdates}" />
@@ -51,8 +53,8 @@
         <TextBlock Classes="h2" Text="{DynamicResource about.support_title}" />
         <TextBlock Classes="muted" TextWrapping="Wrap" Text="{DynamicResource about.support_text}" />
         <WrapPanel>
-          <Button Classes="accent" Click="OnStar" Margin="0,0,8,0" Content="{DynamicResource feedback.star}" />
-          <Button Click="OnIssue" Content="{DynamicResource feedback.issue}" Margin="0,0,8,0" />
+          <Button Classes="accent" Click="OnStar" Margin="0,0,8,0" Content="{DynamicResource feedback.star}" IsVisible="{Binding HasRepository}" />
+          <Button Click="OnIssue" Content="{DynamicResource feedback.issue}" Margin="0,0,8,0" IsVisible="{Binding HasRepository}" />
           <Button Click="OnSponsor">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Heart}" Foreground="#D4537E" />

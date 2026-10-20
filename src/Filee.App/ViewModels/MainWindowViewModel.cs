@@ -39,6 +39,9 @@ public sealed partial class MainWindowViewModel : ObservableObject, IDisposable
     /// <summary>The repository, for the GitHub button above the version.</summary>
     public string RepositoryUrl => UpdateService.RepositoryUrl;
 
+    /// <summary>False while the fork has no repository: the sidebar then has no GitHub button.</summary>
+    public bool HasRepository => UpdateService.HasRepository;
+
     public MainWindowViewModel(IServiceProvider services, ILocalizer loc, UpdateService updates)
     {
         _services = services;

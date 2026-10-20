@@ -1,5 +1,5 @@
 {
-  "app.name": "Filee",
+  "app.name": "Filee Plus",
   "app.tagline": "Drag, drop, converted.",
 
   "nav.home": "Home",
@@ -185,7 +185,7 @@
   "general.language_auto": "System default",
   "general.start_with_system": "Start Filee when I sign in",
   "general.context_menu": "Show “Convert with Filee” in the Explorer context menu",
-  "general.context_menu_label": "Convert with Filee",
+  "general.context_menu_label": "Convert with Filee Plus",
   "general.context_menu_macos": "Show “Convert with Filee” when you right-click files in Finder",
   "general.context_menu_linux": "Add “Convert with Filee” to the file manager",
   "general.integration_macos": "Finder shows it in the right-click menu (under Quick Actions or Services when the menu is long).\nKeep Filee in Applications.",
@@ -592,6 +592,7 @@
   "common.retry": "Retry",
   "about.version": "Version {0}",
   "about.license": "Filee is free software under the MIT license.",
+  "about.based_on": "Based on {0} by KnifeLemon (MIT license).",
   "about.notices": "Third-party notices",
   "about.github": "GitHub repository",
   "about.support_title": "Help Filee grow",
