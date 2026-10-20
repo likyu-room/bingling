@@ -117,6 +117,88 @@ public class ToastWindowTests
     }
 
     [AvaloniaFact]
+    public async Task An_animation_gets_a_thumbnail_of_its_first_frame()
+    {
+        // GIF to WebP, compress on a GIF, video to GIF: the card shows one frame and reads no more (ImageToolTests).
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var output = Path.Combine(dir.Path, "anim.gif");
+        using (var frames = new MagickImageCollection())
+        {
+            foreach (var color in new[] { MagickColors.Red, MagickColors.Lime, MagickColors.Blue })
+                frames.Add(new MagickImage(color, 120, 80) { AnimationDelay = 10 });
+            frames.Write(output, MagickFormat.Gif);
+        }
+        var vm = Finished(dir.Bytes("clip.mp4", 50_000), output);
+
+        await vm.LoadFinishDetailsAsync();
+
+        Assert.NotNull(vm.Thumbnail);
+        Assert.Equal((84, 56), (vm.Thumbnail!.PixelSize.Width, vm.Thumbnail.PixelSize.Height));
+    }
+
+    [AvaloniaTheory]
+    [InlineData(20000, 100, 224, 56)]
+    [InlineData(100, 20000, 56, 224)]
+    public async Task A_panorama_thumbnail_keeps_the_middle_four_times_as_long_as_it_is_short(int width, int height, int thumbWidth, int thumbHeight)
+    {
+        // Not 11200 × 56: the card shows the middle square of it anyway.
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var output = Path.Combine(dir.Path, "pano.png");
+        using (var image = new MagickImage(MagickColors.SteelBlue, (uint)width, (uint)height))
+            image.Write(output, MagickFormat.Png);
+        var vm = Finished(dir.Bytes("pano.txt", 50_000), output);
+
+        await vm.LoadFinishDetailsAsync();
+
+        Assert.Equal((thumbWidth, thumbHeight), (vm.Thumbnail!.PixelSize.Width, vm.Thumbnail.PixelSize.Height));
+    }
+
+    [AvaloniaFact]
+    public async Task A_cancelled_job_that_wrote_a_file_still_says_it_was_cancelled()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var conversion = new ConversionJob([dir.Bytes("a.txt", 2048), dir.Bytes("b.txt", 2048)], new Preset { TargetFormat = "pdf" }, "PDF");
+        await using (var queue = new JobQueue(new ConverterCatalog([new CancelAfterWriting(conversion)])))
+            await queue.RunAsync(conversion);
+        Assert.Equal(JobState.Cancelled, conversion.State); // the test job is what it should be: stopped, one file written
+        Assert.Single(conversion.Outputs);
+
+        var vm = new JobViewModel(conversion, AppHost.Get<ILocalizer>(), AppHost.Get<IPlatformServices>(), _ => { });
+        await vm.LoadFinishDetailsAsync();
+
+        Assert.NotNull(vm.SizeChange);
+        Assert.Equal("취소됨", vm.Status);
+        Assert.True(vm.ShowsStatus);
+    }
+
+    [AvaloniaFact]
+    public async Task The_size_before_is_the_one_the_source_had_when_the_job_was_handed_over()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var source = dir.Bytes("a.txt", 4096);
+        var vm = Finished(source, dir.Bytes("a.pdf", 2048));
+
+        File.Delete(source); // a watch folder moved the original away once the job was done
+        await vm.LoadFinishDetailsAsync();
+
+        Assert.Equal("4.0 KB → 2.0 KB · 50% 작아짐", vm.SizeChange);
+    }
+
+    [AvaloniaFact]
+    public void A_format_without_an_icon_of_its_own_gets_a_plain_file_in_the_circle()
+    {
+        TestServices.EnsureInitialized("ko");
+        var font = new JobViewModel(new ConversionJob(["C:/a.otf"], new Preset { TargetFormat = "ttf" }, "TTF"),
+            AppHost.Get<ILocalizer>(), AppHost.Get<IPlatformServices>(), _ => { });
+        Assert.True(Avalonia.Application.Current!.TryGetResource("Icon.Donut.File", null, out var file));
+        Assert.Same(file, font.FormatIcon);
+    }
+
+    [AvaloniaFact]
     public async Task A_finished_document_job_shows_no_thumbnail_but_the_size()
     {
         TestServices.EnsureInitialized("ko");
@@ -300,6 +382,25 @@ public class ToastWindowTests
         }
         Assert.NotNull(vm.SizeChange);
         return vm;
+    }
+
+    /// <summary>"Converts" text to PDF by writing a file, then cancels the job: a job stopped after it wrote something.</summary>
+    private sealed class CancelAfterWriting(ConversionJob job) : IConverter
+    {
+        public string Id => "cancel-after-writing";
+        public string DisplayName => Id;
+        public IReadOnlyList<ConversionEdge> Edges { get; } = [new("txt", "pdf")];
+        public int MaxParallelism => 1; // one file after the other: the second finds the job cancelled
+        public EngineStatus GetStatus() => EngineStatus.Available();
+
+        public Task<IReadOnlyList<string>> ConvertAsync(ConversionStep step, IProgress<double>? progress, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var path = step.Output.Allocate("pdf")!;
+            File.WriteAllBytes(path, new byte[1024]);
+            job.Cancel();
+            return Task.FromResult<IReadOnlyList<string>>([path]);
+        }
     }
 
     /// <summary>WCAG contrast ratio of two colours.</summary>

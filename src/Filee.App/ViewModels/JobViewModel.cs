@@ -24,12 +24,24 @@ public sealed partial class JobViewModel : ObservableObject
     /// <summary>Side of the card's thumbnail, in device-independent pixels (ToastWindow.axaml draws it 56 × 56).</summary>
     private const uint ThumbnailEdge = 56;
 
+    /// <summary>
+    /// The thumbnail's long side is at most this many times its short side: the card shows only the middle square, and a
+    /// 20000 × 100 panorama would otherwise come out 11200 × 56.
+    /// </summary>
+    private const uint ThumbnailMaxAspect = 4;
+
     private readonly ILocalizer _loc;
     private readonly IPlatformServices _platform;
     private readonly Action<JobViewModel> _dismiss;
     private readonly Action<JobViewModel>? _retry;
     private int _refreshPending;
     private bool _detailsRequested;
+
+    /// <summary>
+    /// The size of each source file (as <see cref="ConversionJob.Sources"/>) when the job was handed over: a watch folder
+    /// may move the originals away once it is done, before the card compares the sizes.
+    /// </summary>
+    private readonly long[] _sourceSizes;
 
     public JobViewModel(ConversionJob job, ILocalizer loc, IPlatformServices platform, Action<JobViewModel> dismiss,
         Action<JobViewModel>? retry = null)
@@ -39,6 +51,7 @@ public sealed partial class JobViewModel : ObservableObject
         _platform = platform;
         _dismiss = dismiss;
         _retry = retry;
+        _sourceSizes = [.. job.Sources.Select(SizeOf)];
         var what = job.Sources.Count == 1 ? Path.GetFileName(job.Sources[0]) : loc.Format("home.files", job.Sources.Count);
         Title = loc.Format("toast.converting", what, job.PresetDisplayName);
         Refresh();
@@ -50,7 +63,9 @@ public sealed partial class JobViewModel : ObservableObject
 
     [ObservableProperty] private double _progress;
     [ObservableProperty] private string _status = "";
-    [ObservableProperty] private bool _isRunning = true;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsStatus))]
+    private bool _isRunning = true;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsStatus))]
     private bool _hasErrors;
@@ -84,12 +99,18 @@ public sealed partial class JobViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowsStatus))]
     private string? _sizeChange;
 
-    /// <summary>The line under the title is <see cref="Status"/> unless the sizes replace it (failures keep it: they say how many).</summary>
-    public bool ShowsStatus => SizeChange is null || HasErrors;
+    /// <summary>
+    /// The line under the title is <see cref="Status"/> unless the sizes replace it. Failures keep it (they say how many),
+    /// and so does a cancelled job that wrote some files before it stopped (it says so).
+    /// </summary>
+    public bool ShowsStatus => SizeChange is null || HasErrors || Job.State == JobState.Cancelled;
 
-    /// <summary>The icon of what the job makes (the first output's format, before there is one the preset's), or null for none.</summary>
+    /// <summary>
+    /// The icon of what the job makes (the first output's format, before there is one the preset's); a plain file for a
+    /// format without one of its own (CAD, fonts), so the circle is never empty.
+    /// </summary>
     public Geometry? FormatIcon => DonutIcons.ForFormat(
-        FormatRegistry.Detect(Job.Outputs.FirstOrDefault() ?? "")?.Id ?? Job.Preset.TargetFormat);
+        FormatRegistry.Detect(Job.Outputs.FirstOrDefault() ?? "")?.Id ?? Job.Preset.TargetFormat) ?? DonutIcons.AnyFile;
 
     /// <summary>Source files that failed.</summary>
     public IEnumerable<string> FailedSources => Job.Files.Where(f => f.State == FileState.Failed).Select(f => f.SourcePath);
@@ -148,9 +169,8 @@ public sealed partial class JobViewModel : ObservableObject
         // The screen's scale comes from a window: ask on the UI thread, before the work moves off it.
         var scaling = ScreenScaling();
         var outputs = Job.Outputs.ToList();
-        var converted = Job.Files.Where(f => f.State is not (FileState.Failed or FileState.Skipped or FileState.Cancelled))
-            .Select(f => f.SourcePath).ToList();
-        var (thumbnail, sizeChange) = await Task.Run(() => (ReadThumbnail(outputs.FirstOrDefault(), scaling), FormatSizeChange(converted, outputs)));
+        var before = Job.Files.Select((f, i) => f.State is FileState.Failed or FileState.Skipped or FileState.Cancelled ? 0 : _sourceSizes[i]).Sum();
+        var (thumbnail, sizeChange) = await Task.Run(() => (ReadThumbnail(outputs.FirstOrDefault(), scaling), FormatSizeChange(before, outputs)));
         // ponytail: the bitmap lives until the garbage collector takes it (tens of KB per card); dispose it when the card goes if that adds up.
         await Dispatcher.UIThread.InvokeAsync(() =>
         {
@@ -165,8 +185,9 @@ public sealed partial class JobViewModel : ObservableObject
             .Select(w => w.Screens.Primary?.Scaling).FirstOrDefault(s => s is not null) ?? 1;
 
     /// <summary>
-    /// The still image at <paramref name="path"/>, upright, shrunk until its short side is the thumbnail's (the card cuts the
-    /// long side to its square), as a bitmap (through PNG in memory). Null for anything else or when it can't be read.
+    /// The first frame of the image at <paramref name="path"/>, upright, shrunk until its short side is the thumbnail's (the
+    /// card cuts the long side to its square, and a panorama is cut to <see cref="ThumbnailMaxAspect"/> before), as a bitmap
+    /// (through PNG in memory). Null for anything else or when it can't be read.
     /// </summary>
     private static Bitmap? ReadThumbnail(string? path, double scaling)
     {
@@ -174,9 +195,18 @@ public sealed partial class JobViewModel : ObservableObject
             return null;
         try
         {
-            using var frames = ImageReader.Read(path, format.Id, new Preset());
+            using var frames = ImageReader.Read(path, format.Id, new Preset(), firstFrameOnly: true);
             var image = frames[0];
             image.AutoOrient();
+            var (shortSide, longSide) = (Math.Min(image.Width, image.Height), Math.Max(image.Width, image.Height));
+            if (longSide > ThumbnailMaxAspect * shortSide)
+            {
+                // The middle of the long side: the part of it the card shows.
+                var keep = ThumbnailMaxAspect * shortSide;
+                image.Crop(new MagickGeometry(image.Width > image.Height ? keep : image.Width, image.Width > image.Height ? image.Height : keep),
+                    Gravity.Center);
+                image.ResetPage();
+            }
             var edge = (uint)Math.Ceiling(ThumbnailEdge * scaling);
             image.Resize(new MagickGeometry(edge, edge) { FillArea = true }); // covers the square, keeping the shape
             image.Quality = 10; // zlib level 1, no filter: the PNG only lives until Avalonia has decoded it
@@ -193,14 +223,15 @@ public sealed partial class JobViewModel : ObservableObject
     }
 
     /// <summary>
-    /// "before → after · N% smaller" (or larger) for the files that converted, with the sizes of the files as they are now.
-    /// Null when either side has no file left to measure. A change that rounds to 0% reads as "0% smaller" whichever way it went.
+    /// "before → after · N% smaller" (or larger): <paramref name="before"/> is the size the converted files had when the job
+    /// was handed over, after the size of the outputs as they are now. Null when either side has nothing to measure. A
+    /// change that rounds to 0% reads as "0% smaller" whichever way it went.
     /// </summary>
-    private string? FormatSizeChange(IEnumerable<string> sources, IEnumerable<string> outputs)
+    private string? FormatSizeChange(long before, IEnumerable<string> outputs)
     {
         try
         {
-            long before = Measure(sources), after = Measure(outputs);
+            var after = outputs.Sum(SizeOf);
             if (before <= 0 || after <= 0)
                 return null;
             var percent = (int)Math.Round(Math.Abs(after - before) * 100.0 / before, MidpointRounding.AwayFromZero);
@@ -213,8 +244,18 @@ public sealed partial class JobViewModel : ObservableObject
         }
     }
 
-    /// <summary>Total size of the files that exist (folders and missing files count nothing).</summary>
-    private static long Measure(IEnumerable<string> paths) => paths.Where(File.Exists).Sum(p => new FileInfo(p).Length);
+    /// <summary>The size of a file; 0 for a folder, a file that is gone or one that can't be looked at.</summary>
+    private static long SizeOf(string path)
+    {
+        try
+        {
+            return new FileInfo(path) is { Exists: true } info ? info.Length : 0;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return 0;
+        }
+    }
 
     [RelayCommand]
     private void OpenFolder()

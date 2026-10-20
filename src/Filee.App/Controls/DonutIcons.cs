@@ -35,6 +35,9 @@ public static class DonutIcons
     /// <summary>The icon for what a preset that writes <paramref name="formatId"/> makes (null for a format with none).</summary>
     public static Geometry? ForFormat(string formatId) => Find(NameOf(formatId));
 
+    /// <summary>A plain file: what the toast's circle shows for a format without an icon of its own (CAD, fonts).</summary>
+    public static Geometry? AnyFile => Find("File");
+
     private static string? NameOf(string formatId) => FormatRegistry.FindById(formatId)?.Category switch
     {
         FormatCategory.Image or FormatCategory.Vector => "Image",
