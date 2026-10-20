@@ -76,6 +76,33 @@ public class JobQueueTests
         Assert.False(queue.IsBusy);
     }
 
+    [Fact]
+    public async Task The_only_if_smaller_check_never_deletes_the_source_an_engine_hands_back()
+    {
+        // An engine with nothing to do may hand back its input: that is the original, never an output to discard.
+        using var dir = new TempDir();
+        var photo = dir.File("photo.jpg", "original");
+        await using var queue = new JobQueue(new ConverterCatalog([new HandsBackItsInput(new ConversionEdge("jpg", "jpg"))]));
+
+        var job = await Run(queue, [photo], new Preset { TargetFormat = BuiltInData.SameAsSource, Image = { OnlyIfSmaller = true } });
+
+        Assert.Equal(FileState.Done, job.Files.Single().State);
+        Assert.Equal("original", File.ReadAllText(photo));
+    }
+
+    /// <summary>An engine that "converts" by handing back the file it was given.</summary>
+    private sealed class HandsBackItsInput(params ConversionEdge[] edges) : IConverter
+    {
+        public string Id => "hands-back";
+        public string DisplayName => Id;
+        public IReadOnlyList<ConversionEdge> Edges => edges;
+        public int MaxParallelism => 0;
+        public EngineStatus GetStatus() => EngineStatus.Available();
+
+        public Task<IReadOnlyList<string>> ConvertAsync(ConversionStep step, IProgress<double>? progress, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<string>>([step.InputPath]);
+    }
+
     /// <summary>Converts like <see cref="FakeConverter"/> once the gate opens.</summary>
     private sealed class GatedConverter(Task gate, params ConversionEdge[] edges) : IConverter
     {

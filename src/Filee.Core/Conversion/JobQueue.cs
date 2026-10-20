@@ -502,15 +502,19 @@ public sealed class JobQueue : IAsyncDisposable
 
     /// <summary>
     /// True when <paramref name="outputs"/> are smaller than <paramref name="source"/> together, and also when either
-    /// can't be measured (a folder, a file gone): then the output is kept as it would be without the check.
+    /// can't be measured (a folder, a file gone) or an output is the source itself: then the output is kept as it would
+    /// be without the check, and the source is never deleted as an output.
     /// </summary>
     private static bool IsSmaller(IReadOnlyList<string> outputs, string source)
     {
         try
         {
+            var sourcePath = Path.GetFullPath(source);
+            if (outputs.Any(o => string.Equals(Path.GetFullPath(o), sourcePath, StringComparison.OrdinalIgnoreCase)))
+                return true;
             return outputs.Sum(o => new FileInfo(o).Length) < new FileInfo(source).Length;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             return true;
         }
