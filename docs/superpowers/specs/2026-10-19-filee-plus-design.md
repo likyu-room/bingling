@@ -251,10 +251,15 @@
   - 탐색기 오른쪽 메뉴의 이름, 레지스트리 키, CLSID, Windows 11 메뉴 패키지 이름
   - '보내기' 바로 가기 이름
 - **원작자 쪽으로 가는 연결:** 피드백, 형식 요청 같은 곳은 포크 저장소로 바꾸거나 끈다. 원작자가 만들지 않은 기능의 오류 보고를 받지 않게 하려는 것이다. 후원 창은 원작자 후원으로 그대로 둔다.
-- **업데이트:** `FileeRepositoryUrl`을 사용자의 GitHub 포크 주소로 바꾼다. 포크를 만들기 전까지는 주소를 비워 업데이트 확인을 끈다. 빈 주소일 때 꺼지게 만든다.
+- **업데이트:** Filee에 이미 있는 자동 업데이트(`UpdateService`)를 그대로 쓴다.
+  - 동작: 앱이 켜진 직후와 그 뒤 6시간마다 GitHub 저장소의 최신 릴리스를 확인한다. 새 버전이 있으면 바뀐 내용과 함께 알린다. '업데이트'를 누르면 설치 파일을 받아 SHA-256을 확인한 뒤 진행 창만 띄워 설치하고, 설정을 지킨 채 다시 켠다. 설치할 때 관리자 확인이 한 번 뜬다. 압축(포터블)판은 다운로드 페이지를 연다.
+  - `FileeRepositoryUrl`을 사용자의 GitHub 포크 주소로 바꾼다. 저장소는 **공개**여야 한다. 비공개면 로그인 없이 릴리스를 볼 수 없어서 확인이 404로 실패한다.
+  - `UpdateService.WebsiteUrl`(`https://filee.sh/`, 원작자 사이트)을 포크의 `/releases/latest`로 바꾼다. 설치판에서 업데이트가 실패하면 이 주소가 열린다.
+  - 포크를 만들기 전까지는 주소를 비워 업데이트 확인을 끈다. 빈 주소일 때 꺼지게 만든다.
+  - 새 버전 내기: 버전을 올리고 `v1.0.1` 같은 태그를 푸시한다. 기존 `.github/workflows/release.yml`이 설치 파일, 포터블 zip, 체크섬을 만들어 GitHub 릴리스에 올린다. 그러면 모든 사용자의 앱이 6시간 안에 찾아낸다.
 - **버전:** Filee Plus 1.0.0부터 따로 센다. 정보 화면에 "Filee 1.12.0 기반"이라고 보여 준다.
 - **저작권:** LICENSE와 THIRD-PARTY-NOTICES를 그대로 둔다. README와 정보 화면에 "KnifeLemon의 Filee(MIT)를 바탕으로 함"이라고 적는다. 새 외부 라이브러리는 추가하지 않는다. SkiaSharp과 Magick.NET은 이미 쓰고 있다.
-- **설치 파일:** 기존 `build/build-installer.ps1`로 만든다. 이름은 `FileePlus-Setup-<버전>.exe`다.
+- **설치 파일:** 기존 `build/build-installer.ps1`로 만든다. 이름은 `FileePlus-<버전>-win-Setup.exe`, 체크섬은 `FileePlus-<버전>-SHA256SUMS.txt`다. 업데이트 기능은 끝이 `-win-Setup.exe`와 `-SHA256SUMS.txt`인 파일을 찾으므로(`UpdateService.FindFiles`) 이 끝부분은 바꾸지 않는다.
 - **코드 서명:** 하지 않는다. 다른 사람 PC에서 SmartScreen 경고가 뜨므로 README에 "추가 정보 → 실행"을 안내한다.
 - **이 PC의 빌드 준비:** .NET 10 SDK가 없다(런타임 8.0만 있음). winget으로 설치한다. 설치 파일을 만드는 데 필요한 Zig와 Inno Setup은 빌드 스크립트 안내를 따른다.
 
