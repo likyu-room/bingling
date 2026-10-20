@@ -79,10 +79,15 @@ public sealed class TriggerGesture
     {
         // On macOS Ctrl+click means right-click, and Option already means "copy" in Finder.
         var dragModifier = OperatingSystem.IsMacOS() ? ModifierKeys.Alt : ModifierKeys.Ctrl;
-        return
+        List<TriggerGesture> defaults =
         [
             new() { Kind = TriggerKind.Drag, Modifiers = dragModifier, Button = TriggerMouseButton.Left },
             new() { Kind = TriggerKind.KeyChord, Modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt, Button = TriggerMouseButton.None, Key = "Space" },
         ];
+        // Shift + drag is the headline gesture on Windows (Ctrl + drag stays as the second way in).
+        // macOS and Linux keep their single drag default.
+        if (OperatingSystem.IsWindows())
+            defaults.Insert(0, new() { Kind = TriggerKind.Drag, Modifiers = ModifierKeys.Shift, Button = TriggerMouseButton.Left });
+        return defaults;
     }
 }

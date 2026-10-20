@@ -125,7 +125,7 @@ public sealed class TriggerService : IDisposable
             _hook.MouseMoved += (_, e) => OnMove(e);
             _hook.MouseDraggedRelative += (_, e) => OnRelativeMove(e);
             _hook.MouseMovedRelative += (_, e) => OnRelativeMove(e);
-            _hook.KeyPressed += (_, e) => _detector.KeyDown(KeyName(e.Data.KeyCode), Map(e.RawEvent.Mask));
+            _hook.KeyPressed += (_, e) => _detector.KeyDown(KeyName(e.Data.KeyCode), Map(e.RawEvent.Mask) | KeyModifier(e.Data.KeyCode));
             // Own the actual Run thread. SharpHook's RunAsync task completes BEFORE its finally
             // clears the native callback, so awaiting that task alone is not a safe restart barrier.
             var hook = _hook;
@@ -228,6 +228,18 @@ public sealed class TriggerService : IDisposable
         if (mask.HasMeta()) result |= ModifierKeys.Meta;
         return result;
     }
+
+    /// <summary>
+    /// The modifier a modifier key adds, else None. The hook's mask on a key press may not yet contain the key that was
+    /// just pressed, and "Shift while the dragging mouse stands still" needs to see that Shift.
+    /// </summary>
+    internal static ModifierKeys KeyModifier(KeyCode code) => code switch
+    {
+        KeyCode.VcLeftShift or KeyCode.VcRightShift => ModifierKeys.Shift,
+        KeyCode.VcLeftControl or KeyCode.VcRightControl => ModifierKeys.Ctrl,
+        KeyCode.VcLeftAlt or KeyCode.VcRightAlt => ModifierKeys.Alt,
+        _ => ModifierKeys.None,
+    };
 
     internal static TriggerMouseButton HeldButton(EventMask mask) =>
         mask.HasFlag(EventMask.Button1) ? TriggerMouseButton.Left

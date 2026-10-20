@@ -19,6 +19,7 @@ public sealed class GestureDetector
     private bool _dragActive;
     private bool _lateRejected; // scope check failed for this drag; don't re-check on every move
     private int _lastX, _lastY;
+    private TriggerMouseButton _lastHeldButton; // from the last move; lets a key press tell that a drag is under way
 
     private sealed record Armed(TriggerGesture Gesture, TriggerMouseButton Button, int X, int Y, long Token);
 
@@ -89,6 +90,7 @@ public sealed class GestureDetector
         {
             _lastX = x;
             _lastY = y;
+            _lastHeldButton = heldButton;
             fire = _armed is null ? DetectLateModifier(x, y, modifiers, heldButton) : DetectDragPastThreshold(x, y);
             if (fire is not null)
                 _dragActive = true;
@@ -115,7 +117,8 @@ public sealed class GestureDetector
 
     /// <summary>
     /// The modifier was pressed after the drag had already started (common in Explorer: start dragging,
-    /// then press Ctrl to copy). Treat it like a drag gesture that just passed the threshold. Caller holds the lock.
+    /// then press Ctrl to copy). Treat it like a drag gesture that just passed the threshold. Seen on the next move,
+    /// or at once from <see cref="KeyDown"/> when the mouse stands still. Caller holds the lock.
     /// </summary>
     private TriggerGesture? DetectLateModifier(int x, int y, ModifierKeys modifiers, TriggerMouseButton heldButton)
     {
@@ -140,6 +143,7 @@ public sealed class GestureDetector
             _lastX = x;
             _lastY = y;
             _armed = null;
+            _lastHeldButton = TriggerMouseButton.None;
             ended = _dragActive;
             _dragActive = false;
             _lateRejected = false;
@@ -170,20 +174,32 @@ public sealed class GestureDetector
     public void KeyDown(string key, ModifierKeys modifiers)
     {
         TriggerGesture? fire;
+        TriggerGesture? lateDrag = null;
         int x, y;
         lock (_lock)
         {
             if (Paused)
                 return;
-            fire = _gestures.FirstOrDefault(g =>
+            (x, y) = (_lastX, _lastY);
+
+            // The modifier of a drag gesture came while the mouse stands still: no move would report it, so the key does.
+            if (_armed is null && _lastHeldButton != TriggerMouseButton.None)
+            {
+                lateDrag = DetectLateModifier(x, y, modifiers, _lastHeldButton);
+                if (lateDrag is not null)
+                    _dragActive = true;
+            }
+
+            fire = lateDrag is not null ? null : _gestures.FirstOrDefault(g =>
                 g.Kind == TriggerKind.KeyChord &&
                 string.Equals(g.Key, key, StringComparison.OrdinalIgnoreCase) &&
                 g.Modifiers == modifiers);
-            (x, y) = (_lastX, _lastY);
             if (fire is not null && !ScopeFilter(fire, x, y))
                 fire = null;
         }
-        if (fire is not null)
+        if (lateDrag is not null)
+            DragStarted?.Invoke(lateDrag, x, y);
+        else if (fire is not null)
             KeyChordTriggered?.Invoke(fire, x, y);
     }
 }
