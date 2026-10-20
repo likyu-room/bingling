@@ -78,6 +78,8 @@
   "toast.skipped": "Skipped (file exists)",
   "toast.open_folder": "Show",
   "toast.cancel": "Cancel",
+  "toast.size_change": "{0} → {1} · {2}% smaller",
+  "toast.size_larger": "{0} → {1} · {2}% larger",
 
   "error.unsupported_source": "This file type isn't supported",
   "error.empty_file": "The file is empty (0 bytes). A file made with “New” in the right-click menu stays empty until you open it in its app and save it",

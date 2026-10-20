@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Filee.App.ViewModels"
         xmlns:s="using:Filee.App.Services"
+        xmlns:v="using:Filee.App.Views"
         x:Class="Filee.App.Views.ToastWindow"
         x:DataType="s:ConversionService"
         Title="Filee Plus"
@@ -55,43 +56,64 @@
     <ItemsControl.ItemTemplate>
       <DataTemplate x:DataType="vm:JobViewModel">
         <Border Classes="card" Padding="14,12">
-          <StackPanel Spacing="8">
-            <DockPanel>
-              <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding DismissCommand}" Padding="4" VerticalAlignment="Top">
-                <PathIcon Width="12" Height="12" Data="{StaticResource Icon.Close}" />
-              </Button>
-              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-            </DockPanel>
-            <ProgressBar Value="{Binding Progress}" Maximum="100" IsVisible="{Binding IsRunning}" />
-            <DockPanel>
-              <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
-                <Button Content="{DynamicResource toast.cancel}" Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}" Padding="10,4" />
-                <Button Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}" Padding="10,4">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Refresh}" />
-                    <TextBlock Text="{DynamicResource common.retry}" />
-                  </StackPanel>
+          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+            <!-- What came out: a rounded picture of it, or (no picture to show) a circle with the icon of its format. -->
+            <Panel Grid.Column="0" Width="56" Height="56" VerticalAlignment="Top">
+              <Border Classes="format-circle" CornerRadius="28" Background="{DynamicResource AccentSoftBrush}"
+                      IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNull}}">
+                <PathIcon Width="24" Height="24" Data="{Binding FormatIcon}" />
+              </Border>
+              <Border CornerRadius="12" ClipToBounds="True"
+                      IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+              </Border>
+            </Panel>
+            <StackPanel Grid.Column="1" Spacing="8">
+              <DockPanel>
+                <Button DockPanel.Dock="Right" Classes="icon" Command="{Binding DismissCommand}" Padding="4" VerticalAlignment="Top">
+                  <PathIcon Width="12" Height="12" Data="{StaticResource Icon.Close}" />
                 </Button>
-                <Button Classes="accent" Command="{Binding OpenFolderCommand}" IsVisible="{Binding HasOutputs}" Padding="10,4">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Folder}" />
-                    <TextBlock Text="{DynamicResource toast.open_folder}" />
-                  </StackPanel>
-                </Button>
+                <!-- The check wears the success colour; its glyph is picked to read on it in light and dark. -->
+                <Border DockPanel.Dock="Right" Classes="success-badge" Width="18" Height="18" CornerRadius="9" Margin="6,0"
+                        VerticalAlignment="Center" Background="{DynamicResource SuccessBrush}" IsVisible="{Binding IsSucceeded}">
+                  <PathIcon Width="10" Height="10" Data="{StaticResource Icon.Check}"
+                            Foreground="{Binding $parent[Border].Background, Converter={x:Static v:BadgeGlyphConverter.Instance}}" />
+                </Border>
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              </DockPanel>
+              <TextBlock Classes="caption" Text="{Binding SizeChange}" TextWrapping="Wrap"
+                         IsVisible="{Binding SizeChange, Converter={x:Static ObjectConverters.IsNotNull}}" />
+              <ProgressBar Value="{Binding Progress}" Maximum="100" IsVisible="{Binding IsRunning}" />
+              <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
+                  <Button Content="{DynamicResource toast.cancel}" Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}" Padding="10,4" />
+                  <Button Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}" Padding="10,4">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Refresh}" />
+                      <TextBlock Text="{DynamicResource common.retry}" />
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="accent" Command="{Binding OpenFolderCommand}" IsVisible="{Binding HasOutputs}" Padding="10,4">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Folder}" />
+                      <TextBlock Text="{DynamicResource toast.open_folder}" />
+                    </StackPanel>
+                  </Button>
+                </StackPanel>
+                <TextBlock Classes="caption" Text="{Binding Status}" IsVisible="{Binding ShowsStatus}" VerticalAlignment="Center" />
+              </DockPanel>
+              <TextBlock Classes="caption danger" Text="{Binding ErrorDetails}" TextWrapping="Wrap" MaxLines="4"
+                         IsVisible="{Binding HasErrors}" />
+              <TextBlock Classes="caption" Text="{Binding Notices}" TextWrapping="Wrap" MaxLines="4"
+                         IsVisible="{Binding HasNotices}" />
+              <!-- Files of a type Filee doesn't know: open the GitHub "Format request" form (FormatRequest). The form lives
+                   in the repository, so the button is gone while the fork has none. -->
+              <StackPanel IsVisible="{x:Static s:UpdateService.HasRepository}">
+                <Button HorizontalAlignment="Left" Padding="10,4" Click="OnRequestFormat"
+                        IsVisible="{Binding CanRequestFormat}" Content="{DynamicResource format_request.request}" />
               </StackPanel>
-              <TextBlock Classes="caption" Text="{Binding Status}" VerticalAlignment="Center" />
-            </DockPanel>
-            <TextBlock Classes="caption danger" Text="{Binding ErrorDetails}" TextWrapping="Wrap" MaxLines="4"
-                       IsVisible="{Binding HasErrors}" />
-            <TextBlock Classes="caption" Text="{Binding Notices}" TextWrapping="Wrap" MaxLines="4"
-                       IsVisible="{Binding HasNotices}" />
-            <!-- Files of a type Filee doesn't know: open the GitHub "Format request" form (FormatRequest). The form lives
-                 in the repository, so the button is gone while the fork has none. -->
-            <StackPanel IsVisible="{x:Static s:UpdateService.HasRepository}">
-              <Button HorizontalAlignment="Left" Padding="10,4" Click="OnRequestFormat"
-                      IsVisible="{Binding CanRequestFormat}" Content="{DynamicResource format_request.request}" />
             </StackPanel>
-          </StackPanel>
+          </Grid>
         </Border>
       </DataTemplate>
     </ItemsControl.ItemTemplate>

@@ -78,6 +78,8 @@
   "toast.skipped": "건너뜀 (파일이 이미 있음)",
   "toast.open_folder": "보기",
   "toast.cancel": "취소",
+  "toast.size_change": "{0} → {1} · {2}% 작아짐",
+  "toast.size_larger": "{0} → {1} · {2}% 커짐",
 
   "error.unsupported_source": "지원하지 않는 파일 형식이에요",
   "error.empty_file": "빈 파일이에요(0바이트). 우클릭 메뉴의 “새로 만들기”로 만든 파일은 앱에서 열어 저장해야 내용이 생겨요",

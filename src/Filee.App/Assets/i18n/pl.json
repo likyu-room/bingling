@@ -78,6 +78,8 @@
   "toast.skipped": "Pominięto (plik istnieje)",
   "toast.open_folder": "Pokaż",
   "toast.cancel": "Anuluj",
+  "toast.size_change": "{0} → {1} · {2}% mniejszy",
+  "toast.size_larger": "{0} → {1} · {2}% większy",
 
   "error.unsupported_source": "Ten typ pliku nie jest obsługiwany",
   "error.empty_file": "Plik jest pusty (0 bajtów). Plik utworzony przez „Nowy” w menu kontekstowym pozostaje pusty, dopóki nie otworzysz go w jego aplikacji i nie zapiszesz",

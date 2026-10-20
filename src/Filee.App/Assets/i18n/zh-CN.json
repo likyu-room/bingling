@@ -78,6 +78,8 @@
   "toast.skipped": "已跳过（文件已存在）",
   "toast.open_folder": "查看",
   "toast.cancel": "取消",
+  "toast.size_change": "{0} → {1} · 小了 {2}%",
+  "toast.size_larger": "{0} → {1} · 大了 {2}%",
 
   "error.unsupported_source": "不支持此文件类型",
   "error.empty_file": "文件是空的（0 字节）。用右键菜单“新建”创建的文件，要在对应的应用中打开并保存后才有内容",
