@@ -6,7 +6,7 @@
 // Motion.Enabled == false every value jumps straight to its target.
 //
 // After a drop the donut turns into a progress ring: see DonutMenu.Progress.cs. Group slices, which fan out a ring
-// of presets, and the keyboard: DonutMenu.Groups.cs.
+// of presets, and the keyboard: DonutMenu.Groups.cs. The Peach Glass backdrop: DonutMenu.Glass.cs.
 
 using System.Globalization;
 using Avalonia;
@@ -89,7 +89,7 @@ public sealed partial class DonutMenu : Control
         AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(HotBrush));
     public static readonly StyledProperty<IBrush?> OnHotBrushProperty =
         AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(OnHotBrush));
-    /// <summary>The Peach Glass look. Only selects the style in Soft.axaml that colours the donut peach.</summary>
+    /// <summary>The Peach Glass look: selects the style in Soft.axaml that colours the donut peach, and shows <see cref="GlassBackdrop"/> through it.</summary>
     public static readonly StyledProperty<bool> IsGlassProperty =
         AvaloniaProperty.Register<DonutMenu, bool>(nameof(IsGlass));
     public static readonly StyledProperty<IBrush?> ForegroundProperty =
@@ -141,7 +141,8 @@ public sealed partial class DonutMenu : Control
         AffectsMeasure<DonutMenu>(OuterRadiusProperty, ReserveSubRingProperty);
         AffectsRender<DonutMenu>(HoleRatioProperty, SliceOpacityProperty, CenterTitleProperty, CenterSubtitleProperty,
             IsEditModeProperty, SliceBrushProperty, SliceBorderBrushProperty, CenterBrushProperty, AccentBrushProperty,
-            ToolBrushProperty, OnAccentBrushProperty, HotBrushProperty, OnHotBrushProperty, ForegroundProperty, SecondaryForegroundProperty, SuccessBrushProperty);
+            ToolBrushProperty, OnAccentBrushProperty, HotBrushProperty, OnHotBrushProperty, ForegroundProperty, SecondaryForegroundProperty, SuccessBrushProperty,
+            IsGlassProperty, GlassBackdropProperty);
         ItemsProperty.Changed.AddClassHandler<DonutMenu>((d, _) => d.OnItemsChanged());
     }
 
@@ -827,9 +828,11 @@ public sealed partial class DonutMenu : Control
         if (n == 0)
         {
             var ring = CreateRing(center, r1, r2);
+            DrawGlass(context, ring, Matrix.Identity);
             context.DrawGeometry(WithOpacity(SliceBrush, SliceOpacity), BorderPen(), ring);
             if (_dropTargetIndex >= 0)
                 context.DrawGeometry(WithOpacity(AccentBrush, 0.35), null, ring);
+            DrawGlassEdge(context, ring);
         }
 
         for (var i = 0; i < n; i++)
@@ -860,6 +863,7 @@ public sealed partial class DonutMenu : Control
             using (context.PushOpacity(Math.Clamp(open, 0, 1) * (i == _dimmedIndex ? 0.3 : 1)))
             {
                 var wedge = CreateWedge(center, r1, r2, mid, span);
+                DrawGlass(context, wedge, transform);
                 context.DrawGeometry(WithOpacity(SliceBrush, SliceOpacity * (item.IsEnabled ? 1 : 0.55)), BorderPen(), wedge);
                 DrawToolTint(context, item, wedge);
 
@@ -867,6 +871,7 @@ public sealed partial class DonutMenu : Control
                 var emphasis = i == _dropTargetIndex ? 1.0 : hover;
                 if (emphasis > 0.01 && item.IsEnabled)
                     context.DrawGeometry(WithOpacity(HotFill, 0.82 * Math.Clamp(emphasis, 0, 1)), null, wedge);
+                DrawGlassEdge(context, wedge);
 
                 var hot = (i == ActiveIndex || i == _dropTargetIndex) && item.IsEnabled;
                 DrawLabel(context, item, center, (r1 + r2) / 2, mid, span * (r1 + r2) / 2 - 10,
@@ -913,9 +918,12 @@ public sealed partial class DonutMenu : Control
         var pulse = 1 + _centerPulse.Value * 0.06;
         var radius = (r1 - 6) * pulse;
         var cancelHot = _externalCenterHot;
+        var disc = new EllipseGeometry(new Rect(center.X - radius, center.Y - radius, 2 * radius, 2 * radius));
+        DrawGlass(context, disc, Matrix.Identity);
         context.DrawEllipse(CenterBrush, BorderPen(), center, radius, radius);
         if (cancelHot)
             context.DrawEllipse(WithOpacity(DangerBrush, 0.18), null, center, radius, radius);
+        DrawGlassEdge(context, disc);
 
         var maxWidth = radius * 1.6;
         var title = MakeText(CenterTitle ?? "", bold, 14, Foreground, maxWidth, maxLines: 2);

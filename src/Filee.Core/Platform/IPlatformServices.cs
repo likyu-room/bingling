@@ -95,6 +95,13 @@ public interface IPlatformServices
     /// window below normal ones (seen after the Photos app opened) while it still reports itself as topmost.
     /// </summary>
     void RaiseTopmost(nint windowHandle);
+
+    /// <summary>
+    /// The screen's pixels in the given area (physical pixels), taken before the donut's window shows there so it isn't
+    /// in the picture. Null where the platform can't (macOS, Linux: the Peach Glass donut is then flat peach) or when
+    /// capturing failed.
+    /// </summary>
+    ScreenCapture? CaptureScreen(int x, int y, int width, int height) => null;
 }
 
 /// <summary>Whether "Convert with Filee" is in the top-level Windows 11 File Explorer menu (not just "Show more options").</summary>

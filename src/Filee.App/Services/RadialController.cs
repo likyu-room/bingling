@@ -12,6 +12,7 @@
 //   still running after HandOffAfter, failed, Esc, click elsewhere or a new gesture → the toast takes over.
 
 using System.ComponentModel;
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Threading;
 using Filee.App.Controls;
@@ -56,6 +57,12 @@ public sealed class RadialController(
     private static readonly LogThrottle Throttle = new(TimeSpan.FromMinutes(1));
     private bool _converted;   // a conversion started from the files on the donut now
     private readonly HashSet<string> _formatRequestsOffered = new(StringComparer.OrdinalIgnoreCase);
+
+    // Peach Glass: the screen where the window shows, taken just before it did (null: flat peach), its scale, and how
+    // long taking it took (for the log).
+    private ScreenCapture? _capture;
+    private double _captureScaling = 1;
+    private double _captureMs;
 
     /// <summary>
     /// How long a drag that never brought files may keep the invisible window up, in case the button release is
@@ -116,6 +123,7 @@ public sealed class RadialController(
         viewModel.FitToThisDonut();
         window.DonutControl.AllowContextEdit = true;
         PlaceAndShow(window, x, y, activate: true);
+        ShowGlass(window.DonutControl);
         window.DonutControl.PlayOpenAnimation();
     }
 
@@ -170,11 +178,35 @@ public sealed class RadialController(
             window.DonutControl.PlayCloseAnimation(() =>
             {
                 if (!_visible)
-                    window.Hide();
+                    Hide(window);
             });
         else
-            window.Hide();
+            Hide(window);
         OfferFormatRequest();
+    }
+
+    /// <summary>Hides the window and lets go of the glass: the next time it opens the screen is taken anew.</summary>
+    private void Hide(RadialWindow window)
+    {
+        window.DonutControl.GlassBackdrop = null;
+        _capture = null;
+        window.Hide();
+    }
+
+    /// <summary>
+    /// Blurs the screen taken as the window showed into the donut's glass, once the donut has files; without a picture
+    /// (taking it failed, the window was already showing, Classic style, macOS, Linux) the peach stays flat.
+    /// </summary>
+    private void ShowGlass(DonutMenu donut)
+    {
+        if (_capture is not { } capture)
+        {
+            donut.GlassBackdrop = null;
+            return;
+        }
+        donut.GlassBackdrop = GlassBackdrop.Create(capture, _captureScaling, _captureMs, out var blurMs);
+        log.LogDebug("Glass backdrop {Width}x{Height}: captured in {Capture:0.0} ms, blurred in {Blur:0.0} ms{Black}",
+            capture.Width, capture.Height, _captureMs, blurMs, donut.GlassBackdrop is null ? " (black: flat peach)" : "");
     }
 
     /// <summary>
@@ -213,6 +245,7 @@ public sealed class RadialController(
             if (viewModel.IsClickMode || SameFiles(files, viewModel.Files))
                 return;
             viewModel.Load(files, clickMode: false);
+            ShowGlass(donut);
             donut.PlayOpenAnimation();
         };
         window.Dropped += (hit, files) =>
@@ -389,8 +422,10 @@ public sealed class RadialController(
     private void HideWindow()
     {
         _visible = false;
-        _window?.DonutControl.CollapseGroup();
-        _window?.Hide();
+        if (_window is null)
+            return;
+        _window.DonutControl.CollapseGroup();
+        Hide(_window);
     }
 
     /// <summary>Edits the preset of slice <paramref name="index"/>, or of slice <paramref name="sub"/> of its group's ring.</summary>
@@ -442,6 +477,15 @@ public sealed class RadialController(
         var position = WindowPosition(cursor, screen?.WorkingArea, sidePx);
 
         Motion.Refresh();
+        // Peach Glass: the screen where the window will be, before it is there. One already showing would be in it.
+        _capture = null;
+        if (viewModel.IsGlass && !window.IsVisible)
+        {
+            var clock = Stopwatch.StartNew();
+            _capture = platform.CaptureScreen(position.X, position.Y, sidePx, sidePx);
+            _captureMs = clock.Elapsed.TotalMilliseconds;
+            _captureScaling = scaling;
+        }
         window.Position = position;
         if (!window.IsVisible)
             window.Show();

@@ -50,6 +50,58 @@ public sealed class WindowsPlatformServices : IPlatformServices
                 NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_NOOWNERZORDER);
     }
 
+    /// <summary>
+    /// Copies the area from the desktop DC with BitBlt into a top-down 32-bit DIB. Never with CAPTUREBLT (layered windows
+    /// such as Explorer's drag picture stay out), and the donut's window is not excluded from capture either: it isn't
+    /// on screen yet, and excluding it would hide the donut from screen recordings.
+    /// </summary>
+    public ScreenCapture? CaptureScreen(int x, int y, int width, int height)
+    {
+        if (width <= 0 || height <= 0)
+            return null;
+        var screen = NativeMethods.GetDC(0);
+        if (screen == 0)
+            return null;
+        nint memory = 0, bitmap = 0, previous = 0;
+        try
+        {
+            memory = NativeMethods.CreateCompatibleDC(screen);
+            if (memory == 0)
+                return null;
+            var header = new NativeMethods.BITMAPINFOHEADER
+            {
+                biSize = (uint)Marshal.SizeOf<NativeMethods.BITMAPINFOHEADER>(),
+                biWidth = width,
+                biHeight = -height, // negative: top row first
+                biPlanes = 1,
+                biBitCount = 32,
+                biCompression = NativeMethods.BI_RGB,
+            };
+            bitmap = NativeMethods.CreateDIBSection(screen, header, NativeMethods.DIB_RGB_COLORS, out var bits, 0, 0);
+            if (bitmap == 0 || bits == 0)
+                return null;
+            previous = NativeMethods.SelectObject(memory, bitmap);
+            if (!NativeMethods.BitBlt(memory, 0, 0, width, height, screen, x, y, NativeMethods.SRCCOPY))
+                return null;
+            NativeMethods.GdiFlush(); // the blit may still be queued: the bits are read directly below
+            var pixels = new byte[width * height * 4];
+            Marshal.Copy(bits, pixels, 0, pixels.Length);
+            for (var i = 3; i < pixels.Length; i += 4)
+                pixels[i] = 255; // GDI leaves alpha 0, which would make the picture fully transparent
+            return new ScreenCapture(width, height, pixels);
+        }
+        finally
+        {
+            if (previous != 0)
+                NativeMethods.SelectObject(memory, previous);
+            if (bitmap != 0)
+                NativeMethods.DeleteObject(bitmap);
+            if (memory != 0)
+                NativeMethods.DeleteDC(memory);
+            NativeMethods.ReleaseDC(0, screen);
+        }
+    }
+
     public bool IsFileManagerAt(int x, int y)
     {
         var root = RootWindowAt(x, y);

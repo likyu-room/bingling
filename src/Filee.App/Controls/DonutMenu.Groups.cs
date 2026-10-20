@@ -393,11 +393,13 @@ public sealed partial class DonutMenu
                 var item = children[k];
                 var mid = DonutGeometry.SubMidAngle(parentMid, k, children.Count, subSpan);
                 var wedge = CreateWedge(center, inner, outer, mid, subSpan);
+                DrawGlass(context, wedge, transform);
                 context.DrawGeometry(WithOpacity(SliceBrush, SliceOpacity * (item.IsEnabled ? 1 : 0.55)), BorderPen(), wedge);
                 DrawToolTint(context, item, wedge);
                 var hot = k == _subHover && group == _expanded && item.IsEnabled;
                 if (hot)
                     context.DrawGeometry(WithOpacity(HotFill, 0.82), null, wedge);
+                DrawGlassEdge(context, wedge);
                 DrawLabel(context, item, center, (inner + outer) / 2, mid, subSpan * (inner + outer) / 2 - 8,
                     SubBand - 8, bold, regular, hot);
             }

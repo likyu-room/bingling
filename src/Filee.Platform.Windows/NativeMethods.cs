@@ -118,6 +118,59 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     public static partial nint GetShellWindow();
 
+    // GDI screen capture (the Peach Glass backdrop). SRCCOPY only: CAPTUREBLT would also take layered windows, such as
+    // the picture Explorer drags along under the cursor.
+    public const uint SRCCOPY = 0x00CC0020;
+    public const uint BI_RGB = 0, DIB_RGB_COLORS = 0;
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct BITMAPINFOHEADER
+    {
+        public uint biSize;
+        public int biWidth;
+        public int biHeight;
+        public ushort biPlanes;
+        public ushort biBitCount;
+        public uint biCompression;
+        public uint biSizeImage;
+        public int biXPelsPerMeter;
+        public int biYPelsPerMeter;
+        public uint biClrUsed;
+        public uint biClrImportant;
+    }
+
+    [LibraryImport("user32.dll")]
+    public static partial nint GetDC(nint hwnd);
+
+    [LibraryImport("user32.dll")]
+    public static partial int ReleaseDC(nint hwnd, nint dc);
+
+    [LibraryImport("gdi32.dll")]
+    public static partial nint CreateCompatibleDC(nint dc);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DeleteDC(nint dc);
+
+    /// <summary>A bitmap whose pixels are at <paramref name="bits"/> (the header stands for a BITMAPINFO without colours).</summary>
+    [LibraryImport("gdi32.dll")]
+    public static partial nint CreateDIBSection(nint dc, in BITMAPINFOHEADER info, uint usage, out nint bits, nint section, uint offset);
+
+    [LibraryImport("gdi32.dll")]
+    public static partial nint SelectObject(nint dc, nint obj);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool DeleteObject(nint obj);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool BitBlt(nint dest, int x, int y, int width, int height, nint source, int sourceX, int sourceY, uint rop);
+
+    [LibraryImport("gdi32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GdiFlush();
+
     public const uint MB_OK = 0x0, MB_ICONWARNING = 0x30, MB_SETFOREGROUND = 0x10000, MB_TOPMOST = 0x40000;
 
     [LibraryImport("user32.dll", EntryPoint = "MessageBoxW", StringMarshalling = StringMarshalling.Utf16)]
