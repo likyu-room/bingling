@@ -1403,6 +1403,205 @@ public class RenderTests
         window.Close();
     }
 
+    /// <summary>
+    /// Peach Glass for the settings window: it asks for Mica (then acrylic, then nothing), its background and cards get the
+    /// peach brushes, and Classic takes all of it away again. The settings are put back afterwards.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("ko", "light")]
+    [InlineData("ko", "dark")]
+    public void Main_window_takes_the_peach_glass_look(string language, string mode)
+    {
+        TestServices.EnsureInitialized(language);
+        var light = mode == "light";
+        var store = AppHost.Get<UserDataStore>();
+        var before = store.Settings.Theme.Clone();
+        try
+        {
+            store.Settings.Theme.Style = ThemeStyle.PeachGlass;
+            store.Settings.Theme.Mode = light ? ThemeMode.Light : ThemeMode.Dark;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, language);
+            var vm = new MainWindowViewModel(AppHost.Services, AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<UpdateService>());
+            vm.Navigate("general");
+            var window = new MainWindow { DataContext = vm, Width = 1080, Height = 760 };
+            window.Show();
+            Pump();
+
+            Assert.Contains("peach", window.Classes);
+            Assert.Contains(Avalonia.Controls.WindowTransparencyLevel.Mica, window.TransparencyLevelHint);
+            Assert.Contains(Avalonia.Controls.WindowTransparencyLevel.AcrylicBlur, window.TransparencyLevelHint);
+            // The headless platform has no Mica, like Windows 10 without it: the page colour must then be solid ...
+            Assert.Equal(Avalonia.Controls.WindowTransparencyLevel.None, window.ActualTransparencyLevel);
+            AssertBrush(light ? "#F6F5F1" : "#1B1B19", 1, window.Background);
+            // ... and as soon as the system grants Mica (or acrylic) the page lets it shine through.
+            GrantTransparency(window, Avalonia.Controls.WindowTransparencyLevel.Mica);
+            Pump();
+            AssertBrush(light ? "#FFF3E8" : "#1E140E", 0.78, window.Background);
+            var card = window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("card"));
+            AssertBrush(light ? "#FFFFFF" : "#2A1A10", 0.72, card.Background);
+            AssertBrush("#FFFFFF", light ? 0.55 : 0.10, card.BorderBrush);
+            Save(window, $"main-peach-{mode}-{language}.png");
+
+            store.Settings.Theme.Style = ThemeStyle.Classic;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, language);
+            Pump();
+            Assert.DoesNotContain("peach", window.Classes);
+            Assert.DoesNotContain(Avalonia.Controls.WindowTransparencyLevel.Mica, window.TransparencyLevelHint);
+            AssertBrush(light ? "#F6F5F1" : "#1B1B19", 1, window.Background);
+            AssertBrush(light ? "#FFFFFF" : "#262624", 1, card.Background);
+            window.Close();
+        }
+        finally
+        {
+            store.Settings.Theme.Style = before.Style;
+            store.Settings.Theme.Mode = before.Mode;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, language);
+        }
+    }
+
+    /// <summary>What Windows does on its own: reports the see-through level it granted (the headless platform grants none).</summary>
+    private static void GrantTransparency(Window window, Avalonia.Controls.WindowTransparencyLevel level)
+    {
+        var impl = window.PlatformImpl!;
+        var changed = Assert.IsType<Action<Avalonia.Controls.WindowTransparencyLevel>>(
+            impl.GetType().GetProperty("TransparencyLevelChanged")!.GetValue(impl));
+        changed(level);
+    }
+
+    /// <summary>
+    /// A notice or toast window is clear all over (the rounded cards are the only visible thing): it must not ask for
+    /// Mica, which would blur its whole rectangle. Only its card turns peach.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    public void Toast_card_turns_peach_while_the_window_stays_clear(string mode)
+    {
+        TestServices.EnsureInitialized("ko");
+        var light = mode == "light";
+        var store = AppHost.Get<UserDataStore>();
+        var before = store.Settings.Theme.Clone();
+        var service = AppHost.Get<ConversionService>();
+        service.ToastJobs.Clear();
+        var toast = new ToastWindow { DataContext = service };
+        // The headless clock leaves the card's slide-in half done; without it the screenshot shows the card at rest.
+        foreach (var slide in toast.Styles.OfType<Avalonia.Styling.Style>().Where(s => s.Animations.Count > 0).ToList())
+            toast.Styles.Remove(slide);
+        try
+        {
+            store.Settings.Theme.Style = ThemeStyle.PeachGlass;
+            store.Settings.Theme.Mode = light ? ThemeMode.Light : ThemeMode.Dark;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+            var job = new JobViewModel(new Filee.Core.Conversion.ConversionJob(["C:/clip.mp4"], new Filee.Core.Presets.Preset { TargetFormat = "mp4" }, "MP4"),
+                AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<Filee.Core.Platform.IPlatformServices>(), _ => { });
+            service.Jobs.Insert(0, job);
+            service.ShowInToast(job);
+            Pump();
+
+            Assert.Contains("peach", toast.Classes);
+            Assert.DoesNotContain("glassy", toast.Classes);
+            Assert.Equal([Avalonia.Controls.WindowTransparencyLevel.Transparent], toast.TransparencyLevelHint);
+            Assert.Equal(Avalonia.Media.Colors.Transparent, Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(toast.Background).Color);
+            var card = toast.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("card"));
+            AssertBrush(light ? "#FFF6EE" : "#2A1A10", 0.95, card.Background);
+            Save(toast, $"toast-peach-{mode}.png");
+        }
+        finally
+        {
+            service.ToastJobs.Clear();
+            service.Jobs.Clear();
+            toast.Close();
+            store.Settings.Theme.Style = before.Style;
+            store.Settings.Theme.Mode = before.Mode;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+        }
+    }
+
+    /// <summary>The editor windows (preset, group, picture tool) are glassy like the settings window.</summary>
+    [AvaloniaTheory]
+    [InlineData("light")]
+    [InlineData("dark")]
+    public void Editor_windows_take_the_peach_glass_look(string mode)
+    {
+        TestServices.EnsureInitialized("ko");
+        var light = mode == "light";
+        var store = AppHost.Get<UserDataStore>();
+        var before = store.Settings.Theme.Clone();
+        try
+        {
+            store.Settings.Theme.Style = ThemeStyle.PeachGlass;
+            store.Settings.Theme.Mode = light ? ThemeMode.Light : ThemeMode.Dark;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+            var loc = AppHost.Get<Filee.Core.Localization.ILocalizer>();
+            var preset = store.FindPreset("jpg-70")!;
+            var group = new GroupEditorViewModel(
+                new Filee.Core.Presets.Preset { Name = "이미지 도구", Kind = Filee.Core.Presets.PresetKind.Group, SubPresetIds = ["half-size", "grayscale"] }, store, loc);
+            using var tool = new ImageToolViewModel(Filee.Core.Presets.ImageToolKind.Crop, [ImageToolWindowTests.TestImages.Png(400, 300)],
+                new UserDataStore(Path.Combine(TestServices.DataDirectory, "peach-tool-" + mode)), loc);
+            Window[] windows =
+            [
+                new PresetEditorWindow { DataContext = new PresetEditorViewModel(preset, loc) },
+                new GroupEditorWindow { DataContext = group },
+                new ImageToolWindow { DataContext = tool, Width = 960, Height = 640 },
+            ];
+            foreach (var window in windows)
+            {
+                window.Show();
+                Pump();
+                Assert.Contains("peach", window.Classes);
+                Assert.Contains("glassy", window.Classes);
+                Assert.Contains(Avalonia.Controls.WindowTransparencyLevel.Mica, window.TransparencyLevelHint);
+                var card = window.GetVisualDescendants().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("card"));
+                if (card is not null)
+                    AssertBrush(light ? "#FFFFFF" : "#2A1A10", 0.72, card.Background);
+            }
+            Save(windows[0], $"preset-peach-{mode}.png");
+            foreach (var window in windows)
+                window.Close();
+        }
+        finally
+        {
+            store.Settings.Theme.Style = before.Style;
+            store.Settings.Theme.Mode = before.Mode;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+        }
+    }
+
+    /// <summary>Every donut in the app looks alike: the one in Settings → Toolbar is glass under Peach Glass, plain under Classic.</summary>
+    [AvaloniaFact]
+    public void The_toolbar_pages_donut_follows_the_style()
+    {
+        TestServices.EnsureInitialized("ko");
+        var store = AppHost.Get<UserDataStore>();
+        var before = store.Settings.Theme.Clone();
+        try
+        {
+            store.Settings.Theme.Style = ThemeStyle.PeachGlass;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+            var vm = new MainWindowViewModel(AppHost.Services, AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<UpdateService>());
+            vm.Navigate("toolbar");
+            var window = new MainWindow { DataContext = vm, Width = 1080, Height = 820 };
+            window.Show();
+            Pump();
+
+            var donut = window.GetVisualDescendants().OfType<DonutMenu>().Single(d => d.Name == "Donut");
+            Assert.True(donut.IsGlass);
+            AssertBrush("#FF7A1A", 1, donut.AccentBrush);
+            Save(window, "toolbar-peach.png");
+
+            store.Settings.Theme.Style = ThemeStyle.Classic;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+            Pump();
+            Assert.False(donut.IsGlass);
+            window.Close();
+        }
+        finally
+        {
+            store.Settings.Theme.Style = before.Style;
+            AppHost.Get<ThemeService>().Apply(store.Settings.Theme, "ko");
+        }
+    }
+
     private static void Pump()
     {
         // Let layout, bindings and a few animation frames run.

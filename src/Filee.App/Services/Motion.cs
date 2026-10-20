@@ -1,11 +1,11 @@
-// Global "reduce animations" switch. Styles react through the .reduced-motion class on windows;
-// custom-drawn controls (DonutMenu) read Motion.Enabled directly.
+// Global "reduce animations" switch and the Peach Glass switch. Styles react through the .reduced-motion and .peach classes
+// on windows; custom-drawn controls (DonutMenu) read Motion.Enabled directly.
 
 using Avalonia.Controls;
 
 namespace Filee.App.Services;
 
-/// <summary>Whether animations are enabled.</summary>
+/// <summary>Whether animations are enabled, and which look (Peach Glass or Classic) the windows wear.</summary>
 public static class Motion
 {
     private static readonly List<WeakReference<Window>> Windows = [];
@@ -15,6 +15,7 @@ public static class Motion
 
     public static event EventHandler? Changed;
 
+    private static bool _peach;
     private static bool? _reduceMotion;
     private static Func<bool>? _systemPrefersReduced;
 
@@ -52,6 +53,22 @@ public static class Motion
     public static void Set(bool enabled)
     {
         Enabled = enabled;
+        ApplyToAll();
+        Changed?.Invoke(null, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Turns the <c>peach</c> class on for every tracked window (Peach Glass) or off (Classic); windows tracked later
+    /// start with the right class. Soft.axaml does the rest.
+    /// </summary>
+    public static void SetPeach(bool on)
+    {
+        _peach = on;
+        ApplyToAll();
+    }
+
+    private static void ApplyToAll()
+    {
         lock (Windows)
         {
             Windows.RemoveAll(w => !w.TryGetTarget(out _));
@@ -59,7 +76,6 @@ public static class Motion
                 if (weak.TryGetTarget(out var window))
                     Apply(window);
         }
-        Changed?.Invoke(null, EventArgs.Empty);
     }
 
     /// <summary>Call once per window so its styles follow the setting.</summary>
@@ -73,5 +89,9 @@ public static class Motion
         Apply(window);
     }
 
-    private static void Apply(Window window) => window.Classes.Set("reduced-motion", !Enabled);
+    private static void Apply(Window window)
+    {
+        window.Classes.Set("reduced-motion", !Enabled);
+        window.Classes.Set("peach", _peach);
+    }
 }

@@ -6,6 +6,7 @@
         xmlns:c="using:Filee.App.Controls"
         x:Class="Filee.App.Views.ImageToolWindow"
         x:DataType="vm:ImageToolViewModel"
+        Classes="glassy"
         Title="{Binding Title}"
         Icon="avares://Filee/Assets/Icons/filee.ico"
         Width="960" Height="640" MinWidth="720" MinHeight="480"

@@ -5,6 +5,7 @@
         xmlns:views="using:Filee.App.Views"
         x:Class="Filee.App.Views.PresetEditorWindow"
         x:DataType="vm:PresetEditorViewModel"
+        Classes="glassy"
         Title="{DynamicResource presets.editor_title}"
         Icon="avares://Filee/Assets/Icons/filee.ico"
         Width="560" Height="680" MinWidth="440" MinHeight="400"

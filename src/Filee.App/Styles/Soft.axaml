@@ -27,6 +27,12 @@
           <SolidColorBrush x:Key="PeachCenterBrush" Color="#FFF6EE" Opacity="0.8" />
           <SolidColorBrush x:Key="PeachTextBrush" Color="#3B2416" />
           <SolidColorBrush x:Key="PeachToolBrush" Color="#F2552C" />
+          <!-- Peach Glass windows and cards: the page lets the Mica behind it shine through, cards are frosted white. -->
+          <SolidColorBrush x:Key="PeachPageBrush" Color="#FFF3E8" Opacity="0.78" />
+          <SolidColorBrush x:Key="PeachSurfaceBrush" Color="#FFFFFF" Opacity="0.72" />
+          <SolidColorBrush x:Key="PeachBorderBrush" Color="#FFFFFF" Opacity="0.55" />
+          <!-- A notice's window is clear, so nothing shines through its card: nearly solid peach. -->
+          <SolidColorBrush x:Key="PeachNoticeBrush" Color="#FFF6EE" Opacity="0.95" />
         </ResourceDictionary>
         <ResourceDictionary x:Key="Dark">
           <SolidColorBrush x:Key="PageBrush" Color="#1B1B19" />
@@ -44,6 +50,10 @@
           <SolidColorBrush x:Key="PeachCenterBrush" Color="#2A1A10" Opacity="0.8" />
           <SolidColorBrush x:Key="PeachTextBrush" Color="#FFE9D9" />
           <SolidColorBrush x:Key="PeachToolBrush" Color="#FF6A3D" />
+          <SolidColorBrush x:Key="PeachPageBrush" Color="#1E140E" Opacity="0.78" />
+          <SolidColorBrush x:Key="PeachSurfaceBrush" Color="#2A1A10" Opacity="0.72" />
+          <SolidColorBrush x:Key="PeachBorderBrush" Color="#FFFFFF" Opacity="0.10" />
+          <SolidColorBrush x:Key="PeachNoticeBrush" Color="#2A1A10" Opacity="0.95" />
         </ResourceDictionary>
       </ResourceDictionary.ThemeDictionaries>
 
@@ -103,6 +113,29 @@
     <Setter Property="CornerRadius" Value="{DynamicResource SoftRadius}" />
     <Setter Property="Padding" Value="18,16" />
     <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}" />
+  </Style>
+
+  <!-- Peach Glass (Motion.SetPeach puts .peach on every window). Windows marked .glassy ask for Mica, so their page and
+       cards are see-through; where Windows can't do that (10), the page stays solid. Notices and toasts are clear
+       windows without .glassy (Mica would blur the whole rectangle): just their card turns peach. -->
+  <Style Selector="Window.peach.glassy">
+    <Setter Property="TransparencyLevelHint" Value="Mica, AcrylicBlur, None" />
+    <Setter Property="Background" Value="{DynamicResource PeachPageBrush}" />
+  </Style>
+  <Style Selector="Window.peach.glassy[ActualTransparencyLevel=None]">
+    <Setter Property="Background" Value="{DynamicResource PageBrush}" />
+  </Style>
+  <Style Selector="Window.peach Border.card">
+    <Setter Property="Background" Value="{DynamicResource PeachSurfaceBrush}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource PeachBorderBrush}" />
+    <Setter Property="BorderThickness" Value="1" />
+  </Style>
+  <Style Selector="Window.peach:not(.glassy) Border.card">
+    <Setter Property="Background" Value="{DynamicResource PeachNoticeBrush}" />
+  </Style>
+  <!-- Every donut in the app looks alike: Settings → Toolbar's too, not only the one at the cursor. -->
+  <Style Selector="Window.peach c|DonutMenu">
+    <Setter Property="IsGlass" Value="True" />
   </Style>
 
   <Style Selector="Border.chip">

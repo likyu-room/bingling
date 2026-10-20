@@ -1,4 +1,4 @@
-// Applies ThemeSettings (light/dark, accent colour, corner radius, font order, reduced motion) at runtime by
+// Applies ThemeSettings (light/dark, Peach Glass or Classic, accent colour, corner radius, font order, reduced motion) at runtime by
 // writing resources into Application.Resources. All styles reference these with DynamicResource.
 
 using Avalonia;
@@ -18,6 +18,9 @@ public sealed class ThemeService(IPlatformServices platform)
 
     /// <summary>The accent of <see cref="ThemeStyle.PeachGlass"/>.</summary>
     public static readonly Color PeachAccent = Color.Parse("#FF7A1A");
+
+    /// <summary>The text colour on <see cref="PeachAccent"/>.</summary>
+    public static readonly Color PeachOnAccent = Color.Parse("#3B2416");
 
     /// <summary>Embedded Noto fonts (see build/fetch-fonts.ps1). Missing files fall back to system fonts.</summary>
     private const string Latin = "fonts:Filee#Noto Sans";
@@ -48,7 +51,9 @@ public sealed class ThemeService(IPlatformServices platform)
         res["AccentSoftBrush"] = new SolidColorBrush(accent, 0.18);
         res["AccentFaintBrush"] = new SolidColorBrush(accent, 0.09);
         res["AccentStrongBrush"] = new SolidColorBrush(Shade(accent, -0.25));
-        res["OnAccentBrush"] = new SolidColorBrush(Luminance(accent) > 0.6 ? Color.Parse("#1F1E1D") : Colors.White);
+        // White on the Peach Glass orange is only ~2.6:1, so text on it is the dark brown of the donut's labels.
+        res["OnAccentBrush"] = new SolidColorBrush(theme.Style == ThemeStyle.PeachGlass ? PeachOnAccent
+            : Luminance(accent) > 0.6 ? Color.Parse("#1F1E1D") : Colors.White);
         res["SystemAccentColor"] = accent;
         res["SystemAccentColorLight1"] = Shade(accent, 0.15);
         res["SystemAccentColorLight2"] = Shade(accent, 0.30);
@@ -72,6 +77,7 @@ public sealed class ThemeService(IPlatformServices platform)
         res["AppFontFamily"] = FontFamily.Parse($"{Latin}, {Devanagari}, {cjk}, {SystemFallbacks}");
 
         Motion.Configure(theme.ReduceMotion, () => platform.PrefersReducedMotion);
+        Motion.SetPeach(theme.Style == ThemeStyle.PeachGlass);
     }
 
     /// <summary>Lightens (amount &gt; 0) or darkens (amount &lt; 0) a colour.</summary>
