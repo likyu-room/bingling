@@ -107,4 +107,15 @@ public class InstallerTests
         Assert.DoesNotContain(@"{localappdata}\Filee\", script);
         Assert.DoesNotContain(@"{localappdata}\Filee'", script);
     }
+
+    [Fact]
+    public void Setup_only_force_ends_the_Filee_that_runs_from_its_own_install_folder()
+    {
+        var script = Script;
+        // The original Filee has the same image name (Filee.exe): taskkill /IM would end it too.
+        Assert.DoesNotContain("taskkill", script, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("/IM", script);
+        Assert.Contains("Where-Object { $_.Path -eq ' + PsQuote(ExpandConstant('{app}\\{#AppExe}')) + ' }", script);
+        Assert.Contains("Stop-Process -Force", script);
+    }
 }

@@ -522,6 +522,18 @@ begin
     Result := Result + NewLine + NewLine + CustomMessage('ReadyEngines') + NewLine + Engines;
 end;
 
+// Ends the Filee that runs from this install folder, and only that one. The original Filee has the same image name
+// (Filee.exe) and may be running next to it, so ending it by image name would end that one too; Get-Process
+// knows the full path.
+procedure KillInstalledFilee;
+var
+  Error: String;
+begin
+  RunPowerShell('Get-Process -Name ' + PsQuote(ChangeFileExt('{#AppExe}', '')) + ' -ErrorAction SilentlyContinue | ' +
+    'Where-Object { $_.Path -eq ' + PsQuote(ExpandConstant('{app}\{#AppExe}')) + ' } | ' +
+    'Stop-Process -Force -ErrorAction SilentlyContinue', Error);
+end;
+
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
@@ -533,8 +545,7 @@ begin
     Exec(ExpandConstant('{app}\{#AppExe}'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   // Filee 1.1 and earlier, or a Filee that did not answer: end it.
   if HadVelopackInstall or (ResultCode <> 0) then
-    Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM {#AppExe} /FI "USERNAME eq ' + GetUserNameString + '"', '',
-      SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    KillInstalledFilee;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
