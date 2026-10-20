@@ -46,6 +46,7 @@
   "donut.drop_to": "Suelta → {0}",
   "donut.pick_in_group": "Muévete hacia fuera para elegir",
   "donut.group_empty": "No quedan ajustes preestablecidos en este grupo. Edítalo en Ajustes → Menú circular",
+  "donut.tool_single_images": "Solo se pueden editar imágenes fijas individuales",
   "donut.click_to": "Clic → {0}",
   "donut.cancel": "Suelta aquí para cancelar",
   "donut.close_hint": "Esc para cerrar",

@@ -50,6 +50,7 @@
   "donut.drop_to": "Upuść → {0}",
   "donut.pick_in_group": "Przesuń na zewnątrz, by wybrać",
   "donut.group_empty": "W tej grupie nie ma już ustawień. Edytuj ją w Ustawienia → Pasek-pierścień",
+  "donut.tool_single_images": "Edytować można tylko pojedyncze, nieruchome obrazy",
   "donut.click_to": "Kliknij → {0}",
   "donut.cancel": "Upuść tu, by anulować",
   "donut.close_hint": "Esc zamyka",

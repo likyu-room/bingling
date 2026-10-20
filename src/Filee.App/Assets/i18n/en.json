@@ -50,6 +50,7 @@
   "donut.drop_to": "Drop → {0}",
   "donut.pick_in_group": "Move outward to choose",
   "donut.group_empty": "No presets left in this group. Edit it in Settings → Donut toolbar",
+  "donut.tool_single_images": "Only single still pictures can be edited",
   "donut.click_to": "Click → {0}",
   "donut.cancel": "Drop here to cancel",
   "donut.close_hint": "Esc to close",

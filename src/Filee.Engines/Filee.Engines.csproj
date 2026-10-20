@@ -37,6 +37,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Filee.Engines.Tests" />
+    <!-- The image tools ask the image engine which formats it reads and writes (Services/ImageToolSupport.cs). -->
+    <InternalsVisibleTo Include="Filee" />
   </ItemGroup>
 
   <ItemGroup>

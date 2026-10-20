@@ -33,6 +33,9 @@ public sealed class DonutItem
     /// <summary>Tooltip shown for disabled slices.</summary>
     public string? DisabledReason { get; init; }
 
+    /// <summary>An image tool (crop ...): drawn with a tint over the ordinary slice colour, so tools stand out from conversions.</summary>
+    public bool IsAccent { get; init; }
+
     /// <summary>
     /// A group slice: converts nothing itself; hovering it fans these out in a small ring outside the donut, where they
     /// are clicked or dropped on like ordinary slices.
@@ -76,6 +79,9 @@ public sealed partial class DonutMenu : Control
         AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(CenterBrush), Brushes.White);
     public static readonly StyledProperty<IBrush?> AccentBrushProperty =
         AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(AccentBrush), Brushes.MediumPurple);
+    /// <summary>Tint of the tool slices (<see cref="DonutItem.IsAccent"/>); null uses <see cref="AccentBrush"/>.</summary>
+    public static readonly StyledProperty<IBrush?> ToolBrushProperty =
+        AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(ToolBrush));
     public static readonly StyledProperty<IBrush?> OnAccentBrushProperty =
         AvaloniaProperty.Register<DonutMenu, IBrush?>(nameof(OnAccentBrush), Brushes.White);
     public static readonly StyledProperty<IBrush?> ForegroundProperty =
@@ -127,7 +133,7 @@ public sealed partial class DonutMenu : Control
         AffectsMeasure<DonutMenu>(OuterRadiusProperty, ReserveSubRingProperty);
         AffectsRender<DonutMenu>(HoleRatioProperty, SliceOpacityProperty, CenterTitleProperty, CenterSubtitleProperty,
             IsEditModeProperty, SliceBrushProperty, SliceBorderBrushProperty, CenterBrushProperty, AccentBrushProperty,
-            OnAccentBrushProperty, ForegroundProperty, SecondaryForegroundProperty, SuccessBrushProperty);
+            ToolBrushProperty, OnAccentBrushProperty, ForegroundProperty, SecondaryForegroundProperty, SuccessBrushProperty);
         ItemsProperty.Changed.AddClassHandler<DonutMenu>((d, _) => d.OnItemsChanged());
     }
 
@@ -160,6 +166,7 @@ public sealed partial class DonutMenu : Control
     public IBrush? SliceBorderBrush { get => GetValue(SliceBorderBrushProperty); set => SetValue(SliceBorderBrushProperty, value); }
     public IBrush? CenterBrush { get => GetValue(CenterBrushProperty); set => SetValue(CenterBrushProperty, value); }
     public IBrush? AccentBrush { get => GetValue(AccentBrushProperty); set => SetValue(AccentBrushProperty, value); }
+    public IBrush? ToolBrush { get => GetValue(ToolBrushProperty); set => SetValue(ToolBrushProperty, value); }
     public IBrush? OnAccentBrush { get => GetValue(OnAccentBrushProperty); set => SetValue(OnAccentBrushProperty, value); }
     public IBrush? Foreground { get => GetValue(ForegroundProperty); set => SetValue(ForegroundProperty, value); }
     public IBrush? SecondaryForeground { get => GetValue(SecondaryForegroundProperty); set => SetValue(SecondaryForegroundProperty, value); }
@@ -838,6 +845,7 @@ public sealed partial class DonutMenu : Control
             {
                 var wedge = CreateWedge(center, r1, r2, mid, span);
                 context.DrawGeometry(WithOpacity(SliceBrush, SliceOpacity * (item.IsEnabled ? 1 : 0.55)), BorderPen(), wedge);
+                DrawToolTint(context, item, wedge);
 
                 // The accent fades in and out with the highlight (no floor: a floor made it vanish with a jump).
                 var emphasis = i == _dropTargetIndex ? 1.0 : hover;
@@ -963,6 +971,13 @@ public sealed partial class DonutMenu : Control
         ISolidColorBrush solid => new SolidColorBrush(solid.Color, solid.Opacity * opacity),
         _ => brush,
     };
+
+    /// <summary>One more layer over the slice colour for a tool slice (the group's ring and the donut alike).</summary>
+    private void DrawToolTint(DrawingContext context, DonutItem item, Geometry wedge)
+    {
+        if (item.IsAccent)
+            context.DrawGeometry(WithOpacity(ToolBrush ?? AccentBrush, 0.30), null, wedge);
+    }
 
     private static double Distance(Point a, Point b) => Math.Sqrt(Math.Pow(a.X - b.X, 2) + Math.Pow(a.Y - b.Y, 2));
 

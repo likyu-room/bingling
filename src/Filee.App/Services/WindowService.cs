@@ -14,7 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Filee.App.Services;
 
-public sealed class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrimmer trimmer)
+public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrimmer trimmer)
 {
     private MainWindow? _main;
     private MainWindowPlacement? _mainPlacement;
@@ -214,6 +214,13 @@ public sealed class WindowService(ILocalizer loc, IServiceProvider services, Mem
         }
         return await dialog.ShowDialog<bool>(owner);
     }
+
+    /// <summary>
+    /// Opens the window of image tool <paramref name="tool"/> on <paramref name="files"/>, centred on
+    /// <paramref name="cursor"/> (screen pixels), and returns the edit the user applied; null when they closed it without.
+    /// </summary>
+    public virtual Task<ImageEdit?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor) =>
+        Task.FromResult<ImageEdit?>(null); // the window follows with the crop window
 
     /// <summary>
     /// Opens the group editor. Returns true when the user saved (the group was updated) or deleted it (it was removed

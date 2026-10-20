@@ -19,6 +19,7 @@ using Filee.App.ViewModels;
 using Filee.App.Views;
 using Filee.Core.Conversion;
 using Filee.Core.Platform;
+using Filee.Core.Presets;
 using Filee.Core.Profiles;
 using Filee.Core.Settings;
 using Microsoft.Extensions.Logging;
@@ -271,6 +272,12 @@ public sealed class RadialController(
             return;
         }
 
+        if (preset.Kind == PresetKind.Tool)
+        {
+            OpenTool(preset, files);
+            return;
+        }
+
         log.LogInformation("Converting {Count} file(s) with preset {Preset}", files.Count, preset.Id);
         var job = conversions.Start(files, preset, showInToast: false);
         if (job is null || _window is null)
@@ -280,6 +287,37 @@ public sealed class RadialController(
         }
         _converted = true;
         ShowProgress(job);
+    }
+
+    /// <summary>
+    /// A tool slice (crop): the donut closes and the tool's window opens where the donut was; the conversion starts with
+    /// the edit it made (none: closed without applying, nothing runs). It shows in the toast, not on a ring.
+    /// </summary>
+    private void OpenTool(Preset preset, IReadOnlyList<string> files)
+    {
+        // viewModel.Files changes under us when the next gesture loads the donut, and a drop's list is the drag's own.
+        var picked = files.ToList();
+        var window = _window!;
+        var cursor = window.PointToScreen(new Point(window.Bounds.Width / 2, window.Bounds.Height / 2)); // the donut's centre
+        log.LogInformation("Opening tool {Tool} for {Count} file(s)", preset.Tool, picked.Count);
+        _converted = true;
+        Close(animate: false);
+        // Not inside a drop handler: the window opens once the drag has ended.
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                if (await windows.EditImageAsync(preset.Tool, picked, cursor) is not { } edit)
+                    return;
+                var run = preset.Clone();
+                run.Image.Edit = edit;
+                conversions.Start(picked, run);
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "The {Tool} tool failed", preset.Tool);
+            }
+        });
     }
 
     // ───────── Progress ring ─────────

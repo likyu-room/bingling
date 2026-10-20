@@ -112,12 +112,21 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
                 .Select(store.FindPreset).OfType<Preset>().Where(c => !c.IsGroup).Take(Preset.MaxSubPresets).ToList())
             .ToList();
 
+        // The tools look at the files themselves (an animation, an icon): once per Load, and only when a tool is on this donut.
+        var toolReason = new Lazy<string?>(() => ImageToolSupport.Reason(files, loc));
+        var formatReason = new Lazy<string?>(() => ImageToolSupport.Reason(files, loc, formatOnly: true));
+
+        // Crop opens a window; compress and strip metadata are conversions that re-encode the picture. Same look, same files.
+        static bool IsTool(Preset p) => p.Kind == PresetKind.Tool || p.Image.Optimize;
+
         DonutItem ItemOf(Preset p, bool caption = true)
         {
-            var reason = availability.Check(p, formats);
+            var reason = availability.Check(p, formats)
+                ?? (p.Kind == PresetKind.Tool ? toolReason.Value : p.Image.Optimize ? formatReason.Value : null);
             return new DonutItem
             {
                 Id = p.Id,
+                IsAccent = IsTool(p),
                 // On a group's ring the group's name gives the context: "Rotate" → Left / Right / 180°.
                 Label = caption ? loc.DisplayName(p) : loc.RingName(p),
                 Caption = !caption ? null
@@ -138,6 +147,7 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
             return new DonutItem
             {
                 Id = p.Id,
+                IsAccent = _subPresets[i].Any(IsTool),
                 Label = loc.DisplayName(p),
                 Caption = loc.Format("donut.group_caption", children.Count),
                 IsEnabled = children.Any(c => c.IsEnabled),
@@ -148,9 +158,12 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
             };
         }).ToList();
 
-        CenterTitle = formats.Count == 1
+        // "PNG 2개 · 1.2 MB": the size of the files themselves (a folder or a file that is gone adds nothing).
+        var total = files.Where(File.Exists).Sum(f => new FileInfo(f).Length);
+        CenterTitle = (formats.Count == 1
             ? loc.Format("donut.files_same", files.Count, formats[0].DisplayName)
-            : loc.Format("donut.files_mixed", files.Count);
+            : loc.Format("donut.files_mixed", files.Count))
+            + (total > 0 ? " · " + ByteSize.Format(total) : "");
         CenterSubtitle = clickMode ? loc["donut.close_hint"] : null;
     }
 

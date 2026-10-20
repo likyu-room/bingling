@@ -50,6 +50,7 @@
   "donut.drop_to": "놓으면 {0}(으)로",
   "donut.pick_in_group": "바깥으로 옮겨 고르세요",
   "donut.group_empty": "묶음에 남은 프리셋 없음 (설정 → 원형 툴바에서 편집)",
+  "donut.tool_single_images": "한 장짜리 사진만 편집할 수 있어요",
   "donut.click_to": "클릭하면 {0}(으)로",
   "donut.cancel": "여기에 놓으면 취소",
   "donut.close_hint": "Esc로 닫기",

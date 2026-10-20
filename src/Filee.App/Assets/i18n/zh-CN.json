@@ -50,6 +50,7 @@
   "donut.drop_to": "松开 → {0}",
   "donut.pick_in_group": "向外移动以选择",
   "donut.group_empty": "此组中已没有预设，请在“设置 → 环形工具栏”中编辑",
+  "donut.tool_single_images": "仅支持编辑单张静态图片",
   "donut.click_to": "点击 → {0}",
   "donut.cancel": "拖到这里取消",
   "donut.close_hint": "按 Esc 关闭",
