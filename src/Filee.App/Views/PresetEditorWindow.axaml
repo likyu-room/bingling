@@ -13,7 +13,7 @@
         ShowInTaskbar="False">
   <DockPanel>
     <Border DockPanel.Dock="Bottom" Padding="20,12" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SubtleBorderBrush}"
-            Background="{DynamicResource SurfaceBrush}">
+            Classes="bar">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
         <Button Content="{DynamicResource common.cancel}" Click="OnCancel" IsCancel="True" />
         <Button Classes="accent" Content="{DynamicResource common.save}" Click="OnSave" IsDefault="True" IsEnabled="{Binding IsValid}" />

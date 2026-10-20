@@ -350,11 +350,21 @@ public sealed partial class DonutMenu
             DrawCancelButton(context, CancelButtonCenter(center));
     }
 
+    /// <summary>
+    /// The colour of the ✓ / ! on a success or failure disc: white or near-black, whichever reads on the disc's colour.
+    /// The disc is not the accent, so <see cref="OnAccentBrush"/> (dark brown under Peach Glass) would not.
+    /// </summary>
+    internal static IBrush BadgeGlyphBrush(IBrush? disc) =>
+        disc is ISolidColorBrush { Color: var c } && ThemeService.Luminance(c) > 0.6 ? DarkGlyph : Brushes.White;
+
+    private static readonly IBrush DarkGlyph = new SolidColorBrush(Color.Parse("#1F1E1D"));
+
     /// <summary>✓ (success) or ! (failure) popping in the centre of the ring.</summary>
     private void DrawOutcomeBadge(DrawingContext context, Point center, DonutProgressOutcome outcome, double scale, Typeface bold)
     {
         var radius = 22 * scale;
         var fill = outcome == DonutProgressOutcome.Succeeded ? SuccessBrush : DangerBrush;
+        var glyph = BadgeGlyphBrush(fill);
         context.DrawEllipse(fill, null, center, radius, radius);
 
         var transform = Matrix.CreateTranslation(-center.X, -center.Y) * Matrix.CreateScale(scale, scale) *
@@ -370,11 +380,11 @@ public sealed partial class DonutMenu
                 g.LineTo(new Point(center.X + 10, center.Y - 6.5));
                 g.EndFigure(false);
             }
-            context.DrawGeometry(null, new Pen(OnAccentBrush, 3.6, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), check);
+            context.DrawGeometry(null, new Pen(glyph, 3.6, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), check);
         }
         else
         {
-            var mark = MakeText("!", bold, 22, OnAccentBrush, 30);
+            var mark = MakeText("!", bold, 22, glyph, 30);
             DrawCentered(context, mark, center.X, center.Y - mark.Height / 2);
         }
     }

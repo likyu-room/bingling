@@ -1440,6 +1440,9 @@ public class RenderTests
             var card = window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("card"));
             AssertBrush(light ? "#FFFFFF" : "#2A1A10", 0.72, card.Background);
             AssertBrush("#FFFFFF", light ? 0.55 : 0.10, card.BorderBrush);
+            // The navigation pane frosts like the cards.
+            var nav = window.GetVisualDescendants().OfType<Border>().First(b => b.Classes.Contains("bar"));
+            AssertBrush(light ? "#FFFFFF" : "#2A1A10", 0.72, nav.Background);
             Save(window, $"main-peach-{mode}-{language}.png");
 
             store.Settings.Theme.Style = ThemeStyle.Classic;
@@ -1449,6 +1452,7 @@ public class RenderTests
             Assert.DoesNotContain(Avalonia.Controls.WindowTransparencyLevel.Mica, window.TransparencyLevelHint);
             AssertBrush(light ? "#F6F5F1" : "#1B1B19", 1, window.Background);
             AssertBrush(light ? "#FFFFFF" : "#262624", 1, card.Background);
+            AssertBrush(light ? "#FFFFFF" : "#262624", 1, nav.Background);
             window.Close();
         }
         finally
@@ -1543,6 +1547,7 @@ public class RenderTests
                 new PresetEditorWindow { DataContext = new PresetEditorViewModel(preset, loc) },
                 new GroupEditorWindow { DataContext = group },
                 new ImageToolWindow { DataContext = tool, Width = 960, Height = 640 },
+                new RenameToolWindow { DataContext = new RenameToolViewModel("", "{name}", [new Filee.Core.Presets.RenameStep()], [], (_, _, name) => name, loc) },
             ];
             foreach (var window in windows)
             {
@@ -1554,6 +1559,15 @@ public class RenderTests
                 var card = window.GetVisualDescendants().OfType<Border>().FirstOrDefault(b => b.Classes.Contains("card"));
                 if (card is not null)
                     AssertBrush(light ? "#FFFFFF" : "#2A1A10", 0.72, card.Background);
+                // The top, bottom and side bars frost like the cards instead of staying solid next to the glass.
+                var bars = window.GetVisualDescendants().OfType<Border>().Where(b => b.Classes.Contains("bar")).ToList();
+                Assert.NotEmpty(bars);
+                foreach (var bar in bars)
+                    AssertBrush(light ? "#FFFFFF" : "#2A1A10", 0.72, bar.Background);
+                // Fluent's accent button would keep its white text, ~2.6:1 on the orange.
+                foreach (var accent in window.GetVisualDescendants().OfType<Button>().Where(b => b.Classes.Contains("accent")))
+                    AssertBrush("#3B2416", 1, accent.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>()
+                        .First(p => p.Name == "PART_ContentPresenter").Foreground);
             }
             Save(windows[0], $"preset-peach-{mode}.png");
             foreach (var window in windows)

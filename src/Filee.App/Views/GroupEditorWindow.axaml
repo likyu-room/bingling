@@ -13,7 +13,7 @@
         ShowInTaskbar="False">
   <DockPanel>
     <Border DockPanel.Dock="Bottom" Padding="20,12" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SubtleBorderBrush}"
-            Background="{DynamicResource SurfaceBrush}">
+            Classes="bar">
       <DockPanel>
         <Button x:Name="DeleteButton" DockPanel.Dock="Left" Classes="ghost" Content="{DynamicResource group.delete}" Click="OnDelete"
                 IsVisible="{Binding CanDelete}" />

@@ -3,6 +3,7 @@
 using Avalonia;
 using Avalonia.Headless.XUnit;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Filee.App.Services;
 using Filee.App.ViewModels.Pages;
 using Filee.Core.Localization;
@@ -66,5 +67,42 @@ public class ThemeStyleTests
         }
 
         static Color OnAccent() => ((SolidColorBrush)Application.Current!.Resources["OnAccentBrush"]!).Color;
+    }
+
+    /// <summary>
+    /// Fluent's accent button and checked toggle button bring their own white text (~2.6:1 on the Peach Glass orange):
+    /// Peach Glass swaps it for the dark brown, in light and dark, and Classic gives Fluent's white back. That Classic
+    /// finds the keys at all, white, shows they are Fluent's real resource names.
+    /// </summary>
+    [AvaloniaFact]
+    public void Accent_filled_controls_get_dark_text_under_peach_glass_only()
+    {
+        TestServices.EnsureInitialized("en");
+        var theme = AppHost.Get<UserDataStore>().Settings.Theme.Clone();
+        var themes = AppHost.Get<ThemeService>();
+        try
+        {
+            theme.Style = ThemeStyle.PeachGlass;
+            themes.Apply(theme, "en");
+            AssertAll(Color.Parse("#3B2416"));
+
+            theme.Style = ThemeStyle.Classic;
+            themes.Apply(theme, "en");
+            AssertAll(Colors.White);
+        }
+        finally
+        {
+            themes.Apply(AppHost.Get<UserDataStore>().Settings.Theme, "en");
+        }
+
+        static void AssertAll(Color expected)
+        {
+            foreach (var variant in new[] { ThemeVariant.Light, ThemeVariant.Dark })
+                foreach (var key in ThemeService.FluentOnAccentKeys)
+                {
+                    Assert.True(Application.Current!.TryGetResource(key, variant, out var value), $"{key} ({variant}) not found");
+                    Assert.Equal(expected, Assert.IsAssignableFrom<ISolidColorBrush>(value).Color);
+                }
+        }
     }
 }

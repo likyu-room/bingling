@@ -38,6 +38,9 @@ public class GlassTests
         window.Show();
         Pump();
         var donut = window.DonutControl;
+        // The pop-in runs on the real clock, and 40 quick frames may not be enough of it: sample the finished donut.
+        for (var i = 0; i < 120; i++)
+            donut.Advance(1 / 60.0);
         var side = (int)donut.Bounds.Width;
         donut.GlassBackdrop = GlassBackdrop.Create(HalfRedHalfBlue(side, side), 1);
         Assert.NotNull(donut.GlassBackdrop);

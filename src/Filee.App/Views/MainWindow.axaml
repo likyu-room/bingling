@@ -11,7 +11,7 @@
         WindowStartupLocation="CenterScreen">
   <Grid ColumnDefinitions="230,*">
     <!-- Navigation -->
-    <Border Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="0,0,1,0">
+    <Border Classes="bar" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="0,0,1,0">
       <DockPanel Margin="14,18">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="8,0,0,20">
           <Image Source="avares://Filee/Assets/Icons/filee.png" Width="30" Height="30" />

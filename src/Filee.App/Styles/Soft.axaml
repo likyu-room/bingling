@@ -115,6 +115,11 @@
     <Setter Property="BoxShadow" Value="{DynamicResource CardShadow}" />
   </Style>
 
+  <!-- Navigation pane and editor bars: a plain surface strip next to the page. -->
+  <Style Selector="Border.bar">
+    <Setter Property="Background" Value="{DynamicResource SurfaceBrush}" />
+  </Style>
+
   <!-- Peach Glass (Motion.SetPeach puts .peach on every window). Windows marked .glassy ask for Mica, so their page and
        cards are see-through; where Windows can't do that (10), the page stays solid. Notices and toasts are clear
        windows without .glassy (Mica would blur the whole rectangle): just their card turns peach. -->
@@ -132,6 +137,10 @@
   </Style>
   <Style Selector="Window.peach:not(.glassy) Border.card">
     <Setter Property="Background" Value="{DynamicResource PeachNoticeBrush}" />
+  </Style>
+  <!-- The bars frost like the cards, so no solid white or grey strip is left next to the glass. -->
+  <Style Selector="Window.peach Border.bar">
+    <Setter Property="Background" Value="{DynamicResource PeachSurfaceBrush}" />
   </Style>
   <!-- Every donut in the app looks alike: Settings → Toolbar's too, not only the one at the cursor. -->
   <Style Selector="Window.peach c|DonutMenu">

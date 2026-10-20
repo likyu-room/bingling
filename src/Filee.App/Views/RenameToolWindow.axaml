@@ -5,6 +5,7 @@
         xmlns:vm="using:Filee.App.ViewModels"
         x:Class="Filee.App.Views.RenameToolWindow"
         x:DataType="vm:RenameToolViewModel"
+        Classes="glassy"
         Title="{DynamicResource watch.rename_title}"
         Icon="avares://Filee/Assets/Icons/filee.ico"
         Width="880" Height="640" MinWidth="640" MinHeight="420"
@@ -24,7 +25,7 @@
   </Window.Styles>
   <DockPanel>
     <Border DockPanel.Dock="Bottom" Padding="20,12" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SubtleBorderBrush}"
-            Background="{DynamicResource SurfaceBrush}">
+            Classes="bar">
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
         <Button Content="{DynamicResource common.cancel}" Click="OnCancel" IsCancel="True" />
         <Button Classes="accent" Content="{DynamicResource common.save}" Click="OnSave" IsDefault="True" IsEnabled="{Binding IsValid}" />
