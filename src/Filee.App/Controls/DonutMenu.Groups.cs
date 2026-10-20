@@ -392,6 +392,30 @@ public sealed partial class DonutMenu
     /// </summary>
     private static readonly IBrush HitBackdrop = new SolidColorBrush(Color.FromArgb(1, 0, 0, 0));
 
+    /// <summary>How far the backdrop of a fan of <paramref name="count"/> reaches from the middle, and how wide (radians) it is.</summary>
+    private (double Reach, double Span) BackdropFan(int count)
+    {
+        var reach = SubRadii.Outer + BackdropMargin;
+        return (reach, Math.Min(2 * Math.PI, SubSpanOf(count) * count + 2 * BackdropMargin / reach));
+    }
+
+    /// <summary>
+    /// True when <paramref name="p"/> is on what <see cref="DrawHitBackdrop"/> covers, as drawn once the ring is open: the
+    /// donut and the fan of the group that is open or about to open, margin included.
+    /// </summary>
+    private bool OnHitBackdrop(Point p)
+    {
+        var group = _expanded >= 0 ? _expanded : _pendingGroup;
+        if (IsEditMode || group < 0 || group >= Count || Items![group].Children is not { Count: > 0 } children)
+            return false;
+        var distance = Distance(p, Center);
+        if (distance <= OuterRadius + PopOut)
+            return true;
+        var (reach, span) = BackdropFan(children.Count);
+        return distance <= reach &&
+               Math.Abs(Math.IEEERemainder(DonutGeometry.AngleOf(Center, p) - DonutGeometry.MidAngle(group, Count), 2 * Math.PI)) <= span / 2;
+    }
+
     /// <summary>
     /// <see cref="HitBackdrop"/> over the donut and the fan of <paramref name="group"/>. The donut has see-through seams
     /// (between the hole and the slices, between slices): the pointer crossing one on its way to the ring would leave
@@ -400,8 +424,7 @@ public sealed partial class DonutMenu
     /// </summary>
     private void DrawHitBackdrop(DrawingContext context, Point center, int group, int count)
     {
-        var reach = SubRadii.Outer + BackdropMargin;
-        var span = Math.Min(2 * Math.PI, SubSpanOf(count) * count + 2 * BackdropMargin / reach);
+        var (reach, span) = BackdropFan(count);
         context.DrawEllipse(HitBackdrop, null, center, OuterRadius + PopOut, OuterRadius + PopOut);
         context.DrawGeometry(HitBackdrop, null, CreateWedge(center, OuterRadius, reach, DonutGeometry.MidAngle(group, Count), span));
     }
@@ -426,12 +449,13 @@ public sealed partial class DonutMenu
         if (distance <= OuterRadius + PopOut - LeaveEdge)
             return true;
         var count = Items![group].Children?.Count ?? 0;
-        var reach = SubRadii.Outer + BackdropMargin;
-        if (count == 0 || distance > reach - LeaveEdge)
+        if (count == 0)
+            return false;
+        var (reach, span) = BackdropFan(count);
+        if (distance > reach - LeaveEdge)
             return false;
         // Inside the backdrop's wedge, and LeaveEdge away from its sides.
-        var halfSpan = Math.Min(2 * Math.PI, SubSpanOf(count) * count + 2 * BackdropMargin / reach) / 2;
-        var inside = halfSpan - Math.Abs(Math.IEEERemainder(DonutGeometry.AngleOf(Center, p) - DonutGeometry.MidAngle(group, Count), 2 * Math.PI));
+        var inside = span / 2 - Math.Abs(Math.IEEERemainder(DonutGeometry.AngleOf(Center, p) - DonutGeometry.MidAngle(group, Count), 2 * Math.PI));
         return inside > 0 && (inside >= Math.PI / 2 || distance * Math.Sin(inside) >= LeaveEdge);
     }
 

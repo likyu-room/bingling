@@ -33,6 +33,13 @@ public sealed partial class DonutMenu
     public const double RingRadius = 36;
 
     private const double RingStroke = 6;
+
+    /// <summary>Radius of the plate under the ring, which the hole of the collapsing donut shrinks to.</summary>
+    private const double PlateRadius = RingRadius + RingStroke + 2;
+
+    /// <summary>The plate's soft shadow reaches this far past it and sits this far lower (<see cref="DrawPlateShadow"/>).</summary>
+    private const double PlateShadowReach = 10, PlateShadowDrop = 3;
+
     private const double CollapseSeconds = 0.28;
     private const double CollapseStagger = 0.02;
     private const double MinRingSeconds = 0.6;
@@ -316,8 +323,7 @@ public sealed partial class DonutMenu
             }
 
             // The hole shrinks to the size of the ring's plate.
-            var plate = RingRadius + RingStroke + 2;
-            var holeRadius = Lerp(r1 - 6, plate, EaseInCubic(collapseAll));
+            var holeRadius = Lerp(r1 - 6, PlateRadius, EaseInCubic(collapseAll));
             context.DrawEllipse(CenterBrush, BorderPen(), center, holeRadius, holeRadius);
             return;
         }
@@ -335,7 +341,7 @@ public sealed partial class DonutMenu
         using var _ = context.PushTransform(ringTransform);
         using var __ = context.PushOpacity(opacity);
 
-        var plateRadius = RingRadius + RingStroke + 2;
+        var plateRadius = PlateRadius;
         DrawPlateShadow(context, center, plateRadius);
         context.DrawEllipse(CenterBrush, BorderPen(), center, plateRadius, plateRadius);
         context.DrawEllipse(null, new Pen(WithOpacity(SecondaryForeground, 0.22), RingStroke), center, RingRadius, RingRadius);
@@ -433,7 +439,7 @@ public sealed partial class DonutMenu
 
     private static void DrawPlateShadow(DrawingContext context, Point center, double radius)
     {
-        var outer = radius + 10;
+        var outer = radius + PlateShadowReach;
         var brush = new RadialGradientBrush
         {
             GradientStops =
@@ -444,7 +450,7 @@ public sealed partial class DonutMenu
                 new GradientStop(Color.FromArgb(0, 0, 0, 0), 1),
             },
         };
-        context.DrawEllipse(brush, null, new Point(center.X, center.Y + 3), outer, outer);
+        context.DrawEllipse(brush, null, new Point(center.X, center.Y + PlateShadowDrop), outer, outer);
     }
 
     /// <summary>Clockwise arc from 12 o'clock covering <paramref name="fraction"/> of the circle.</summary>
@@ -475,7 +481,7 @@ public sealed partial class DonutMenu
     {
         if (_ringHover && _outcome is null && Distance(p, CancelButtonCenter(Center)) <= 11)
             return new DonutHit(DonutHitKind.ProgressCancel);
-        return Distance(p, Center) <= RingRadius + RingStroke + 2
+        return Distance(p, Center) <= PlateRadius
             ? new DonutHit(DonutHitKind.ProgressRing)
             : new DonutHit(DonutHitKind.Outside);
     }

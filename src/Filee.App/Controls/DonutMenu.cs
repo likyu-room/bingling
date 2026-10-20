@@ -131,6 +131,9 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
     private const double CloseScale = 0.92;
     private const double DragStartDistance = 5;
 
+    /// <summary>The soft shadow round the donut reaches this far past its rim and sits this far lower (<see cref="DrawSoftShadow"/>).</summary>
+    private const double SoftShadowReach = 14, SoftShadowDrop = 4;
+
     // Pencil (Material "edit") path in a 24×24 box.
     private static readonly Geometry PencilIcon = Geometry.Parse(
         "M3,17.25V21h3.75L17.81,9.94l-3.75-3.75L3,17.25z M20.71,7.04c0.39-0.39,0.39-1.02,0-1.41l-2.34-2.34c-0.39-0.39-1.02-0.39-1.41,0l-1.83,1.83l3.75,3.75L20.71,7.04z");
@@ -414,11 +417,26 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
     }
 
     /// <summary>
-    /// Where the pointer belongs to the donut: wherever <see cref="HitTest"/> finds it. Without this Avalonia routes the
-    /// pointer by what has been drawn, and a slice not drawn yet (a ring's later slices wait their turn while it opens, a
-    /// slice at 0 opacity) would get no hover, no click, and a pointer on it would count as having left the window.
+    /// Where the pointer belongs to the donut: wherever <see cref="HitTest"/> finds it, and where the backdrops and
+    /// shadows round it are drawn (<see cref="OnDrawnEdge"/>). Without this Avalonia routes the pointer by what has been
+    /// drawn, and a slice not drawn yet (a ring's later slices wait their turn while it opens, a slice at 0 opacity)
+    /// would get no hover, no click, and a pointer on it would count as having left the window. Anywhere further out the
+    /// pointer goes through to what is below, so a click there closes the donut.
     /// </summary>
-    bool ICustomHitTest.HitTest(Point point) => HitTest(point).Kind != DonutHitKind.Outside;
+    bool ICustomHitTest.HitTest(Point point) => HitTest(point).Kind != DonutHitKind.Outside || OnDrawnEdge(point);
+
+    /// <summary>
+    /// True where something that belongs to no slice is drawn, which had the pointer before it was routed by
+    /// <see cref="HitTest"/>: the soft shadow round the donut, a group's hit backdrop (the margin beyond its open ring and
+    /// the fan of a group about to open; a flick out to that ring has to reach it) and, in progress mode, the shadow of the
+    /// ring's plate (which the cancel button, sticking out of it, is within). All at the size they settle at.
+    /// </summary>
+    private bool OnDrawnEdge(Point p)
+    {
+        if (_progressMode)
+            return Distance(p, new Point(Center.X, Center.Y + PlateShadowDrop)) <= PlateRadius + PlateShadowReach;
+        return Distance(p, new Point(Center.X, Center.Y + SoftShadowDrop)) <= OuterRadius + SoftShadowReach || OnHitBackdrop(p);
+    }
 
     /// <summary>Hit-tests a point in this control's coordinates.</summary>
     public DonutHit HitTest(Point p)
@@ -978,7 +996,7 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
     private void DrawSoftShadow(DrawingContext context, Point center, double r2)
     {
         // A radial gradient ring fakes a soft drop shadow without blur effects (cheap on any GPU).
-        var shadowRadius = r2 + 14;
+        var shadowRadius = r2 + SoftShadowReach;
         var brush = new RadialGradientBrush
         {
             GradientStops =
@@ -991,7 +1009,7 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
         };
         var opening = _open.Length == 0 ? 1 : Math.Clamp(_open.Average(), 0, 1);
         using (context.PushOpacity(opening))
-            context.DrawEllipse(brush, null, new Point(center.X, center.Y + 4), shadowRadius, shadowRadius);
+            context.DrawEllipse(brush, null, new Point(center.X, center.Y + SoftShadowDrop), shadowRadius, shadowRadius);
     }
 
     private void DrawCenter(DrawingContext context, Point center, double r1, Typeface bold, Typeface regular)

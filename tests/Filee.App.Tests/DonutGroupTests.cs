@@ -49,6 +49,26 @@ public class DonutGroupTests
 
     private static bool IsOpen(DonutMenu donut) => donut.HitTest(OnRing(donut, 1)).Kind == DonutHitKind.SubSegment;
 
+    /// <summary>What the window routes the pointer to at <paramref name="p"/> after a frame (before one, to nothing at all).</summary>
+    private static IInputElement? RoutedTo(Window window, DonutMenu donut, Point p)
+    {
+        donut.InvalidateVisual();
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        return window.InputHitTest(p);
+    }
+
+    /// <summary>Distance from the middle to the outer edge of the open group's ring, found by walking out along it.</summary>
+    private static double RingOuterEdge(DonutMenu donut)
+    {
+        var c = Center(donut);
+        var mid = DonutGeometry.MidAngle(Group, donut.Items!.Count);
+        var radius = Math.Sqrt(Math.Pow(OnRing(donut, 1).X - c.X, 2) + Math.Pow(OnRing(donut, 1).Y - c.Y, 2));
+        while (donut.HitTest(DonutGeometry.PointAt(c, radius, mid)).Kind == DonutHitKind.SubSegment)
+            radius += 0.25;
+        return radius;
+    }
+
     [AvaloniaFact]
     public void Passing_over_a_group_on_the_way_elsewhere_does_not_open_it()
     {
@@ -678,26 +698,92 @@ public class DonutGroupTests
     {
         var (donut, window) = Open();
         var c = Center(donut);
-        // What the window routes the pointer to, after a frame (before one it routes it to nothing at all).
-        IInputElement? At(Point p)
-        {
-            donut.InvalidateVisual();
-            Dispatcher.UIThread.RunJobs();
-            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-            return window.InputHitTest(p);
-        }
-        Assert.Same(donut, At(OnGroup(donut, donut.OuterRadius * 0.6)));
-        Assert.Same(donut, At(c)); // the hole
+        Assert.Same(donut, RoutedTo(window, donut, OnGroup(donut, donut.OuterRadius * 0.6)));
+        Assert.Same(donut, RoutedTo(window, donut, c)); // the hole
         var corner = new Point(3, 3);
-        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(At(corner))); // the window's own: clicks there close the donut
+        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(RoutedTo(window, donut, corner))); // the window's own: clicks there close the donut
 
-        // With the ring open: on it the donut, past its outer edge and beside it not.
+        // With the ring open: on it the donut, past its outer edge (and its margin) and beside it not.
         var inner = OnGroup(donut, donut.OuterRadius * 0.6);
         donut.SetExternalHit(donut.HitTest(inner), inner);
         donut.ExpandPendingGroup();
-        Assert.Same(donut, At(OnRing(donut, 1)));
-        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(At(OnGroup(donut, donut.OuterRadius + 75))));
-        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(At(corner)));
+        Assert.Same(donut, RoutedTo(window, donut, OnRing(donut, 1)));
+        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(RoutedTo(window, donut, OnGroup(donut, donut.OuterRadius + 75))));
+        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(RoutedTo(window, donut, corner)));
+        window.Close();
+    }
+
+    /// <summary>
+    /// The 8 px of backdrop beyond an open ring still had the pointer when what was drawn routed it (and still does): a
+    /// click there folds the ring, as a click past the donut always did.
+    /// </summary>
+    [AvaloniaFact]
+    public void A_click_just_past_an_open_rings_edge_folds_it()
+    {
+        var (donut, window) = Open();
+        var inner = OnGroup(donut, donut.OuterRadius * 0.6);
+        window.MouseMove(inner);
+        window.MouseDown(inner, MouseButton.Left);
+        window.MouseUp(inner, MouseButton.Left); // opens the group
+        Assert.True(IsOpen(donut));
+
+        var edge = RingOuterEdge(donut);
+        var past = DonutGeometry.PointAt(Center(donut), edge + 4, DonutGeometry.MidAngle(Group, 4));
+        Assert.Equal(DonutHitKind.Outside, donut.HitTest(past).Kind); // no slice there, only the backdrop
+        Assert.Same(donut, RoutedTo(window, donut, past));
+        window.MouseMove(past);
+        window.MouseDown(past, MouseButton.Left);
+        window.MouseUp(past, MouseButton.Left);
+        Assert.False(IsOpen(donut));
+
+        // Well past the backdrop the pointer goes through to the window.
+        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(
+            RoutedTo(window, donut, DonutGeometry.PointAt(Center(donut), edge + 20, DonutGeometry.MidAngle(Group, 4)))));
+        window.Close();
+    }
+
+    /// <summary>
+    /// The flick of the mouse from a group's slice straight out to where its ring will be opens the group at once (no
+    /// 160 ms of resting first). Dragged files get there through the shape calculation (SetExternalHit), a real pointer
+    /// only if the donut gets it in the not yet open ring's area.
+    /// </summary>
+    [AvaloniaFact]
+    public void A_flick_of_the_mouse_out_to_the_ring_opens_the_group_at_once()
+    {
+        var (donut, window) = Open();
+        var inner = OnGroup(donut, donut.OuterRadius * 0.6);
+        window.MouseMove(inner); // rests on the group: it will open after the delay
+        Assert.False(IsOpen(donut));
+
+        window.MouseMove(OnRing(donut, 1)); // flicked out to where its ring will be
+
+        Assert.True(IsOpen(donut));
+        window.Close();
+    }
+
+    /// <summary>
+    /// While the ring shows progress the pointer keeps the donut a little past the ring's plate (where its shadow is), so
+    /// the cancel button, which sticks out of it, stays while the mouse goes for it.
+    /// </summary>
+    [AvaloniaFact]
+    public void During_progress_the_cancel_button_stays_while_the_mouse_is_a_little_past_the_plate()
+    {
+        var (donut, window) = Open();
+        var c = Center(donut);
+        donut.BeginProgress();
+        for (var i = 0; i < 90; i++)
+            donut.Advance(1 / 60.0);
+        var button = DonutGeometry.PointAt(c, DonutMenu.RingRadius + 6, Math.PI / 4); // the ring's stroke and its edge
+        var below = new Point(c.X, c.Y + DonutMenu.RingRadius + 6 + 8 + 2); // 8 px beyond the plate's 44 px: the shadow
+        Assert.NotEqual(DonutHitKind.ProgressCancel, donut.HitTest(button).Kind); // not hovered yet: no button
+
+        window.MouseMove(c);
+        window.MouseMove(below);
+
+        Assert.Equal(DonutHitKind.ProgressCancel, donut.HitTest(button).Kind); // hovered still
+        Assert.Same(donut, RoutedTo(window, donut, below));
+        var far = new Point(c.X, c.Y + 80);
+        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(RoutedTo(window, donut, far))); // past the shadow: through
         window.Close();
     }
 
