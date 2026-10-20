@@ -7,9 +7,8 @@
 ;    the signed-in user without elevation: Windows blocks drag and drop from Explorer into elevated windows;
 ;  - closes a running Filee first ("Filee.exe --quit") and moves FileeExplorerMenu.dll aside when Explorer has it
 ;    loaded, so updates need no restart;
-;  - (dormant, inherited from the original Filee installer) takes over a Velopack installation of Filee 1.1 or earlier.
-;    It looks in %LocalAppData%\FileePlus, where Filee Plus never had one, so it never touches the original Filee's
-;    folder; settings are in %APPDATA%\FileePlus, downloaded engines in %LocalAppData%\FileePlus\engines;
+;  - leaves the original Filee alone: settings are in %APPDATA%\FileePlus, downloaded engines in
+;    %LocalAppData%\FileePlus\engines;
 ;  - on Windows 11 registers the top-level File Explorer menu entry (an unsigned sparse package, which needs the
 ;    administrator rights Setup already has);
 ;  - offers the optional conversion engines; Filee downloads the chosen ones (verified) when Setup starts it;
@@ -60,7 +59,7 @@ SolidCompression=yes
 CloseApplications=yes
 CloseApplicationsFilter=*.exe
 RestartApplications=no
-; Per-user parts (the old Velopack copy, Start menu shortcuts) belong to the account that runs Setup.
+; Per-user parts (Start menu shortcuts) belong to the account that runs Setup.
 UsedUserAreasWarning=no
 ; The "filee" command folder is added to PATH: tell running programs (new terminals) about it.
 ChangesEnvironment=yes
@@ -79,9 +78,6 @@ zhcn.GroupOptions=选项：
 en.TaskModernMenu=Also show it at the top of the Windows 11 menu, not only under “Show more options”
 ko.TaskModernMenu=Windows 11 기본 메뉴에도 표시 (“추가 옵션 표시”를 누르지 않아도 보여요)
 zhcn.TaskModernMenu=也显示在 Windows 11 主菜单中，而不仅是“显示更多选项”里
-en.StatusRemovingOld=Removing the previous version (settings and engines are kept)...
-ko.StatusRemovingOld=이전 버전을 정리하는 중 (설정과 엔진은 그대로 둬요)...
-zhcn.StatusRemovingOld=正在移除旧版本（保留设置和引擎）...
 en.StatusExplorerMenu=Adding Filee Plus to the File Explorer menu...
 ko.StatusExplorerMenu=탐색기 메뉴에 Filee Plus를 추가하는 중...
 zhcn.StatusExplorerMenu=正在将 Filee Plus 添加到资源管理器菜单...
@@ -129,14 +125,11 @@ const
   ExplorerMenuMinimumBuild = 22000;
   // EngineInstaller marks every installed engine folder with this file.
   EngineMarker = '.filee-component';
-  // Filee 1.1 and earlier: Velopack installed it per user and registered it here.
-  VelopackUninstallKey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\FileePlus';
   ERROR_INSUFFICIENT_BUFFER = 122;
 
 var
   // Filee 1.2 or later is installed already: this run is an update, which keeps the user's choices.
   WasInstalled: Boolean;
-  HadVelopackInstall: Boolean;
   ExplorerMenuWasRegistered: Boolean;
   EnginePage: TInputOptionWizardPage;
   // Package id per entry of EnginePage; empty for packages that are installed already.
@@ -269,61 +262,6 @@ begin
     Log('Could not move the loaded ' + Dll + ' aside');
 end;
 
-procedure DeleteFileOrSchedule(const Path: String);
-begin
-  if FileExists(Path) and not DeleteFile(Path) then
-    RestartReplace(Path, '');
-end;
-
-// Deletes a folder tree; what Windows keeps open (a DLL loaded by Explorer) goes at the next restart.
-procedure DeleteTreeOrSchedule(const Dir: String);
-var
-  Find: TFindRec;
-  Path: String;
-begin
-  if not DirExists(Dir) then
-    Exit;
-  if FindFirst(AddBackslash(Dir) + '*', Find) then
-  try
-    repeat
-      if (Find.Name <> '.') and (Find.Name <> '..') then
-      begin
-        Path := AddBackslash(Dir) + Find.Name;
-        // Never follow junctions or symbolic links out of the folder.
-        if (Find.Attributes and FILE_ATTRIBUTE_REPARSE_POINT) <> 0 then
-          RemoveDir(Path)
-        else if (Find.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
-          DeleteTreeOrSchedule(Path)
-        else
-          DeleteFileOrSchedule(Path);
-      end;
-    until not FindNext(Find);
-  finally
-    FindClose(Find);
-  end;
-  if not RemoveDir(Dir) then
-    RestartReplace(Dir, '');
-end;
-
-// Removes the Velopack installation of Filee 1.1 and earlier without running its uninstaller, which would also
-// delete the downloaded engines. Its registry entries (context menu, startup) are rewritten by the new Filee.
-procedure RemoveVelopackInstall;
-var
-  Root: String;
-begin
-  WizardForm.StatusLabel.Caption := CustomMessage('StatusRemovingOld');
-  // Its Explorer menu entry points into the folder that is deleted next.
-  if ExplorerMenuWasRegistered then
-    UnregisterExplorerMenu;
-  Root := ExpandConstant('{localappdata}\FileePlus');
-  DeleteFileOrSchedule(Root + '\Update.exe');
-  DeleteFileOrSchedule(Root + '\Filee.exe');
-  DeleteTreeOrSchedule(Root + '\current');
-  DeleteTreeOrSchedule(Root + '\packages');
-  DeleteFile(ExpandConstant('{userprograms}\Filee Plus.lnk'));
-  DeleteFile(ExpandConstant('{userdesktop}\Filee Plus.lnk'));
-  RegDeleteKeyIncludingSubkeys(HKCU, VelopackUninstallKey);
-end;
 
 const
   EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
@@ -470,12 +408,8 @@ end;
 function InitializeSetup: Boolean;
 begin
   WasInstalled := RegKeyExists(HKA, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{' + '{#AppGuid}' + '}_is1');
-  HadVelopackInstall := FileExists(ExpandConstant('{localappdata}\FileePlus\Update.exe'))
-    and DirExists(ExpandConstant('{localappdata}\FileePlus\current'));
   ExplorerMenuWasRegistered := IsExplorerMenuSupported and IsExplorerMenuRegistered;
-  // (A line must not start with "[" in [Code]: the compiler would take it for a section.)
-  Log(Format('Update: %d, Velopack install: %d, Explorer menu registered: %d', [Ord(WasInstalled),
-    Ord(HadVelopackInstall), Ord(ExplorerMenuWasRegistered)]));
+  Log(Format('Update: %d, Explorer menu registered: %d', [Ord(WasInstalled), Ord(ExplorerMenuWasRegistered)]));
   Result := True;
 end;
 
@@ -543,8 +477,8 @@ begin
   ResultCode := 0;
   if WasInstalled and FileExists(ExpandConstant('{app}\{#AppExe}')) then
     Exec(ExpandConstant('{app}\{#AppExe}'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  // Filee 1.1 and earlier, or a Filee that did not answer: end it.
-  if HadVelopackInstall or (ResultCode <> 0) then
+  // A Filee that did not answer: end it.
+  if ResultCode <> 0 then
     KillInstalledFilee;
 end;
 
@@ -552,11 +486,7 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   case CurStep of
     ssInstall:
-      begin
-        MoveLoadedDllAside(ExpandConstant('{app}'));
-        if HadVelopackInstall then
-          RemoveVelopackInstall;
-      end;
+      MoveLoadedDllAside(ExpandConstant('{app}'));
     ssPostInstall:
       begin
         UpdateExplorerMenu;
