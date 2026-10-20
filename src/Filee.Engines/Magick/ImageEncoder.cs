@@ -282,12 +282,12 @@ internal static class ImageEncoder
         }
 
         var quality = (uint)Math.Clamp(options.Quality, 1, 100);
-        // Turning, cropping or compressing a JPEG (or compressing a WebP) has to re-encode it: at the picture's own
-        // quality (Magick's estimate when it read the file), not above it, or a phone photo saved at 75 comes back at
-        // 95, bigger and no better.
-        var reencodes = (targetFormat == "jpg" && image.Format == MagickFormat.Jpeg && (options.TurnsOrMirrors || options.Optimize))
-            || (targetFormat == "webp" && image.Format == MagickFormat.WebP && options.Optimize);
-        if (reencodes && image.Quality is > 0 and <= 100)
+        // Turning, cropping or compressing a JPEG has to re-encode it: at the photo's own quality (Magick's estimate when
+        // it read the file), not above it, or a phone photo saved at 75 comes back at 95, bigger and no better. Only JPEG
+        // has this ceiling: Magick reports no quality for lossy WebP, AVIF, JPEG XL or JPEG 2000 files, so those are
+        // saved at the preset's quality.
+        if ((options.TurnsOrMirrors || options.Optimize) && targetFormat == "jpg" && image.Format == MagickFormat.Jpeg
+            && image.Quality is > 0 and <= 100)
             quality = Math.Min(quality, image.Quality);
         switch (targetFormat)
         {

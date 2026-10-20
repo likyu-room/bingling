@@ -1,7 +1,9 @@
 // Rotate and flip presets: the image turns and mirrors the way the preset names say.
 
 using Filee.Core.Conversion;
+using Filee.Core.Formats;
 using Filee.Core.Presets;
+using Filee.Engines.Magick;
 using ImageMagick;
 using ImageMagick.Drawing;
 
@@ -350,33 +352,56 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     }
 
     /// <summary>
+    /// Raster formats ImageMagick reads and writes whose tool output is not right, so the tools (crop, compress, strip
+    /// metadata) must not be offered for them. The tests below the theory say why for each.
+    /// ICO: the cropped picture is padded to a square and stored in the icon sizes. XBM: ImageMagick names the data in the
+    /// file after the file name, and the tools' names ("s Cropped") hold a space, which is no C identifier: the file is not
+    /// valid XBM. (CUR crops fine: a cursor is only scaled down past 256 × 256.)
+    /// </summary>
+    private static readonly string[] ToolsMustNotOffer = ["ico", "xbm"];
+
+    /// <summary>Every format the image engine reads and writes, so a format added later is covered without touching this test.</summary>
+    public static TheoryData<string> RasterFormats() =>
+        [.. ImageEncoder.Readable.Intersect(ImageEncoder.Writable).Except(ToolsMustNotOffer)];
+
+    /// <summary>
     /// The crop tool's output size on every raster format ImageMagick reads and writes here (a 64 × 48 picture, the box
-    /// is its middle half → 32 × 24). Icons are left out: they are padded to a square on the way.
+    /// is its middle half → 32 × 24).
     /// </summary>
     [Theory]
-    [InlineData("jpg")]
-    [InlineData("png")]
-    [InlineData("webp")]
-    [InlineData("bmp")]
-    [InlineData("tiff")]
-    [InlineData("gif")]
-    [InlineData("avif")]
-    [InlineData("jxl")]
-    [InlineData("jp2")]
-    [InlineData("psd")]
-    [InlineData("tga")]
-    [InlineData("qoi")]
-    [InlineData("ppm")]
+    [MemberData(nameof(RasterFormats))]
     public async Task Crop_cuts_every_raster_format_to_the_box(string format)
     {
-        var picture = new MagickImage(MagickColors.White, 64, 48);
-        new Drawables().FillColor(MagickColors.Red).Rectangle(0, 0, 15, 11).Draw(picture);
-        var source = Write(picture, $"s.{format}");
-
-        var job = await fx.ConvertAsync([source], Crop(.25, .25, .5, .5));
-
-        Assert.True(job.State == JobState.Completed, string.Join("; ", job.Files.Select(f => $"{f.ErrorKey} {f.ErrorDetail}")));
-        using var r = new MagickImage(job.Outputs.Single());
+        var job = await CropAsync(format);
+        using var r = new MagickImage(job.Outputs.Single(), ImageEncoder.ToMagickFormat(format));
         Assert.Equal((32u, 24u), (r.Width, r.Height));
+    }
+
+    private async Task<ConversionJob> CropAsync(string format)
+    {
+        var source = Path.Combine(fx.NewFolder(), $"s.{FormatRegistry.Get(format).PrimaryExtension}");
+        using (var picture = new MagickImage(MagickColors.White, 64, 48))
+            ImageEncoder.WriteImage(picture, source, format); // APNG through Filee's own writer, the others by ImageMagick
+        var job = await fx.ConvertAsync([source], Crop(.25, .25, .5, .5));
+        Assert.True(job.State == JobState.Completed, string.Join("; ", job.Files.Select(f => $"{f.ErrorKey} {f.ErrorDetail}")));
+        return job;
+    }
+
+    [Fact]
+    public async Task An_icon_is_squared_not_cropped_so_the_tools_must_not_offer_ICO()
+    {
+        Assert.Contains("ico", ToolsMustNotOffer);
+        var job = await CropAsync("ico");
+        using var r = new MagickImage(job.Outputs.Single(), MagickFormat.Icon);
+        Assert.Equal(r.Width, r.Height); // the box is 32 × 24
+    }
+
+    [Fact]
+    public async Task XBM_made_from_a_name_with_a_space_is_not_valid_so_the_tools_must_not_offer_XBM()
+    {
+        Assert.Contains("xbm", ToolsMustNotOffer);
+        var job = await CropAsync("xbm");
+        var header = (await File.ReadAllLinesAsync(job.Outputs.Single(), TestContext.Current.CancellationToken))[0];
+        Assert.Equal("#define s Cropped_width 32", header); // the name of the data is "s Cropped": no identifier
     }
 }
