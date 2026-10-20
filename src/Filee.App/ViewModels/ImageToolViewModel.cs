@@ -12,6 +12,7 @@ using Filee.Core.Presets;
 using Filee.Core.Settings;
 using Filee.Engines.Magick;
 using ImageMagick;
+using Microsoft.Extensions.Logging;
 
 namespace Filee.App.ViewModels;
 
@@ -23,6 +24,7 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
     private readonly IReadOnlyList<string> _files;
     private readonly UserDataStore _store;
     private readonly ILocalizer _loc;
+    private readonly ILogger? _log;
     private readonly Stack<Step> _undo = new();
     private readonly Stack<Step> _redo = new();
     private Choice<string> _aspect;
@@ -36,12 +38,14 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <param name="tool">The tool (only <see cref="ImageToolKind.Crop"/> so far).</param>
     /// <param name="files">The pictures; the edit goes on all of them.</param>
     /// <param name="store">Where the last ratio is remembered.</param>
-    public ImageToolViewModel(ImageToolKind tool, IReadOnlyList<string> files, UserDataStore store, ILocalizer loc)
+    /// <param name="log">Where a ratio that can't be remembered is reported.</param>
+    public ImageToolViewModel(ImageToolKind tool, IReadOnlyList<string> files, UserDataStore store, ILocalizer loc, ILogger? log = null)
     {
         Tool = tool;
         _files = files;
         _store = store;
         _loc = loc;
+        _log = log;
         Aspects = CropMath.AspectIds.Select(id => new Choice<string>(id, id switch
         {
             "free" => loc["tool.crop.free"],
@@ -181,7 +185,15 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
         crop.Aspect = _aspect.Value == "original" ? null : Ratio(_aspect);
         Result = new ImageEdit { Crop = crop };
         _store.Settings.ImageTools.CropAspect = _aspect.Value;
-        _store.SaveSettings();
+        try
+        {
+            _store.SaveSettings();
+        }
+        catch (Exception ex)
+        {
+            // A full disk or a locked settings file: the crop still runs, only the ratio is not remembered on disk.
+            _log?.LogWarning(ex, "Could not save the crop ratio");
+        }
         Finished?.Invoke(this, EventArgs.Empty);
     }
 

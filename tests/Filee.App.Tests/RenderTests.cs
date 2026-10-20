@@ -1400,6 +1400,13 @@ public class RenderTests
         Assert.Same(vm.Preview, window.FindControl<ImageCanvas>("Picture")!.Source);
         Assert.Equal(language == "ko" ? "2개 중 1" : "1 of 2", vm.PositionText);
         Save(window, $"window-crop-{language}.png");
+
+        // A 1920 × 1040 screen at 250 %: the size Placement gives it there, the bars kept and the picture smaller.
+        var (size, smallest, _) = ImageToolWindow.Placement(new Avalonia.PixelRect(0, 0, 1920, 1040), 2.5, new Avalonia.PixelPoint(960, 520),
+            new Avalonia.PixelSize(1600, 1000));
+        (window.MinWidth, window.MinHeight, window.Width, window.Height) = (smallest.Width, smallest.Height, size.Width, size.Height);
+        Pump();
+        Save(window, $"window-crop-small-{language}.png");
         window.Close();
     }
 

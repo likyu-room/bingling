@@ -22,7 +22,7 @@ public partial class ImageToolWindow : Window
     /// <summary>What the window needs besides the picture: the panel, the top and bottom bars, the room around it.</summary>
     internal static readonly Size Chrome = new(PanelWidth + 2 * ImageCanvas.Inset, 110 + 2 * ImageCanvas.Inset);
 
-    /// <summary>The smallest window (as MinWidth / MinHeight in the XAML).</summary>
+    /// <summary>The smallest window (as MinWidth / MinHeight in the XAML), unless the screen is smaller (<see cref="Placement"/>).</summary>
     internal static readonly Size Smallest = new(720, 480);
 
     private ImageToolViewModel? _model;
@@ -67,29 +67,33 @@ public partial class ImageToolWindow : Window
     {
         if (_model is null || (Screens.ScreenFromPoint(cursor) ?? Screens.Primary) is not { } screen)
             return;
-        var (size, position) = Placement(screen.WorkingArea, screen.Scaling, cursor, new PixelSize(_model.ImageWidth, _model.ImageHeight));
+        var (size, smallest, position) = Placement(screen.WorkingArea, screen.Scaling, cursor, new PixelSize(_model.ImageWidth, _model.ImageHeight));
+        // The XAML's smallest size would win over the size placed here on a small screen and push the bottom bar off it.
+        (MinWidth, MinHeight) = (smallest.Width, smallest.Height);
         (Width, Height) = (size.Width, size.Height);
         WindowStartupLocation = WindowStartupLocation.Manual;
         Position = position;
     }
 
     /// <summary>
-    /// The window's size (DIPs) and position (pixels) for a <paramref name="picture"/> of this size: the picture at
-    /// its own size when that fits, smaller when not, the window at most 80 % of the working <paramref name="area"/>,
-    /// centred on the cursor and kept on that screen.
+    /// The window's size and smallest size (DIPs) and position (pixels) for a <paramref name="picture"/> of this size: the
+    /// picture at its own size when that fits, smaller when not, the window at most 80 % of the working
+    /// <paramref name="area"/> (its smallest size too: a 1920 × 1040 screen at 250 % is only 768 × 416), centred on the
+    /// cursor and kept on that screen.
     /// </summary>
-    internal static (Size Size, PixelPoint Position) Placement(PixelRect area, double scaling, PixelPoint cursor, PixelSize picture)
+    internal static (Size Size, Size Smallest, PixelPoint Position) Placement(PixelRect area, double scaling, PixelPoint cursor, PixelSize picture)
     {
         var max = new Size(area.Width * .8 / scaling, area.Height * .8 / scaling);
+        var smallest = new Size(Math.Min(Smallest.Width, max.Width), Math.Min(Smallest.Height, max.Height));
         // DIPs per pixel of the picture: one screen pixel each, or less to fit.
         var scale = Math.Min(1 / scaling, Math.Min((max.Width - Chrome.Width) / picture.Width, (max.Height - Chrome.Height) / picture.Height));
         var size = new Size(
-            Math.Min(max.Width, Math.Max(Smallest.Width, picture.Width * scale + Chrome.Width)),
-            Math.Min(max.Height, Math.Max(Smallest.Height, picture.Height * scale + Chrome.Height)));
+            Math.Min(max.Width, Math.Max(smallest.Width, picture.Width * scale + Chrome.Width)),
+            Math.Min(max.Height, Math.Max(smallest.Height, picture.Height * scale + Chrome.Height)));
         var (w, h) = ((int)(size.Width * scaling), (int)(size.Height * scaling));
         var x = Math.Clamp(cursor.X - w / 2, area.X, Math.Max(area.X, area.Right - w));
         var y = Math.Clamp(cursor.Y - h / 2, area.Y, Math.Max(area.Y, area.Bottom - h));
-        return (size, new PixelPoint(x, y));
+        return (size, smallest, new PixelPoint(x, y));
     }
 
     protected override void OnKeyDown(KeyEventArgs e)

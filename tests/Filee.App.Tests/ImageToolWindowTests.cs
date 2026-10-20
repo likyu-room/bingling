@@ -109,6 +109,50 @@ public class ImageToolWindowTests
     }
 
     [AvaloniaFact]
+    public void Save_on_several_files_returns_the_box_as_set_not_as_refitted_on_the_file_shown()
+    {
+        // The engine refits the one box on every file (CropMath.Refit), as the preview did: so Save hands back the box
+        // itself. A 1:1 box on the 400 × 200 file is half its width and all of its height; on the 200 × 400 file it shows
+        // as all of the width and a quarter of the height.
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "1:1");
+        vm.NextCommand.Execute(null);
+        Assert.Equal(.25, vm.Crop.Height, 6); // the one shown
+        vm.SaveCommand.Execute(null);
+        var saved = vm.Result!.Crop!;
+        Assert.Equal((.25, 0.0, .5, 1.0, (double?)1.0), (saved.X, saved.Y, saved.Width, saved.Height, saved.Aspect));
+
+        // "원본" (each file's own shape) on several files: saved without a ratio, so every file keeps its own.
+        vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
+        Assert.Equal("원본", vm.Aspect.Label);
+        vm.PixelWidth = 200;
+        vm.NextCommand.Execute(null);
+        vm.SaveCommand.Execute(null);
+        Assert.Null(vm.Result!.Crop!.Aspect);
+        Assert.Equal((.5, .5), (vm.Result.Crop.Width, vm.Result.Crop.Height));
+    }
+
+    [AvaloniaFact]
+    public void Save_finishes_even_when_the_ratio_cannot_be_remembered()
+    {
+        // The settings folder is a file: saving the settings throws, as on a full disk or a locked file.
+        var blocked = Path.Combine(Path.GetTempPath(), "filee-app-tests", "crop-blocked-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(Path.GetDirectoryName(blocked)!);
+        File.WriteAllText(blocked, "");
+        var store = new UserDataStore(blocked);
+        Assert.ThrowsAny<IOException>(store.SaveSettings);
+
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200)], store, Loc("ko"));
+        var finished = false;
+        vm.Finished += (_, _) => finished = true;
+        vm.SaveCommand.Execute(null);
+
+        Assert.True(finished);
+        Assert.NotNull(vm.Result);
+        Assert.Equal(vm.Aspect.Value, store.Settings.ImageTools.CropAspect); // remembered for this run all the same
+    }
+
+    [AvaloniaFact]
     public void Typing_a_pixel_width_keeps_a_fixed_ratio_and_save_remembers_the_aspect()
     {
         var store = TestStore();
@@ -301,7 +345,8 @@ public class ImageToolWindowTests
     {
         // A big photo on a 150 % screen to the right of the main one, the cursor in its top-left corner.
         var area = new PixelRect(1920, 0, 2560, 1400);
-        var (size, position) = ImageToolWindow.Placement(area, 1.5, new PixelPoint(1950, 30), new PixelSize(6000, 4000));
+        var (size, smallest, position) = ImageToolWindow.Placement(area, 1.5, new PixelPoint(1950, 30), new PixelSize(6000, 4000));
+        Assert.Equal(ImageToolWindow.Smallest, smallest); // room enough for the usual smallest window
         Assert.InRange(size.Width, 0, 2560 * .8 / 1.5 + .01);
         Assert.InRange(size.Height, 0, 1400 * .8 / 1.5 + .01);
         Assert.Equal(new PixelPoint(1920, 0), position); // pushed onto the screen
@@ -309,9 +354,35 @@ public class ImageToolWindowTests
         Assert.Equal(1.5, picture.Width / picture.Height, 2); // sized to the photo
 
         // A small picture: the smallest window, centred on the cursor.
-        (size, position) = ImageToolWindow.Placement(new PixelRect(0, 0, 1920, 1040), 1, new PixelPoint(960, 500), new PixelSize(64, 64));
+        (size, _, position) = ImageToolWindow.Placement(new PixelRect(0, 0, 1920, 1040), 1, new PixelPoint(960, 500), new PixelSize(64, 64));
         Assert.Equal(ImageToolWindow.Smallest, size);
         Assert.Equal(new PixelPoint(960 - (int)(size.Width / 2), 500 - (int)(size.Height / 2)), position);
+    }
+
+    [AvaloniaFact]
+    public void On_a_small_screen_the_window_fits_and_the_bottom_bar_stays_on_it()
+    {
+        // 1920 × 1040 px at 250 %: 768 × 416 DIPs of working area, lower than the usual smallest window (480).
+        var area = new PixelRect(0, 0, 1920, 1040);
+        var (size, smallest, position) = ImageToolWindow.Placement(area, 2.5, new PixelPoint(960, 900), new PixelSize(4000, 3000));
+        Assert.InRange(size.Width, 0, 768 * .8 + .01);
+        Assert.InRange(size.Height, 0, 416 * .8 + .01);
+        Assert.True(smallest.Width <= size.Width && smallest.Height <= size.Height, $"{smallest} > {size}");
+        Assert.InRange(position.Y, area.Y, area.Bottom - (int)(size.Height * 2.5)); // the whole window, bottom bar too
+        Assert.InRange(position.X, area.X, area.Right - (int)(size.Width * 2.5));
+
+        // At that size the picture gives way, not the bar with Save.
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 300)], TestStore(), Loc("ko"));
+        var window = new ImageToolWindow { DataContext = vm, MinWidth = smallest.Width, MinHeight = smallest.Height, Width = size.Width, Height = size.Height };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        var save = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.SaveCommand);
+        var bottom = save.TranslatePoint(new Point(0, save.Bounds.Height), window)!.Value.Y;
+        Assert.Equal(size.Height, window.ClientSize.Height, 1);
+        Assert.InRange(bottom, 0, window.ClientSize.Height);
+        Assert.True(window.FindControl<ImageCanvas>("Picture")!.Bounds.Height > 0);
+        window.Close();
+        vm.Dispose();
     }
 
     // ───────── Canvas geometry ─────────

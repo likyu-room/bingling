@@ -47,10 +47,13 @@
       </DockPanel>
     </Border>
 
-    <!-- The tool's own settings; its width is ImageToolWindow.PanelWidth. -->
-    <Border DockPanel.Dock="Right" Width="260" Padding="18,16" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource SubtleBorderBrush}"
+    <!-- The tool's own settings; its width is ImageToolWindow.PanelWidth. On a short window it scrolls: the bars above and
+         below keep their room (they are docked first), and the picture takes what is left. -->
+    <Border DockPanel.Dock="Right" Width="260" BorderThickness="1,0,0,0" BorderBrush="{DynamicResource SubtleBorderBrush}"
             Classes="bar">
-      <ContentControl x:Name="ToolPanel" />
+      <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ContentControl x:Name="ToolPanel" Margin="18,16" />
+      </ScrollViewer>
     </Border>
 
     <c:ImageCanvas x:Name="Picture" Source="{Binding Preview}" Crop="{Binding Crop}" />

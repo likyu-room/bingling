@@ -11,6 +11,7 @@ using Filee.Core.Localization;
 using Filee.Core.Presets;
 using Filee.Core.Settings;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Filee.App.Services;
 
@@ -222,7 +223,8 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
     public virtual async Task<ImageEdit?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
     {
         Motion.Refresh();
-        using var vm = new ImageToolViewModel(tool, files, services.GetRequiredService<UserDataStore>(), loc);
+        using var vm = new ImageToolViewModel(tool, files, services.GetRequiredService<UserDataStore>(), loc,
+            services.GetService<ILogger<ImageToolViewModel>>());
         var window = new ImageToolWindow { DataContext = vm };
         window.PlaceNear(cursor);
         var closed = new TaskCompletionSource();
