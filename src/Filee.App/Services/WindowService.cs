@@ -264,7 +264,7 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
         ShowMessageAsync(owner, message, destructive, withCancel: true);
 
     /// <summary>A message with only an OK button. Without a visible owner it shows on its own, centred on the screen.</summary>
-    public Task MessageAsync(Window? owner, string message) => ShowMessageAsync(owner, message, destructive: false, withCancel: false);
+    public virtual Task MessageAsync(Window? owner, string message) => ShowMessageAsync(owner, message, destructive: false, withCancel: false);
 
     /// <summary>The in-app update failed: say so, then open the website to download the new version there.</summary>
     public async Task ShowUpdateFailedAsync()

@@ -69,6 +69,7 @@
   "tool.crop.free": "Free",
   "tool.crop.original": "Original",
   "tool.crop.size": "Size (px)",
+  "tool.skipped_not_still": "Skipped {0} (not single still pictures)",
 
   "toast.converting": "{0} → {1}",
   "toast.done": "Done",

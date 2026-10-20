@@ -204,6 +204,24 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     }
 
     [Fact]
+    public void A_picture_to_look_at_reads_only_the_first_frame_of_an_animation()
+    {
+        // The toast's thumbnail and the crop's preview: one frame is all they show, the others are not decoded.
+        var path = Path.Combine(fx.NewFolder(), "anim.gif");
+        using (var frames = new MagickImageCollection())
+        {
+            foreach (var color in new[] { MagickColors.Red, MagickColors.Lime, MagickColors.Blue })
+                frames.Add(new MagickImage(color, 8, 8) { AnimationDelay = 10 });
+            frames.Write(path, MagickFormat.Gif);
+        }
+
+        using (var all = ImageReader.Read(path, "gif", new Preset()))
+            Assert.Equal(3, all.Count);
+        using var first = ImageReader.Read(path, "gif", new Preset(), firstFrameOnly: true);
+        Assert.True(IsRed(Assert.Single(first), 4, 4));
+    }
+
+    [Fact]
     public async Task A_PDF_is_not_copied_as_if_rotated_it_fails_and_says_why()
     {
         var dir = fx.NewFolder();

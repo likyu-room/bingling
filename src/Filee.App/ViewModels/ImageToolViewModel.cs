@@ -325,12 +325,12 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>
-    /// The picture read the way the engine reads it, turned upright, at most <see cref="PreviewEdge"/> pixels on its
-    /// long side, as a bitmap (through PNG in memory).
+    /// The picture read the way the engine reads it (its first frame only), turned upright, at most
+    /// <see cref="PreviewEdge"/> pixels on its long side, as a bitmap (through PNG in memory).
     /// </summary>
     private static Bitmap ReadPreview(string path)
     {
-        using var frames = ImageReader.Read(path, FormatRegistry.Detect(path)?.Id ?? "", new Preset());
+        using var frames = ImageReader.Read(path, FormatRegistry.Detect(path)?.Id ?? "", new Preset(), firstFrameOnly: true);
         var image = frames[0];
         image.AutoOrient();
         if (Math.Max(image.Width, image.Height) > PreviewEdge)

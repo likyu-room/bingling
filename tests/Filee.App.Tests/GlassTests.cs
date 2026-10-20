@@ -71,8 +71,7 @@ public class GlassTests
     {
         using var _ = PeachGlass();
         var platform = new CapturingPlatform();
-        var radial = new RadialController(AppHost.Get<RadialViewModel>(), AppHost.Get<ConversionService>(),
-            AppHost.Get<WindowService>(), AppHost.Get<UserDataStore>(), platform, AppHost.Get<ILogger<RadialController>>());
+        var radial = NewRadial(platform, AppHost.Get<ILogger<RadialController>>());
         platform.Window = () => radial.Window;
         string[] files = [ImageToolWindowTests.TestImages.Png(64, 64)];
 
@@ -101,6 +100,70 @@ public class GlassTests
         Assert.Equal(2, platform.VisibleAtCapture.Count);
         Assert.Null(donut.GlassBackdrop);
         radial.Close(animate: false);
+    }
+
+    [AvaloniaFact]
+    public void A_drag_whose_glass_fails_opens_the_donut_on_flat_peach_instead_of_throwing_into_explorer()
+    {
+        using var _ = PeachGlass();
+        var platform = new CapturingPlatform { Broken = true };
+        var radial = NewRadial(platform, AppHost.Get<ILogger<RadialController>>());
+        platform.Window = () => radial.Window;
+
+        radial.ShowForDrag(400, 400);
+        radial.OnFilesEntered([ImageToolWindowTests.TestImages.Png(64, 64)]); // OLE DragEnter: blurring this capture throws
+
+        Assert.Single(platform.VisibleAtCapture);
+        Assert.Null(radial.Window!.DonutControl.GlassBackdrop);
+        Assert.True(AppHost.Get<RadialViewModel>().HasFiles); // the donut is there all the same
+        radial.Close(animate: false);
+    }
+
+    [AvaloniaFact]
+    public void A_slow_glass_is_forgiven_once_then_blurs_at_half_resolution_and_says_so_once()
+    {
+        using var _ = PeachGlass();
+        GlassBackdrop.Reset();
+        try
+        {
+            // Taking the screen alone takes longer than the 15 ms budget of a 600 × 600 px window.
+            var platform = new CapturingPlatform { Delay = TimeSpan.FromMilliseconds(40) };
+            var log = new ListLogger();
+            var radial = NewRadial(platform, log);
+            platform.Window = () => radial.Window;
+            string[] files = [ImageToolWindowTests.TestImages.Png(64, 64)];
+
+            for (var open = 1; open <= 3; open++)
+            {
+                radial.ShowForFiles(400, 400, files);
+                Assert.NotNull(radial.Window!.DonutControl.GlassBackdrop);
+                radial.Close(animate: false);
+                // The first open of a run pays for starting up: only the second one counts.
+                Assert.Equal(open >= 2, GlassBackdrop.HalfResolution);
+            }
+            var line = Assert.Single(log.Lines, l => l.Contains("half resolution"));
+            Assert.StartsWith("Information: ", line);
+            Assert.Contains("captured in", line);
+        }
+        finally
+        {
+            GlassBackdrop.Reset();
+        }
+    }
+
+    private static RadialController NewRadial(IPlatformServices platform, ILogger<RadialController> log) =>
+        new(AppHost.Get<RadialViewModel>(), AppHost.Get<ConversionService>(), AppHost.Get<WindowService>(),
+            AppHost.Get<UserDataStore>(), platform, log, AppHost.Get<Filee.Core.Localization.ILocalizer>());
+
+    /// <summary>A log that keeps its lines ("Level: message").</summary>
+    private sealed class ListLogger : ILogger<RadialController>
+    {
+        public List<string> Lines { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            Lines.Add($"{logLevel}: {formatter(state, exception)}");
     }
 
     /// <summary>Switches to Peach Glass and back to the settings before when disposed.</summary>
@@ -215,17 +278,25 @@ public class GlassTests
         public int GetHashCode(Color color) => 0;
     }
 
-    /// <summary>A platform whose screen is white, recording whether the donut was on screen at each capture.</summary>
+    /// <summary>
+    /// A platform whose screen is white, recording whether the donut was on screen at each capture. <see cref="Delay"/>
+    /// makes taking it slow; <see cref="Broken"/> hands back a capture without pixels, which the blur can't read.
+    /// </summary>
     private sealed class CapturingPlatform : IPlatformServices
     {
         public Func<Window?> Window { get; set; } = () => null;
         public List<bool> VisibleAtCapture { get; } = [];
         public double LastSize { get; private set; }
+        public TimeSpan Delay { get; init; }
+        public bool Broken { get; init; }
 
         public ScreenCapture? CaptureScreen(int x, int y, int width, int height)
         {
             VisibleAtCapture.Add(Window()?.IsVisible == true);
             LastSize = width;
+            Thread.Sleep(Delay);
+            if (Broken)
+                return new ScreenCapture(width, height, null!);
             var bytes = new byte[width * height * 4];
             Array.Fill(bytes, (byte)255);
             return new ScreenCapture(width, height, bytes);

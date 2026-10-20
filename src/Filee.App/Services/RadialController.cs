@@ -19,6 +19,7 @@ using Filee.App.Controls;
 using Filee.App.ViewModels;
 using Filee.App.Views;
 using Filee.Core.Conversion;
+using Filee.Core.Localization;
 using Filee.Core.Platform;
 using Filee.Core.Presets;
 using Filee.Core.Profiles;
@@ -33,7 +34,8 @@ public sealed class RadialController(
     WindowService windows,
     UserDataStore store,
     IPlatformServices platform,
-    ILogger<RadialController> log)
+    ILogger<RadialController> log,
+    ILocalizer loc)
 {
     /// <summary>
     /// How long the ring shows a running job before the toast window takes over. Long enough for a typical office
@@ -127,6 +129,29 @@ public sealed class RadialController(
         window.DonutControl.PlayOpenAnimation();
     }
 
+    /// <summary>
+    /// Files were dragged into the waiting window: the donut fills and pops out. This runs inside OLE DragEnter, where an
+    /// exception would come out in Explorer's drag (and end Filee as an unhandled UI exception), so whatever goes wrong
+    /// (a file gone mid-drag, a capture that can't be blurred) is logged and the donut opens on flat peach.
+    /// </summary>
+    internal void OnFilesEntered(IReadOnlyList<string> files)
+    {
+        if (_window is not { } window || viewModel.IsClickMode || SameFiles(files, viewModel.Files))
+            return;
+        var donut = window.DonutControl;
+        try
+        {
+            viewModel.Load(files, clickMode: false);
+            ShowGlass(donut);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Filling the donut for {Count} dragged file(s) failed", files.Count);
+            donut.GlassBackdrop = null;
+        }
+        donut.PlayOpenAnimation();
+    }
+
     /// <summary>The mouse button of the drag gesture was released somewhere.</summary>
     public void OnDragGestureEnded()
     {
@@ -204,9 +229,14 @@ public sealed class RadialController(
             donut.GlassBackdrop = null;
             return;
         }
+        var wasHalf = GlassBackdrop.HalfResolution;
         donut.GlassBackdrop = GlassBackdrop.Create(capture, _captureScaling, _captureMs, out var blurMs);
         log.LogDebug("Glass backdrop {Width}x{Height}: captured in {Capture:0.0} ms, blurred in {Blur:0.0} ms{Black}",
             capture.Width, capture.Height, _captureMs, blurMs, donut.GlassBackdrop is null ? " (black: flat peach)" : "");
+        // Once per run: the switch is for good, and the numbers say whether this PC is slow or the budget is too tight.
+        if (!wasHalf && GlassBackdrop.HalfResolution)
+            log.LogInformation("The glass took longer than its budget ({Width}x{Height} px: captured in {Capture:0.0} ms, " +
+                "blurred in {Blur:0.0} ms); it blurs at half resolution from now on", capture.Width, capture.Height, _captureMs, blurMs);
     }
 
     /// <summary>
@@ -240,14 +270,7 @@ public sealed class RadialController(
                 log.LogInformation("A drag without files Filee reads entered the donut; it offered: {Formats}{Held}",
                     formats, LogThrottle.HeldText(held));
         };
-        window.FilesEntered += files =>
-        {
-            if (viewModel.IsClickMode || SameFiles(files, viewModel.Files))
-                return;
-            viewModel.Load(files, clickMode: false);
-            ShowGlass(donut);
-            donut.PlayOpenAnimation();
-        };
+        window.FilesEntered += OnFilesEntered;
         window.Dropped += (hit, files) =>
         {
             _dropped = true;
@@ -324,15 +347,17 @@ public sealed class RadialController(
 
     /// <summary>
     /// A tool slice (crop): the donut closes and the tool's window opens where the donut was; the conversion starts with
-    /// the edit it made (none: closed without applying, nothing runs). It shows in the toast, not on a ring.
+    /// the edit it made (none: closed without applying, nothing runs). It shows in the toast, not on a ring. The donut
+    /// looked into the first files only (<see cref="ImageToolSupport.LookedIntoOnOpen"/>): now all of them are, and what
+    /// is not a still picture is left out, with a note that says so (no window when nothing is left).
     /// </summary>
     private void OpenTool(Preset preset, IReadOnlyList<string> files)
     {
         // viewModel.Files changes under us when the next gesture loads the donut, and a drop's list is the drag's own.
-        var picked = files.ToList();
+        var dropped = files.ToList();
         var window = _window!;
         var cursor = window.PointToScreen(new Point(window.Bounds.Width / 2, window.Bounds.Height / 2)); // the donut's centre
-        log.LogInformation("Opening tool {Tool} for {Count} file(s)", preset.Tool, picked.Count);
+        log.LogInformation("Opening tool {Tool} for {Count} file(s)", preset.Tool, dropped.Count);
         _converted = true;
         Close(animate: false);
         // Not inside a drop handler: the window opens once the drag has ended.
@@ -340,7 +365,19 @@ public sealed class RadialController(
         {
             try
             {
-                if (await windows.EditImageAsync(preset.Tool, picked, cursor) is not { } edit)
+                var picked = await Task.Run(() => ImageToolSupport.StillPictures(dropped));
+                if (picked.Count < dropped.Count)
+                {
+                    var left = dropped.Except(picked, FileSystemPaths.Comparer).Select(Path.GetFileName).ToList();
+                    log.LogInformation("The {Tool} tool leaves out {Count} file(s) that are not still pictures", preset.Tool, left.Count);
+                    // ponytail: the first five names, the count says the rest; a list window if people crop hundreds.
+                    var lines = new List<string?> { loc.Format("tool.skipped_not_still", left.Count) };
+                    lines.AddRange(left.Take(5));
+                    if (left.Count > 5)
+                        lines.Add("…");
+                    await windows.MessageAsync(null, string.Join(Environment.NewLine, lines));
+                }
+                if (picked.Count == 0 || await windows.EditImageAsync(preset.Tool, picked, cursor) is not { } edit)
                     return;
                 var run = preset.Clone();
                 run.Image.Edit = edit;

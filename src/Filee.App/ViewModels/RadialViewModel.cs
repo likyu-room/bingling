@@ -163,8 +163,9 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
             };
         }).ToList();
 
-        // "PNG 2개 · 1.2 MB": the size of the files themselves (a folder or a file that is gone adds nothing).
-        var total = files.Where(File.Exists).Sum(f => new FileInfo(f).Length);
+        // "PNG 2개 · 1.2 MB": the size of the files themselves (a folder or a file that is gone adds nothing). One look per
+        // file: asked for its length after it was found, a file deleted in between would throw.
+        var total = files.Sum(f => new FileInfo(f) is { Exists: true } info ? info.Length : 0);
         CenterTitle = (formats.Count == 1
             ? loc.Format("donut.files_same", files.Count, formats[0].DisplayName)
             : loc.Format("donut.files_mixed", files.Count))

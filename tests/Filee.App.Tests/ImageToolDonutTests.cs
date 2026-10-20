@@ -1,7 +1,9 @@
 // The tools slice on the image donut: drawn as an accent group, off for files the tools can't edit (animations, mixed
-// files, icons), the total file size in the centre, and a tool slice that closes the donut to open its window.
+// files, icons), the total file size in the centre, and a tool slice that closes the donut to open its window on the
+// files it can cut.
 
 using Avalonia;
+using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
 using Avalonia.Threading;
@@ -170,23 +172,44 @@ public class ImageToolDonutTests
     {
         public List<(ImageToolKind Tool, string[] Files, PixelPoint Cursor)> Opened { get; } = [];
 
+        /// <summary>The messages shown (answered at once, as if OK was pressed).</summary>
+        public List<string> Messages { get; } = [];
+
         public override Task<ImageEdit?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
         {
             Opened.Add((tool, [.. files], cursor));
             return Task.FromResult(answer);
         }
+
+        public override Task MessageAsync(Window? owner, string message)
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
     }
 
-    /// <summary>Opens the donut on <paramref name="files"/> at (400, 400) and clicks the crop slice of its tools ring.</summary>
-    private static (RadialController Radial, FakeToolWindows Windows) ClickCrop(string[] files, ImageEdit? edit)
+    /// <summary>Runs the UI thread until <paramref name="done"/>: a picked tool looks at its files on another thread first.</summary>
+    private static void RunUntil(Func<bool> done) =>
+        Assert.True(SpinWait.SpinUntil(() =>
+        {
+            Dispatcher.UIThread.RunJobs();
+            return done();
+        }, 10_000));
+
+    /// <summary>
+    /// Opens the donut on <paramref name="files"/> at (400, 400) and clicks the crop slice of its tools ring
+    /// (<paramref name="beforeClick"/> runs in between, with the donut open).
+    /// </summary>
+    private static (RadialController Radial, FakeToolWindows Windows) ClickCrop(string[] files, ImageEdit? edit, Action? beforeClick = null)
     {
         TestServices.EnsureInitialized("ko");
         var windows = new FakeToolWindows(edit);
         var radial = new RadialController(AppHost.Get<RadialViewModel>(), AppHost.Get<ConversionService>(), windows,
             AppHost.Get<Filee.Core.Settings.UserDataStore>(), AppHost.Get<Filee.Core.Platform.IPlatformServices>(),
-            AppHost.Get<Microsoft.Extensions.Logging.ILogger<RadialController>>());
+            AppHost.Get<Microsoft.Extensions.Logging.ILogger<RadialController>>(), AppHost.Get<ILocalizer>());
         radial.ShowForFiles(400, 400, files);
         Dispatcher.UIThread.RunJobs();
+        beforeClick?.Invoke();
         var donut = radial.Window!.DonutControl;
         var group = donut.Items!.ToList().FindIndex(i => i.Id == "tools");
         var onGroup = DonutGeometry.PointAt(new Point(donut.Bounds.Width / 2, donut.Bounds.Height / 2),
@@ -210,9 +233,10 @@ public class ImageToolDonutTests
 
         Assert.False(radial.IsVisible);         // closed at once, the tool opens from the next turn of the UI thread
         Assert.Empty(windows.Opened);
-        Dispatcher.UIThread.RunJobs();
+        RunUntil(() => windows.Opened.Count > 0 && conversions.Jobs.Count > jobs);
 
         var opened = Assert.Single(windows.Opened);
+        Assert.Empty(windows.Messages); // every file is a still picture: nothing to say
         Assert.Equal(ImageToolKind.Crop, opened.Tool);
         Assert.Equal(files, opened.Files);
         Assert.InRange(opened.Cursor.X, 398, 402);  // where the donut was
@@ -233,10 +257,46 @@ public class ImageToolDonutTests
         var conversions = AppHost.Get<ConversionService>();
         var jobs = conversions.Jobs.Count;
         var (radial, windows) = ClickCrop(TestImages.Png(1), edit: null);
+        RunUntil(() => windows.Opened.Count > 0);
         Dispatcher.UIThread.RunJobs();
 
         Assert.False(radial.IsVisible);
         Assert.Single(windows.Opened);
+        Assert.Equal(jobs, conversions.Jobs.Count);
+    }
+
+    [AvaloniaFact]
+    public void Crop_looks_at_every_file_once_picked_and_leaves_out_what_is_not_a_still_picture()
+    {
+        // The donut opens inside Explorer's drag, so it opens only the first files: the 28th, an animation, is not one of them.
+        string[] files = [.. TestImages.Png(27), TestImages.AnimatedGif(), .. TestImages.Png(2)];
+        Assert.True(ImageToolSupport.LookedIntoOnOpen < 28);
+        Assert.True(Tool(Load(files), "crop").IsEnabled);
+
+        var (_, windows) = ClickCrop(files, edit: null);
+        RunUntil(() => windows.Opened.Count > 0);
+
+        Assert.Equal(files.Where((_, i) => i != 27), Assert.Single(windows.Opened).Files);
+        var notice = Assert.Single(windows.Messages);
+        Assert.StartsWith("1개 건너뜀 (한 장짜리 사진이 아님)", notice);
+        Assert.Contains("anim.gif", notice);
+    }
+
+    [AvaloniaFact]
+    public void Crop_opens_no_window_when_no_file_is_left_to_cut()
+    {
+        TestServices.EnsureInitialized("ko");
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        var files = TestImages.Png(1);
+
+        // Gone after the donut looked at it: by the time crop is picked nothing is left to cut.
+        var (_, windows) = ClickCrop(files, edit: null, beforeClick: () => File.Delete(files[0]));
+        RunUntil(() => windows.Messages.Count > 0);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Contains("p1.png", Assert.Single(windows.Messages));
+        Assert.Empty(windows.Opened);
         Assert.Equal(jobs, conversions.Jobs.Count);
     }
 }

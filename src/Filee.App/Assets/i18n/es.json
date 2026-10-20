@@ -65,6 +65,7 @@
   "tool.crop.free": "Libre",
   "tool.crop.original": "Original",
   "tool.crop.size": "Tamaño (px)",
+  "tool.skipped_not_still": "Omitidos: {0} (no son imágenes fijas individuales)",
   "toast.converting": "{0} → {1}",
   "toast.done": "Hecho",
   "toast.done_errors": "Fallaron {0} de {1}",

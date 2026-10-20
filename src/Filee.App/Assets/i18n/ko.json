@@ -69,6 +69,7 @@
   "tool.crop.free": "자유",
   "tool.crop.original": "원본",
   "tool.crop.size": "크기(px)",
+  "tool.skipped_not_still": "{0}개 건너뜀 (한 장짜리 사진이 아님)",
 
   "toast.converting": "{0} → {1}",
   "toast.done": "완료",

@@ -69,6 +69,7 @@
   "tool.crop.free": "Dowolne",
   "tool.crop.original": "Oryginalne",
   "tool.crop.size": "Rozmiar (px)",
+  "tool.skipped_not_still": "Pominięto: {0} (to nie pojedyncze, nieruchome obrazy)",
 
   "toast.converting": "{0} → {1}",
   "toast.done": "Gotowe",

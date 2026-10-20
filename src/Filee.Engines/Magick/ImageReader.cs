@@ -19,9 +19,11 @@ internal static class ImageReader
 
     /// <summary>
     /// Reads <paramref name="path"/> as format <paramref name="formatId"/>. Layered formats come back as a single,
-    /// flattened image; other multi-frame formats (TIFF pages, GIF frames, ICO sizes) keep all frames.
+    /// flattened image; other multi-frame formats (TIFF pages, GIF frames, ICO sizes) keep all frames, unless
+    /// <paramref name="firstFrameOnly"/> asks for the first one alone (a picture to look at: a thumbnail, a preview),
+    /// so a long animation is not decoded frame by frame for it.
     /// </summary>
-    public static MagickImageCollection Read(string path, string formatId, Preset preset)
+    public static MagickImageCollection Read(string path, string formatId, Preset preset, bool firstFrameOnly = false)
     {
         if (formatId == "apng")
             return Apng.Read(path);
@@ -30,6 +32,12 @@ internal static class ImageReader
 
         var images = new MagickImageCollection();
         var settings = Settings(formatId, preset);
+        // Not for XCF: its frames are the layers, which make the picture only together (FlattenXcf below).
+        if (firstFrameOnly && formatId != "xcf")
+        {
+            settings.FrameIndex = 0;
+            settings.FrameCount = 1;
+        }
         try
         {
             images.Read(path, settings);

@@ -18,13 +18,21 @@ public static class GlassBackdrop
 
     /// <summary>
     /// Taking and blurring a 600 × 600 px capture should fit in this; a larger one gets as much more as it has pixels.
-    /// Once a machine takes longer it blurs at half resolution from then on.
+    /// Once a machine takes longer it blurs at half resolution from then on. The first blur of a run is not timed: it
+    /// pays for compiling the code and starting Skia, and would switch every PC.
     /// </summary>
     private const double BudgetMs = 15;
     private const double BudgetPixels = 600 * 600;
 
     // UI thread only.
     private static bool _halfResolution;
+    private static bool _warmedUp;
+
+    /// <summary>True once an open took longer than the budget: the glass is blurred at half resolution from then on.</summary>
+    public static bool HalfResolution => _halfResolution;
+
+    /// <summary>A fresh run, for tests: full resolution, and the next blur is the first one.</summary>
+    internal static void Reset() => (_halfResolution, _warmedUp) = (false, false);
 
     /// <summary>The blurred capture, or null when it is (nearly) all black: DRM video, the secure desktop.</summary>
     /// <param name="capture">The screen under the window, its top-left corner at the window's.</param>
@@ -62,9 +70,11 @@ public static class GlassBackdrop
         }
 
         milliseconds = clock.Elapsed.TotalMilliseconds;
-        // ponytail: one slow open (a GC pause, say) switches for good; BudgetMs is the knob, an average of opens if that bites.
-        if ((captureMs + milliseconds) * BudgetPixels / Math.Max(BudgetPixels, (double)capture.Width * capture.Height) > BudgetMs)
+        // ponytail: one slow open after the first (a GC pause, say) switches for good; BudgetMs is the knob, an average of
+        // opens if that bites.
+        if (_warmedUp && (captureMs + milliseconds) * BudgetPixels / Math.Max(BudgetPixels, (double)capture.Width * capture.Height) > BudgetMs)
             _halfResolution = true;
+        _warmedUp = true;
         return bitmap;
     }
 
