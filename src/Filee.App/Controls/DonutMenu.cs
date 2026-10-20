@@ -14,6 +14,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Rendering;
 using Avalonia.Threading;
 using Filee.App.Services;
 
@@ -56,7 +57,7 @@ public sealed class DonutItem
 }
 
 /// <summary>Donut-shaped menu control.</summary>
-public sealed partial class DonutMenu : Control
+public sealed partial class DonutMenu : Control, ICustomHitTest
 {
     public static readonly StyledProperty<IReadOnlyList<DonutItem>?> ItemsProperty =
         AvaloniaProperty.Register<DonutMenu, IReadOnlyList<DonutItem>?>(nameof(Items));
@@ -411,6 +412,13 @@ public sealed partial class DonutMenu : Control
         active |= _previewSpan.Step(previewSpan, dt, 420, 36);
         return active;
     }
+
+    /// <summary>
+    /// Where the pointer belongs to the donut: wherever <see cref="HitTest"/> finds it. Without this Avalonia routes the
+    /// pointer by what has been drawn, and a slice not drawn yet (a ring's later slices wait their turn while it opens, a
+    /// slice at 0 opacity) would get no hover, no click, and a pointer on it would count as having left the window.
+    /// </summary>
+    bool ICustomHitTest.HitTest(Point point) => HitTest(point).Kind != DonutHitKind.Outside;
 
     /// <summary>Hit-tests a point in this control's coordinates.</summary>
     public DonutHit HitTest(Point p)
@@ -948,7 +956,7 @@ public sealed partial class DonutMenu : Control
 
                 var hot = (i == ActiveIndex || i == _dropTargetIndex) && item.IsEnabled;
                 DrawLabel(context, item, center, (r1 + r2) / 2, mid, span * (r1 + r2) / 2 - 10,
-                    r2 - r1 - 16, r2 - r1, typeface, typefaceRegular, hot, Math.Max(0, emphasis));
+                    r2 - r1 - 16, r2 - r1, typeface, typefaceRegular, hot, item.IsEnabled ? Math.Max(0, emphasis) : 0);
             }
         }
 

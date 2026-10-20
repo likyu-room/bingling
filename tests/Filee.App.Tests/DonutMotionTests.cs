@@ -37,12 +37,15 @@ public class DonutMotionTests
 
     /// <summary>
     /// Keeps the window's own frame loop out of it: a queued frame would add real time to the clock the test sets. The
-    /// frame request the animation just made is for a loop number that is no longer the current one, so it is ignored.
+    /// frame request the animation just made is for a loop number that is no longer the current one, so it is ignored,
+    /// and the loop counts as having just had a frame (far into the future), so no animation call starts a new one.
     /// </summary>
     internal static void Freeze(DonutMenu donut)
     {
-        var loop = typeof(DonutMenu).GetField("_loop", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        var loop = typeof(DonutMenu).GetField("_loop", flags)!;
         loop.SetValue(donut, (int)loop.GetValue(donut)! + 1);
+        typeof(DonutMenu).GetField("_lastTick", flags)!.SetValue(donut, Environment.TickCount64 + 3_600_000);
     }
 
     internal static void Save(Window window, string name)
@@ -217,6 +220,67 @@ public class DonutMotionTests
         Assert.InRange(lit, 0.001, 0.999);
         Assert.Equal(1 + 0.12 * lit, DonutMenu.IconScale(lit), 9);
         window.Close();
+    }
+
+    /// <summary>
+    /// The icon of a lit slice grows 12 %, a disabled slice's stays: it pops out and grows a little like any slice, but
+    /// does not light up. The icon is a solid square in the colour of the label, so its width is read off the pixels.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData(true, true)]
+    [InlineData(false, false)]
+    public void Only_the_icon_of_an_enabled_slice_grows_when_it_is_lit(bool enabled, bool grows)
+    {
+        TestServices.EnsureInitialized("ko");
+        Motion.Configure(false, () => false);
+        var square = Geometry.Parse("M0,0 H24 V24 H0 Z");
+        var donut = new DonutMenu
+        {
+            Items = new[] { "PNG", "JPG", "WEBP", "PDF", "TIFF", "BMP" }
+                .Select((l, i) => new DonutItem { Id = l, Label = l, Icon = square, IsEnabled = i != 0 || enabled }).ToList(),
+            SecondaryForeground = Brushes.Magenta, // a disabled slice's name and icon
+            OnAccentBrush = Brushes.Magenta,       // a lit one's
+        };
+        var window = new Window { Content = donut, SizeToContent = SizeToContent.WidthAndHeight };
+        window.Show();
+        Dispatcher.UIThread.RunJobs();
+        donut.SetExternalHighlight(0); // the slice at the top
+        for (var i = 0; i < 120; i++)
+            donut.Advance(1 / 60.0);
+        Assert.Equal(1, donut.LitAmount(0), 3);
+
+        var (pixels, width) = Read(donut);
+        bool Magenta(int x, int y) => pixels[(y * width + x) * 4 + 2] > 200 && pixels[(y * width + x) * 4] > 200 && pixels[(y * width + x) * 4 + 1] < 100;
+        var middle = (int)donut.Bounds.Width / 2;
+        var top = Enumerable.Range(0, (int)donut.Bounds.Height / 2)
+            .First(y => Enumerable.Range(middle - 40, 80).Count(x => Magenta(x, y)) >= 5);
+        var across = Enumerable.Range(0, width).Count(x => Magenta(x, top + 4)); // inside the square, above the name
+
+        // 18 px at the slice's own size of 1.035: 18.6, and with the icon's own 12 % 20.9.
+        if (grows)
+            Assert.InRange(across, 20, 23);
+        else
+            Assert.InRange(across, 17, 19);
+        window.Close();
+    }
+
+    private static (byte[] Pixels, int Width) Read(DonutMenu donut)
+    {
+        Dispatcher.UIThread.RunJobs();
+        var (width, height) = ((int)donut.Bounds.Width, (int)donut.Bounds.Height);
+        using var bitmap = new RenderTargetBitmap(new PixelSize(width, height));
+        bitmap.Render(donut);
+        var pixels = new byte[width * height * 4];
+        var handle = GCHandle.Alloc(pixels, GCHandleType.Pinned);
+        try
+        {
+            bitmap.CopyPixels(new PixelRect(0, 0, width, height), handle.AddrOfPinnedObject(), pixels.Length, width * 4);
+        }
+        finally
+        {
+            handle.Free();
+        }
+        return (pixels, width);
     }
 
     [AvaloniaFact]

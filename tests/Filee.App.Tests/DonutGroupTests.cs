@@ -49,19 +49,6 @@ public class DonutGroupTests
 
     private static bool IsOpen(DonutMenu donut) => donut.HitTest(OnRing(donut, 1)).Kind == DonutHitKind.SubSegment;
 
-    /// <summary>
-    /// Lets an open ring finish opening, and draws it. Its slices start one after another, and the headless pointer only
-    /// finds a slice that has been drawn: a mouse sent onto one too soon is "outside" the donut.
-    /// </summary>
-    private static void LetRingOpen(DonutMenu donut)
-    {
-        for (var i = 0; i < 30; i++)
-            donut.Advance(1 / 60.0);
-        donut.InvalidateVisual();
-        Dispatcher.UIThread.RunJobs();
-        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
-    }
-
     [AvaloniaFact]
     public void Passing_over_a_group_on_the_way_elsewhere_does_not_open_it()
     {
@@ -152,7 +139,6 @@ public class DonutGroupTests
         var inner = OnGroup(donut, donut.OuterRadius * 0.6);
         donut.SetExternalHit(donut.HitTest(inner), inner);
         donut.ExpandPendingGroup();
-        LetRingOpen(donut);
 
         // The mouse comes onto the ring first: right after another test's click, a headless press with no move before it
         // can miss the donut.
@@ -319,7 +305,6 @@ public class DonutGroupTests
         window.MouseMove(InWindow(inner));
         window.MouseDown(InWindow(inner), MouseButton.Left);
         window.MouseUp(InWindow(inner), MouseButton.Left);
-        LetRingOpen(donut);
         window.MouseMove(InWindow(OnRing(donut, 1)));
         Assert.True(IsOpen(donut));
         window.MouseMove(new Point(2, 2));
@@ -580,7 +565,6 @@ public class DonutGroupTests
         donut.HandleKey(Key.Right); // to the group
         donut.HandleKey(Key.Enter); // its ring opens
         Assert.True(IsOpen(donut));
-        LetRingOpen(donut);
 
         // The mouse heads for the ring: out of the hole, across the group's slice, to a ring slice.
         foreach (var radius in new[] { 15.0, donut.OuterRadius * 0.3, donut.OuterRadius * 0.7 })
@@ -658,6 +642,63 @@ public class DonutGroupTests
             Motion.Configure(false, () => false);
             window.Close();
         }
+    }
+
+    /// <summary>
+    /// A ring's later slices are not drawn for the first 0.03 s or so of its opening, but the pointer belongs to them from
+    /// the start: a mouse sent straight onto the last one lights it, and a click there converts. (The headless pointer is
+    /// routed by what the last frame drew, which is what failed here before the donut answered the hit test itself.)
+    /// </summary>
+    [AvaloniaFact]
+    public void A_ring_slice_that_is_not_drawn_yet_still_gets_the_pointer()
+    {
+        var (donut, window) = Open();
+        Motion.Configure(false, () => false); // animations on, whatever the machine reports
+        var clicked = new List<(int, int)>();
+        donut.SubSegmentInvoked += (_, hit) => clicked.Add(hit);
+        var inner = OnGroup(donut, donut.OuterRadius * 0.6);
+        window.MouseMove(inner);
+        window.MouseDown(inner, MouseButton.Left);
+        window.MouseUp(inner, MouseButton.Left); // a click opens the group at once
+        Assert.True(IsOpen(donut));
+        var last = 2;
+
+        window.MouseMove(OnRing(donut, last));
+
+        Assert.True(donut.SubOpenAmount(last) < 0.9); // the ring is still opening: the slice is not (all) there yet
+        Assert.Equal(last, donut.ActiveSubIndex);
+        window.MouseDown(OnRing(donut, last), MouseButton.Left);
+        window.MouseUp(OnRing(donut, last), MouseButton.Left);
+        Assert.Equal([(Group, last)], clicked);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void The_pointer_still_falls_through_outside_the_donut_and_its_ring()
+    {
+        var (donut, window) = Open();
+        var c = Center(donut);
+        // What the window routes the pointer to, after a frame (before one it routes it to nothing at all).
+        IInputElement? At(Point p)
+        {
+            donut.InvalidateVisual();
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            return window.InputHitTest(p);
+        }
+        Assert.Same(donut, At(OnGroup(donut, donut.OuterRadius * 0.6)));
+        Assert.Same(donut, At(c)); // the hole
+        var corner = new Point(3, 3);
+        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(At(corner))); // the window's own: clicks there close the donut
+
+        // With the ring open: on it the donut, past its outer edge and beside it not.
+        var inner = OnGroup(donut, donut.OuterRadius * 0.6);
+        donut.SetExternalHit(donut.HitTest(inner), inner);
+        donut.ExpandPendingGroup();
+        Assert.Same(donut, At(OnRing(donut, 1)));
+        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(At(OnGroup(donut, donut.OuterRadius + 75))));
+        Assert.NotSame(donut, Assert.IsAssignableFrom<IInputElement>(At(corner)));
+        window.Close();
     }
 
     [AvaloniaFact]
