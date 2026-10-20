@@ -49,7 +49,7 @@ public class RenderTests
     }
 
     /// <summary>
-    /// The GitHub and Sponsor buttons under the menu share their row; without a repository (the fork has none yet) only
+    /// The GitHub and Sponsor buttons under the menu share their row; without a repository (a build with no fork) only
     /// Sponsor shows, and it takes the whole row instead of sitting alone in its right half.
     /// </summary>
     [AvaloniaFact]
@@ -65,7 +65,8 @@ public class RenderTests
         var shown = row.Children.Where(b => b.IsVisible).ToList();
         Assert.Equal(UpdateService.HasRepository ? 2 : 1, shown.Count);
         var width = (row.Bounds.Width - row.ColumnSpacing * (shown.Count - 1)) / shown.Count;
-        Assert.All(shown, b => Assert.Equal(width, b.Bounds.Width, 1));
+        // Layout rounding snaps each half to whole pixels (93.5 → 94).
+        Assert.All(shown, b => Assert.Equal(width, b.Bounds.Width, tolerance: 1.0));
         Assert.Equal(0, shown[0].Bounds.X, 1);
         Save(window, "sidebar-links-ko.png");
         window.Close();

@@ -249,7 +249,7 @@ public class UpdateServiceTests
         // An earlier check found 9.9.9; 9.9.10 came out before Update was pressed.
         var updates = new UpdateService(NullLogger<UpdateService>.Instance, new LatestRelease("v9.9.10"))
         {
-            Repository = "https://github.com/someone/filee-plus", // Filee Plus has no repository of its own yet
+            Repository = "https://github.com/someone/filee-plus", // not this build's real repository
         };
         updates.UseRelease(new UpdateService.ReleaseFile("FileePlus-9.9.9-win-Setup.exe", Base + "FileePlus-9.9.9-win-Setup.exe", 1),
             new UpdateService.ReleaseFile("FileePlus-9.9.9-SHA256SUMS.txt", Base + "FileePlus-9.9.9-SHA256SUMS.txt", 1));

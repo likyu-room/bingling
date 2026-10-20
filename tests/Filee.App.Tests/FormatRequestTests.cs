@@ -57,7 +57,7 @@ public sealed class FormatRequestTests : IDisposable
     [Fact]
     public void The_link_opens_the_format_request_form_with_only_the_extension()
     {
-        // Filee Plus has no repository until the fork exists, so the test brings its own.
+        // The test brings its own repository, not this build's.
         const string repository = "https://github.com/someone/filee-plus";
         var url = FormatRequest.Url([".ncm", ".kgm"], repository).AbsoluteUri;
 

@@ -83,7 +83,7 @@ public class ReleaseNotesTests
     {
         var updates = new UpdateService(NullLogger<UpdateService>.Instance, new Releases())
         {
-            Repository = "https://github.com/someone/filee-plus", // Filee Plus has no repository of its own yet
+            Repository = "https://github.com/someone/filee-plus", // not this build's real repository
         };
 
         Assert.True(await updates.RefreshAsync(announce: false));

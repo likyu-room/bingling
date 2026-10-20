@@ -2,7 +2,7 @@
 // installed copy "Update" downloads the new installer, checks it against the release's SHA256SUMS file and runs it;
 // Setup closes Filee, updates it in place (settings are kept) and starts it again. A portable copy, a copy run from
 // source, or a failed download opens a download page instead. The check works in every build that has a repository
-// (FileeRepositoryUrl in Directory.Build.props); Filee Plus has none until its fork exists, and then does nothing.
+// (FileeRepositoryUrl in Directory.Build.props); a build without one does nothing.
 
 using System.ComponentModel;
 using System.Diagnostics;
@@ -68,8 +68,8 @@ public sealed partial class UpdateService : ObservableObject
     }
 
     /// <summary>
-    /// GitHub repository from Directory.Build.props (FileeRepositoryUrl). Empty while Filee Plus has no repository of
-    /// its own; it must never fall back to the original Filee's, whose releases are another program.
+    /// GitHub repository from Directory.Build.props (FileeRepositoryUrl). Empty in a build without one; it must never
+    /// fall back to the original Filee's, whose releases are another program.
     /// </summary>
     public static string RepositoryUrl =>
         typeof(UpdateService).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
@@ -161,7 +161,7 @@ public sealed partial class UpdateService : ObservableObject
     internal async Task<bool> RefreshAsync(bool announce, CancellationToken cancellationToken = default)
     {
         if (!CanCheck(Repository))
-            return false; // the fork has no repository yet: nothing to ask
+            return false; // no repository: nothing to ask
         try
         {
             var api = Repository.TrimEnd('/').Replace("https://github.com/", "https://api.github.com/repos/", StringComparison.OrdinalIgnoreCase)

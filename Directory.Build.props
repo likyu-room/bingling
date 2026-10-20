@@ -19,9 +19,10 @@
     <Authors>Filee contributors</Authors>
     <Copyright>Copyright (c) Filee contributors</Copyright>
 
-    <!-- Single source of truth for the GitHub repository (used by the updater and the About page). Empty until the
-         Filee Plus fork exists: with no repository the app does not check for updates and hides the GitHub links. -->
-    <FileeRepositoryUrl></FileeRepositoryUrl>
+    <!-- Single source of truth for the GitHub repository, the public Filee Plus fork (used by the updater and the About
+         page). It must stay public: GitHub shows releases to signed-out apps only then. With no repository the app does
+         not check for updates and hides the GitHub links. -->
+    <FileeRepositoryUrl>https://github.com/likyu-room/filee-plus</FileeRepositoryUrl>
     <RepositoryUrl>$(FileeRepositoryUrl)</RepositoryUrl>
   </PropertyGroup>
 </Project>
