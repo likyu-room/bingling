@@ -50,20 +50,51 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     private static bool IsRed(IMagickImage<byte> image, int x, int y) =>
         image.GetPixels().GetPixel(x, y).ToColor() is { } c && c.R > 200 && c.G < 80 && c.B < 80;
 
+    /// <summary>
+    /// Writes <paramref name="image"/> (and disposes it) as <paramref name="name"/>, whose extension names the format, in
+    /// a fresh folder. <paramref name="compressionLevel"/> sets the zlib level of a PNG.
+    /// </summary>
+    private string Write(MagickImage image, string name, int? compressionLevel = null)
+    {
+        var path = Path.Combine(fx.NewFolder(), name);
+        using (image)
+        {
+            if (compressionLevel is { } level)
+                image.Settings.SetDefine(MagickFormat.Png, "compression-level", level);
+            image.Write(path);
+        }
+        return path;
+    }
+
+    /// <summary>
+    /// A JPEG as phones save it: stored 40 × 20, shown turned right (EXIF orientation 6), so on screen 20 × 40 with the
+    /// red square at the top right.
+    /// </summary>
+    private string WritePhone(uint quality = 90)
+    {
+        var image = Marked();
+        var exif = new ExifProfile();
+        exif.SetValue(ExifTag.Orientation, (ushort)OrientationType.RightTop);
+        image.SetProfile(exif);
+        image.Orientation = OrientationType.RightTop; // ImageMagick writes this into the profile
+        image.Quality = quality;
+        return Write(image, "phone.jpg");
+    }
+
+    /// <summary>Random pixels from a few levels per channel: a picture that zlib packs better the harder it tries.</summary>
+    private static MagickImage Noise(uint width, uint height)
+    {
+        var random = new Random(1);
+        var pixels = new byte[width * height * 3];
+        for (var i = 0; i < pixels.Length; i++)
+            pixels[i] = (byte)(random.Next(8) * 32);
+        return new MagickImage(pixels, new PixelReadSettings(width, height, StorageType.Char, PixelMapping.RGB));
+    }
+
     [Fact]
     public async Task A_phone_photo_turns_the_way_it_looks_and_says_so_in_its_orientation()
     {
-        var dir = fx.NewFolder();
-        var source = Path.Combine(dir, "phone.jpg");
-        using (var image = Marked())
-        {
-            // Stored landscape, shown turned right (EXIF orientation 6): on screen 20 × 40, red at the top right.
-            var exif = new ExifProfile();
-            exif.SetValue(ExifTag.Orientation, (ushort)OrientationType.RightTop);
-            image.SetProfile(exif);
-            image.Orientation = OrientationType.RightTop; // ImageMagick writes this into the profile
-            image.Write(source, MagickFormat.Jpeg);
-        }
+        var source = WritePhone();
         using (var written = new MagickImage(source))
             Assert.Equal(OrientationType.RightTop, written.Orientation); // the test photo is what it says
 
@@ -249,5 +280,103 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
         Assert.Equal(JobState.Completed, job.State);
         using var pdf = PdfSharp.Pdf.IO.PdfReader.Open(job.Outputs.Single(), PdfSharp.Pdf.IO.PdfDocumentOpenMode.Import);
         Assert.True(pdf.Pages[0].Height.Point > pdf.Pages[0].Width.Point); // landscape image, portrait page
+    }
+
+    /// <summary>The built-in crop preset with a box (fractions of the picture as it is shown).</summary>
+    private static Preset Crop(double x, double y, double w, double h, double? aspect = null)
+    {
+        var p = Tool("crop").Clone();
+        p.Image.Edit = new ImageEdit { Crop = new CropRect { X = x, Y = y, Width = w, Height = h, Aspect = aspect } };
+        return p;
+    }
+
+    [Fact]
+    public async Task Crop_keeps_the_box_and_the_format()
+    {
+        // 40×20 PNG, red 10×10 top-left. Box = left quarter, full height → 10×20, red at (0,0).
+        var job = await fx.ConvertAsync([Write(Marked(), "a.png")], Crop(0, 0, .25, 1));
+        Assert.Equal(JobState.Completed, job.State);
+        Assert.Equal("a Cropped.png", Path.GetFileName(job.Outputs.Single()));
+        using var r = new MagickImage(job.Outputs.Single());
+        Assert.Equal((10u, 20u), (r.Width, r.Height));
+        Assert.True(IsRed(r, 0, 0));
+        Assert.Equal((0, 0), (r.Page.X, r.Page.Y)); // no leftover canvas offset
+    }
+
+    [Fact]
+    public async Task Crop_of_a_turned_phone_photo_cuts_what_the_user_sees()
+    {
+        // Stored 40×20 with orientation 6 (shown 20×40, red top-right). Box = top half as seen → 20×20 with red at the top right.
+        var job = await fx.ConvertAsync([WritePhone()], Crop(0, 0, 1, .5));
+        using var r = new MagickImage(job.Outputs.Single());
+        Assert.Equal((20u, 20u), (r.Width, r.Height));
+        Assert.True(IsRed(r, 18, 1));
+        Assert.Contains(r.Orientation, new[] { OrientationType.TopLeft, OrientationType.Undefined });
+    }
+
+    [Fact]
+    public async Task Compress_never_raises_jpeg_quality_and_keeps_the_photo_upright()
+    {
+        var source = WritePhone(quality: 70);              // orientation 6, quality 70, EXIF present
+        var job = await fx.ConvertAsync([source], Tool("compress-image"));
+        var output = job.Outputs.Single();
+        Assert.Equal("phone Compressed.jpg", Path.GetFileName(output));
+        using var r = new MagickImage(output);
+        Assert.True(r.Quality <= 70, $"quality {r.Quality}");
+        Assert.Equal((20u, 40u), (r.Width, r.Height));     // turned upright
+        Assert.Null(r.GetExifProfile());
+    }
+
+    [Fact]
+    public async Task Strip_metadata_removes_exif_and_keeps_orientation_visually()
+    {
+        var job = await fx.ConvertAsync([WritePhone()], Tool("strip-metadata"));
+        using var r = new MagickImage(job.Outputs.Single());
+        Assert.Null(r.GetExifProfile());
+        Assert.Equal((20u, 40u), (r.Width, r.Height));
+        Assert.True(IsRed(r, 18, 1));
+    }
+
+    [Fact]
+    public async Task Compressing_a_png_stays_lossless_and_not_larger()
+    {
+        var source = Write(Noise(256, 256), "n.png", compressionLevel: 1); // little compression on purpose
+        var job = await fx.ConvertAsync([source], Tool("compress-image"));
+        var output = job.Outputs.Single();
+        Assert.True(new FileInfo(output).Length <= new FileInfo(source).Length);
+        using var a = new MagickImage(source);
+        using var b = new MagickImage(output);
+        Assert.Equal(0, a.Compare(b, ErrorMetric.Absolute));
+    }
+
+    /// <summary>
+    /// The crop tool's output size on every raster format ImageMagick reads and writes here (a 64 × 48 picture, the box
+    /// is its middle half → 32 × 24). Icons are left out: they are padded to a square on the way.
+    /// </summary>
+    [Theory]
+    [InlineData("jpg")]
+    [InlineData("png")]
+    [InlineData("webp")]
+    [InlineData("bmp")]
+    [InlineData("tiff")]
+    [InlineData("gif")]
+    [InlineData("avif")]
+    [InlineData("jxl")]
+    [InlineData("jp2")]
+    [InlineData("psd")]
+    [InlineData("tga")]
+    [InlineData("qoi")]
+    [InlineData("ppm")]
+    public async Task Crop_cuts_every_raster_format_to_the_box(string format)
+    {
+        var picture = new MagickImage(MagickColors.White, 64, 48);
+        new Drawables().FillColor(MagickColors.Red).Rectangle(0, 0, 15, 11).Draw(picture);
+        var source = Write(picture, $"s.{format}");
+
+        var job = await fx.ConvertAsync([source], Crop(.25, .25, .5, .5));
+
+        Assert.True(job.State == JobState.Completed, string.Join("; ", job.Files.Select(f => $"{f.ErrorKey} {f.ErrorDetail}")));
+        using var r = new MagickImage(job.Outputs.Single());
+        Assert.Equal((32u, 24u), (r.Width, r.Height));
     }
 }

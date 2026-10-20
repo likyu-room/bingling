@@ -175,6 +175,25 @@ public class HeicTests(EngineFixture fx) : IClassFixture<EngineFixture>
     }
 
     [Fact]
+    public async Task A_cropped_picture_is_stored_as_the_box_only_and_a_HEIC_can_be_cropped_again()
+    {
+        SkipUnlessInstalled();
+        var png = EngineFixture.MakeImage(fx.NewFolder(), "wide.png", MagickFormat.Png, 301, 201);
+        var middle = new ImageOptions { Quality = 80, Edit = new ImageEdit { Crop = new CropRect { X = .25, Y = .25, Width = .5, Height = .5 } } };
+        var cropped = await ConvertAsync(png, middle);
+        using (var heic = new MagickImage(cropped))
+            Assert.Equal((151u, 101u), (heic.Width, heic.Height)); // 150.5 × 100.5 pixels, rounded up
+
+        // The crop tool on a HEIC: same format back (HEIC is read by ImageMagick, written by Filee's HEIF writer).
+        var again = BuiltInData.CreatePresets().Single(p => p.Id == "crop").Clone();
+        again.Image.Edit = new ImageEdit { Crop = new CropRect { Width = .5, Height = .5 } };
+        var job = await fx.ConvertAsync([cropped], again);
+        Assert.True(job.State == JobState.Completed, string.Join("; ", job.Files.Select(f => $"{f.ErrorKey} {f.ErrorDetail}")));
+        using var smaller = new MagickImage(job.Outputs.Single());
+        Assert.Equal((76u, 51u), (smaller.Width, smaller.Height));
+    }
+
+    [Fact]
     public async Task Quality_and_metadata_options_apply()
     {
         SkipUnlessInstalled();

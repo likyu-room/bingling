@@ -227,6 +227,13 @@ internal static class ImageEncoder
 
         // After AutoOrient, so a phone photo turns the way it looks, not the way its pixels are stored.
         Turn(image, options);
+        // After the turn: the box is a fraction of the picture as it is shown (see CropRect).
+        if (options.Edit?.Crop is { } crop)
+        {
+            var (x, y, w, h) = CropMath.ToPixels(crop, (int)image.Width, (int)image.Height);
+            image.Crop(new MagickGeometry(x, y, (uint)w, (uint)h));
+            image.ResetPage(); // else the file keeps the cut-out's place on the old canvas
+        }
         // The small preview kept in the EXIF data still shows the picture as it was: Explorer and photo apps that
         // use it would show it unturned. As HeicWriter does, drop it once the pixels turned.
         if (turned && image.GetExifProfile() is { } exif && exif.ThumbnailLength > 0)
@@ -275,9 +282,12 @@ internal static class ImageEncoder
         }
 
         var quality = (uint)Math.Clamp(options.Quality, 1, 100);
-        // Turning a JPEG has to re-encode it: at the photo's own quality (Magick's estimate when it read the file), not
-        // above it, or a phone photo saved at 75 comes back at 95, bigger and no better.
-        if (options.TurnsOrMirrors && targetFormat == "jpg" && image.Format == MagickFormat.Jpeg && image.Quality is > 0 and <= 100)
+        // Turning, cropping or compressing a JPEG (or compressing a WebP) has to re-encode it: at the picture's own
+        // quality (Magick's estimate when it read the file), not above it, or a phone photo saved at 75 comes back at
+        // 95, bigger and no better.
+        var reencodes = (targetFormat == "jpg" && image.Format == MagickFormat.Jpeg && (options.TurnsOrMirrors || options.Optimize))
+            || (targetFormat == "webp" && image.Format == MagickFormat.WebP && options.Optimize);
+        if (reencodes && image.Quality is > 0 and <= 100)
             quality = Math.Min(quality, image.Quality);
         switch (targetFormat)
         {
@@ -294,6 +304,10 @@ internal static class ImageEncoder
                 image.Quality = quality;
                 if (options.WebpLossless)
                     image.Settings.SetDefine(MagickFormat.WebP, "lossless", true);
+                break;
+            case "png" when options.Optimize:
+                // zlib's strongest level (the filter stays ImageMagick's adaptive one): lossless, it costs time, not quality.
+                image.Settings.SetDefine(MagickFormat.Png, "compression-level", 9);
                 break;
             case "tiff":
                 image.Settings.Compression = options.TiffCompression switch
