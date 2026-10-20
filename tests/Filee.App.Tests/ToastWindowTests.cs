@@ -85,7 +85,7 @@ public class ToastWindowTests
         // The short side is the card's 56 px (headless: scale 1); the card cuts the long side to its square.
         Assert.Equal(56, vm.Thumbnail!.PixelSize.Height);
         Assert.Equal(84, vm.Thumbnail.PixelSize.Width);
-        Assert.Matches(@"^[\d.]+ (KB|MB) → [\d.]+ (KB|MB) · \d+% 작아짐$", vm.SizeChange);
+        Assert.Matches(@"^[\d.]+\u00A0(KB|MB) → [\d.]+\u00A0(KB|MB) · \d+% 작아짐$", vm.SizeChange);
         Assert.False(vm.ShowsStatus);
         // The pictures were read into memory: the user can move or delete them straight away.
         File.Delete(source);
@@ -212,7 +212,7 @@ public class ToastWindowTests
         File.Delete(source); // a watch folder moved the original away once the job was done
         await vm.LoadFinishDetailsAsync();
 
-        Assert.Equal("4.0 KB → 2.0 KB · 50% 작아짐", vm.SizeChange);
+        Assert.Equal("4.0\u00A0KB → 2.0\u00A0KB · 50% 작아짐", vm.SizeChange);
     }
 
     [AvaloniaFact]
@@ -235,17 +235,17 @@ public class ToastWindowTests
         await vm.LoadFinishDetailsAsync();
 
         Assert.Null(vm.Thumbnail);
-        Assert.Equal("4.0 KB → 2.0 KB · 50% 작아짐", vm.SizeChange);
+        Assert.Equal("4.0\u00A0KB → 2.0\u00A0KB · 50% 작아짐", vm.SizeChange);
         // No picture to show: the card gets the circle with the icon of what was made.
         Assert.NotNull(vm.FormatIcon);
     }
 
     [AvaloniaTheory]
-    [InlineData(2048, 1024, "2.0 KB → 1.0 KB · 50% 작아짐")]
-    [InlineData(1024, 3072, "1.0 KB → 3.0 KB · 200% 커짐")]
-    [InlineData(1000, 1000, "1000 B → 1000 B · 0% 작아짐")]
-    [InlineData(1000, 1004, "1000 B → 1004 B · 0% 작아짐")] // under half a percent: "0%", whichever way it went
-    [InlineData(1000, 1006, "1000 B → 1006 B · 1% 커짐")]
+    [InlineData(2048, 1024, "2.0\u00A0KB → 1.0\u00A0KB · 50% 작아짐")]
+    [InlineData(1024, 3072, "1.0\u00A0KB → 3.0\u00A0KB · 200% 커짐")]
+    [InlineData(1000, 1000, "1000\u00A0B → 1000\u00A0B · 0% 작아짐")]
+    [InlineData(1000, 1004, "1000\u00A0B → 1004\u00A0B · 0% 작아짐")] // under half a percent: "0%", whichever way it went
+    [InlineData(1000, 1006, "1000\u00A0B → 1006\u00A0B · 1% 커짐")]
     public async Task The_size_change_names_both_sizes_and_the_whole_percent(long before, long after, string expected)
     {
         TestServices.EnsureInitialized("ko");
@@ -267,7 +267,7 @@ public class ToastWindowTests
         var broken = Finished(dir.Bytes("a.png", 3000), dir.Bytes("a.jpg", 1500));
         await broken.LoadFinishDetailsAsync();
         Assert.Null(broken.Thumbnail);
-        Assert.Equal("2.9 KB → 1.5 KB · 50% 작아짐", broken.SizeChange);
+        Assert.Equal("2.9\u00A0KB → 1.5\u00A0KB · 50% 작아짐", broken.SizeChange);
 
         // The output is gone (moved already): nothing to compare, nothing thrown.
         var gone = Finished(dir.Bytes("b.png", 3000), Path.Combine(dir.Path, "b.jpg"));
@@ -287,7 +287,7 @@ public class ToastWindowTests
 
         Assert.True(vm.IsSucceeded);
         Assert.NotNull(vm.Thumbnail);
-        Assert.Matches(@"^[\d.]+ (B|KB|MB) → [\d.]+ (B|KB|MB) · \d+% (작아짐|커짐)$", vm.SizeChange);
+        Assert.Matches(@"^[\d.]+\u00A0(B|KB|MB) → [\d.]+\u00A0(B|KB|MB) · \d+% (작아짐|커짐)$", vm.SizeChange);
         // Another refresh (the queue reports progress many times) must not read the files again.
         var thumbnail = vm.Thumbnail;
         vm.Refresh();

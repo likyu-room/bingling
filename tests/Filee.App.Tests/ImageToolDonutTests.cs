@@ -95,7 +95,7 @@ public class ImageToolDonutTests
         Assert.Equal(3, tools.Children!.Count);
         Assert.All(tools.Children, c => Assert.True(c.IsAccent && c.IsEnabled));
         Assert.DoesNotContain(vm.Items.Where(i => i.Id != "tools"), i => i.IsAccent);
-        Assert.Matches(@"^PNG 2개 · \d+ B$", vm.CenterTitle);
+        Assert.Matches(@"^PNG 2개 · \d+\u00A0B$", vm.CenterTitle);
     }
 
     [AvaloniaFact]

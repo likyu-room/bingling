@@ -973,8 +973,10 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
                 DrawGlassEdge(context, wedge);
 
                 var hot = (i == ActiveIndex || i == _dropTargetIndex) && item.IsEnabled;
+                // The edit button of the slice under the mouse (DrawEditButton) sits where its icon is: it takes its place.
+                var editing = IsEditMode && i == _hoverIndex && _dimmedIndex < 0;
                 DrawLabel(context, item, center, (r1 + r2) / 2, mid, span * (r1 + r2) / 2 - 10,
-                    r2 - r1 - 16, r2 - r1, typeface, typefaceRegular, hot, item.IsEnabled ? Math.Max(0, emphasis) : 0);
+                    r2 - r1 - 16, r2 - r1, typeface, typefaceRegular, hot, item.IsEnabled ? Math.Max(0, emphasis) : 0, showIcon: !editing);
             }
         }
 
@@ -1043,19 +1045,24 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
     // maxWidth / maxHeight: room for the name across the slice and along the ring (the ring's thickness less a margin).
     // thickness: the ring's thickness itself, which the icon above the name has to fit in too (LabelLayout).
     // lit: how far the slice is lit up (0 to 1, a slice's hover spring), which the icon grows with; by default all or nothing, as hot.
+    // showIcon: false draws the name as if the slice had no icon.
     private void DrawLabel(DrawingContext context, DonutItem item, Point center, double radius, double angle,
-        double maxWidth, double maxHeight, double thickness, Typeface bold, Typeface regular, bool hot, double? lit = null)
+        double maxWidth, double maxHeight, double thickness, Typeface bold, Typeface regular, bool hot, double? lit = null,
+        bool showIcon = true)
     {
         var foreground = hot ? HotText : item.IsEnabled ? Foreground : SecondaryForeground;
         var width = Math.Clamp(maxWidth, 30, 120);
-        var label = MakeText(item.Label, bold, 13, foreground, width, maxLines: 2);
+        // ponytail: measured on every frame, like the label itself; cache by (label, width) if profiling ever shows it.
+        var text = WrapAtSpaces(item.Label, width,
+            s => new FormattedText(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, bold, 13, null).Width);
+        var label = MakeText(text, bold, 13, foreground, width, maxLines: 2);
         var showCaption = !string.IsNullOrEmpty(item.Caption) &&
                           !string.Equals(item.Caption, item.Label, StringComparison.OrdinalIgnoreCase) &&
                           label.Height + 14 < maxHeight;
         var caption = showCaption ? MakeText(item.Caption!, regular, 10.5, hot ? HotText : SecondaryForeground, width) : null;
 
         var anchor = DonutGeometry.PointAt(center, radius, angle);
-        var layout = LabelLayout(item.Icon is not null, center, radius, angle, maxWidth, thickness,
+        var layout = LabelLayout(showIcon && item.Icon is not null, center, radius, angle, maxWidth, thickness,
             width, label.Height + (caption?.Height ?? 0), IconScale(lit ?? (hot ? 1 : 0)));
         DrawCentered(context, label, anchor.X, layout.Text.Top);
         if (caption is not null)
@@ -1068,6 +1075,29 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
             using (context.PushTransform(Matrix.CreateScale(scale, scale) * Matrix.CreateTranslation(layout.Icon.X, layout.Icon.Y)))
                 context.DrawGeometry(foreground, null, item.Icon!);
         }
+    }
+
+    /// <summary>
+    /// <paramref name="text"/> with a line break at a space when it is wider than <paramref name="width"/>: as many whole
+    /// words as fit on the first line ("50% 축소" → "50%" / "축소"), the rest on the second. The text layout may break Korean
+    /// between any two syllables ("50% 축" / "소"), so left to itself it only breaks inside a word that is too wide alone.
+    /// What doesn't fit on the second line is cut by the label's two-line limit and ellipsis, as before.
+    /// </summary>
+    /// <param name="text">The slice's name.</param>
+    /// <param name="width">The width the name is laid out in.</param>
+    /// <param name="measure">The width of a text on one line.</param>
+    internal static string WrapAtSpaces(string text, double width, Func<string, double> measure)
+    {
+        if (!text.Contains(' ') || measure(text) <= width)
+            return text;
+        var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (words.Length < 2)
+            return text;
+        var first = words[0];
+        var next = 1;
+        while (next < words.Length && measure(first + " " + words[next]) <= width)
+            first += " " + words[next++];
+        return next == words.Length ? first : first + "\n" + string.Join(' ', words[next..]);
     }
 
     /// <summary>Edge of the icon's box and the gap between it and the name.</summary>

@@ -1,6 +1,7 @@
 // Renders real windows headlessly (Skia) to catch XAML / binding errors and to produce screenshots
 // in bin/.../screenshots for visual review.
 
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
@@ -326,6 +327,36 @@ public class RenderTests
         {
             (package.Status, package.Progress, package.ProgressDetail) = before;
         }
+    }
+
+    /// <summary>
+    /// The donut on the toolbar page wears the icons of the live donut, and the edit button of the slice under the mouse
+    /// still has room beside its icon (the screenshot is for the eye).
+    /// </summary>
+    [AvaloniaFact]
+    public void The_toolbar_pages_donut_has_the_icons_of_the_live_donut()
+    {
+        TestServices.EnsureInitialized("ko");
+        var vm = new MainWindowViewModel(AppHost.Services, AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<UpdateService>());
+        vm.Navigate("toolbar");
+        var window = new MainWindow { DataContext = vm, Width = 1080, Height = 820 };
+        window.Show();
+        Pump();
+        var donut = window.GetVisualDescendants().OfType<DonutMenu>().Single(d => d.IsEditMode);
+        var store = AppHost.Get<UserDataStore>();
+
+        Assert.All(donut.Items!, item => Assert.Same(DonutIcons.For(store.FindPreset(item.Id)!), item.Icon));
+        Assert.Contains(donut.Items!, item => item.Icon is not null);
+
+        // The mouse on the top slice: its edit button shows.
+        var top = DonutGeometry.PointAt(new Point(donut.Bounds.Width / 2, donut.Bounds.Height / 2), donut.OuterRadius * .7,
+            DonutGeometry.MidAngle(0, donut.Items!.Count));
+        window.MouseMove(donut.TranslatePoint(top, window)!.Value);
+        for (var i = 0; i < 60; i++)
+            donut.Advance(1 / 60.0);
+        Pump();
+        Save(window, "page-toolbar-icons-ko.png");
+        window.Close();
     }
 
     [AvaloniaFact]
@@ -1425,8 +1456,8 @@ public class RenderTests
         Save(window, $"window-crop-{language}.png");
 
         // A 1920 × 1040 screen at 250 %: the size Placement gives it there, the bars kept and the picture smaller.
-        var (size, smallest, _) = ImageToolWindow.Placement(new Avalonia.PixelRect(0, 0, 1920, 1040), 2.5, new Avalonia.PixelPoint(960, 520),
-            new Avalonia.PixelSize(1600, 1000));
+        var (size, smallest, _) = ImageToolWindow.Placement(new PixelRect(0, 0, 1920, 1040), 2.5, new PixelPoint(960, 520),
+            new PixelSize(1600, 1000));
         (window.MinWidth, window.MinHeight, window.Width, window.Height) = (smallest.Width, smallest.Height, size.Width, size.Height);
         Pump();
         Save(window, $"window-crop-small-{language}.png");

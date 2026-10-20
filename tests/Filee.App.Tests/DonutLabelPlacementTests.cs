@@ -1,6 +1,6 @@
 // Pixel-level check that slice labels sit on their slice's centre line.
 // Regression: labels were centred on the measured text width while being laid out centred in a wider box,
-// so short labels drifted right (reported with a screenshot of the donut editor).
+// so short labels drifted right (reported with a screenshot of the donut editor). Also where a long name breaks.
 
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -237,6 +237,20 @@ public class DonutLabelPlacementTests
         Assert.True(n > 20, $"no label found near {at}");
         return (sx / n, sy / n);
     }
+
+    /// <summary>
+    /// A name too wide for its slice breaks at a space, whole words to a line; only a word too wide on its own is left to
+    /// the text layout, which may break Korean between any two syllables. Measured here as 10 px a character.
+    /// </summary>
+    [AvaloniaTheory] // on the UI thread: DonutMenu's static fields belong to it
+    [InlineData("50% 축소", 45, "50%\n축소")]   // not "50% 축" / "소"
+    [InlineData("흑백 선화", 45, "흑백\n선화")]
+    [InlineData("PDF 합치기", 70, "PDF 합치기")] // fits: as it is
+    [InlineData("PNG", 20, "PNG")]               // one word: the layout's own business
+    [InlineData("a bb ccc dddd", 60, "a bb\nccc dddd")] // the rest on the second line, where the two-line limit cuts it
+    [InlineData("abcdefgh ij", 40, "abcdefgh\nij")]     // a first word too wide alone still keeps the next one off its line
+    public void A_name_breaks_at_spaces_before_it_breaks_inside_a_word(string name, double width, string expected) =>
+        Assert.Equal(expected, DonutMenu.WrapAtSpaces(name, width, text => text.Length * 10));
 
     private static (byte[] Pixels, int Width, int Height) Read(Avalonia.Media.Imaging.WriteableBitmap bitmap)
     {
