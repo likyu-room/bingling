@@ -59,6 +59,17 @@
   "donut.same_format": "同格式",
   "donut.group_caption": "组 · {0} 项",
 
+  "tool.crop.title": "裁剪",
+  "tool.position": "第 {0} 个，共 {1} 个",
+  "tool.applies_to_all": "将应用到全部 {0} 个文件",
+  "tool.reset": "重置",
+  "tool.cancel": "取消",
+  "tool.save": "保存",
+  "tool.crop.aspect": "比例",
+  "tool.crop.free": "自由",
+  "tool.crop.original": "原始",
+  "tool.crop.size": "尺寸 (px)",
+
   "toast.converting": "{0} → {1}",
   "toast.done": "完成",
   "toast.done_errors": "{1} 个中有 {0} 个失败",

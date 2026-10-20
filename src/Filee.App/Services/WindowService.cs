@@ -1,4 +1,4 @@
-// Opens windows and dialogs: the main (settings) window, the preset popup, confirmations and toasts.
+// Opens windows and dialogs: the main (settings) window, the preset popup, the image tool window, confirmations and toasts.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -219,8 +219,19 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
     /// Opens the window of image tool <paramref name="tool"/> on <paramref name="files"/>, centred on
     /// <paramref name="cursor"/> (screen pixels), and returns the edit the user applied; null when they closed it without.
     /// </summary>
-    public virtual Task<ImageEdit?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor) =>
-        Task.FromResult<ImageEdit?>(null); // the window follows with the crop window
+    public virtual async Task<ImageEdit?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
+    {
+        Motion.Refresh();
+        using var vm = new ImageToolViewModel(tool, files, services.GetRequiredService<UserDataStore>(), loc);
+        var window = new ImageToolWindow { DataContext = vm };
+        window.PlaceNear(cursor);
+        var closed = new TaskCompletionSource();
+        window.Closed += (_, _) => closed.TrySetResult();
+        window.Show();
+        await closed.Task;
+        trimmer.Request(); // the previews were large pictures
+        return vm.Result;
+    }
 
     /// <summary>
     /// Opens the group editor. Returns true when the user saved (the group was updated) or deleted it (it was removed

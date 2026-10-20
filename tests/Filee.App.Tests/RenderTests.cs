@@ -1306,6 +1306,33 @@ public class RenderTests
         notice.Close();
     }
 
+    [AvaloniaTheory]
+    [InlineData("ko")]
+    [InlineData("en")]
+    public void Crop_window_renders(string language)
+    {
+        TestServices.EnsureInitialized(language);
+        var files = new[] { ImageToolWindowTests.TestImages.Png(1600, 1000, "beach.png"), ImageToolWindowTests.TestImages.Png(800, 1200) };
+        using var vm = new ImageToolViewModel(Filee.Core.Presets.ImageToolKind.Crop, files,
+            new UserDataStore(Path.Combine(TestServices.DataDirectory, "crop-render-" + language)), AppHost.Get<ILocalizer>());
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "16:9");
+        vm.PixelWidth = 1200;
+        var window = new ImageToolWindow { DataContext = vm, Width = 1000, Height = 680 };
+        window.Show();
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (vm.Preview is null && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+        Pump();
+
+        Assert.Same(vm.Preview, window.FindControl<ImageCanvas>("Picture")!.Source);
+        Assert.Equal(language == "ko" ? "2개 중 1" : "1 of 2", vm.PositionText);
+        Save(window, $"window-crop-{language}.png");
+        window.Close();
+    }
+
     private static void Pump()
     {
         // Let layout, bindings and a few animation frames run.

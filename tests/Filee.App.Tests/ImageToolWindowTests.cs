@@ -1,0 +1,402 @@
+// The crop window: the box it opens with, one box over several files, the size boxes, undo, what it hands back, the
+// keys and a drag on the picture, where it opens, and the geometry of the canvas (fitting, zooming, handles, resizing).
+
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Filee.App.Controls;
+using Filee.App.Services;
+using Filee.App.ViewModels;
+using Filee.App.Views;
+using Filee.Core.Localization;
+using Filee.Core.Presets;
+using Filee.Core.Settings;
+using ImageMagick;
+
+namespace Filee.App.Tests;
+
+public class ImageToolWindowTests
+{
+    /// <summary>Real pictures in a fresh temp folder.</summary>
+    internal static class TestImages
+    {
+        private static string Folder()
+        {
+            var folder = Path.Combine(Path.GetTempPath(), "filee-app-tests", "crop-" + Guid.NewGuid().ToString("N")[..8]);
+            Directory.CreateDirectory(folder);
+            return folder;
+        }
+
+        public static string Png(int width, int height, string name = "photo.png")
+        {
+            var path = Path.Combine(Folder(), name);
+            using var image = new MagickImage("gradient:#4682B4-#F2A65A", (uint)width, (uint)height);
+            image.Write(path, MagickFormat.Png);
+            return path;
+        }
+
+        /// <summary>A JPEG stored as <paramref name="width"/> × <paramref name="height"/> that a phone turned: EXIF orientation 6.</summary>
+        public static string TurnedJpeg(int width, int height)
+        {
+            var path = Path.Combine(Folder(), "phone.jpg");
+            using var image = new MagickImage(MagickColors.SteelBlue, (uint)width, (uint)height) { Orientation = OrientationType.RightTop };
+            var exif = new ExifProfile();
+            exif.SetValue(ExifTag.Orientation, (ushort)6);
+            image.SetProfile(exif);
+            image.Write(path, MagickFormat.Jpeg);
+            return path;
+        }
+    }
+
+    /// <summary>A settings store of its own, so a test's remembered ratio doesn't reach the others.</summary>
+    private static UserDataStore TestStore() =>
+        new(Path.Combine(Path.GetTempPath(), "filee-app-tests", "crop-store-" + Guid.NewGuid().ToString("N")[..8]));
+
+    private static ILocalizer Loc(string language)
+    {
+        TestServices.EnsureInitialized(language);
+        return AppHost.Get<ILocalizer>();
+    }
+
+    /// <summary>Runs the UI thread until the preview, read on another thread, has arrived.</summary>
+    private static void WaitForPreview(ImageToolViewModel vm)
+    {
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (vm.Preview is null && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+        Assert.NotNull(vm.Preview);
+    }
+
+    // ───────── The view model ─────────
+
+    [AvaloniaFact]
+    public void Opens_with_the_last_aspect_as_the_largest_centred_box()
+    {
+        var store = TestStore();
+        store.Settings.ImageTools.CropAspect = "1:1";
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200)], store, Loc("ko"));
+        Assert.Equal("1:1", vm.Aspect.Value);
+        Assert.Equal((200, 200), (vm.PixelWidth, vm.PixelHeight));
+        Assert.Equal(.25, vm.Crop.X, 3);
+        Assert.Equal("자르기 · photo.png", vm.Title);
+        Assert.Equal("", vm.FooterText); // one file: nothing to say
+        Assert.Equal(CropMath.AspectIds, vm.Aspects.Select(a => a.Value));
+        Assert.Equal("자유", vm.Aspects[0].Label);
+    }
+
+    [AvaloniaFact]
+    public void Next_file_shows_the_same_box_refitted_and_save_returns_one_shared_edit()
+    {
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
+        Assert.Equal("2개 중 1", vm.PositionText);
+        Assert.Equal("2개 파일에 함께 적용돼요", vm.FooterText);
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "1:1");
+        vm.NextCommand.Execute(null);
+        Assert.Equal("2개 중 2", vm.PositionText);
+        Assert.Equal(vm.PixelWidth, vm.PixelHeight);
+        Assert.Equal((100, 100), (vm.PixelWidth, vm.PixelHeight)); // half the width of the portrait picture
+        Assert.False(vm.NextCommand.CanExecute(null));
+        vm.SaveCommand.Execute(null);
+        Assert.Equal(1.0, vm.Result!.Crop!.Aspect);
+        Assert.Equal(.5, vm.Result.Crop.Width, 6);
+    }
+
+    [AvaloniaFact]
+    public void Typing_a_pixel_width_keeps_a_fixed_ratio_and_save_remembers_the_aspect()
+    {
+        var store = TestStore();
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200)], store, Loc("ko"));
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "16:9");
+        vm.PixelWidth = 160;
+        Assert.Equal(90, vm.PixelHeight);
+        vm.PixelHeight = 45; // a fixed ratio follows: the width goes with it
+        Assert.Equal(80, vm.PixelWidth);
+        vm.SaveCommand.Execute(null);
+        Assert.Equal("16:9", store.Settings.ImageTools.CropAspect);
+        Assert.Equal("16:9", TestStoreAt(store.Directory).Settings.ImageTools.CropAspect); // saved, not just set
+    }
+
+    private static UserDataStore TestStoreAt(string directory)
+    {
+        var store = new UserDataStore(directory);
+        store.Load();
+        return store;
+    }
+
+    [AvaloniaFact]
+    public void Undo_restores_the_previous_box_and_cancel_returns_nothing()
+    {
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        var before = vm.Crop.Clone();
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "free");
+        vm.Crop = new CropRect { X = .1, Y = .1, Width = .2, Height = .2 };
+        vm.UndoCommand.Execute(null);
+        Assert.NotEqual(.2, vm.Crop.Width);
+        Assert.Equal((before.X, before.Width), (vm.Crop.X, vm.Crop.Width));
+        Assert.Equal("free", vm.Aspect.Value);
+        vm.UndoCommand.Execute(null); // the ratio was a step of its own
+        Assert.Equal("original", vm.Aspect.Value);
+        vm.RedoCommand.Execute(null);
+        vm.RedoCommand.Execute(null);
+        Assert.Equal(.2, vm.Crop.Width, 6);
+        vm.CancelCommand.Execute(null);
+        Assert.Null(vm.Result);
+    }
+
+    [AvaloniaFact]
+    public void Original_keeps_each_files_own_shape()
+    {
+        // The box of "original" is the same fraction of either side: on another file it has that file's shape.
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("en"));
+        Assert.Equal("original", vm.Aspect.Value);
+        vm.PixelWidth = 200;
+        Assert.Equal(100, vm.PixelHeight);
+        vm.NextCommand.Execute(null);
+        Assert.Equal((100, 200), (vm.PixelWidth, vm.PixelHeight));
+        vm.SaveCommand.Execute(null);
+        var crop = vm.Result!.Crop!;
+        Assert.Null(crop.Aspect); // so the engine keeps the fractions on every file
+        Assert.Equal((100, 50), (CropMath.ToPixels(crop, 200, 100).Width, CropMath.ToPixels(crop, 200, 100).Height));
+    }
+
+    [AvaloniaFact]
+    public void A_turned_phone_photo_is_measured_and_shown_the_way_it_stands()
+    {
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.TurnedJpeg(400, 200)], TestStore(), Loc("en"));
+        Assert.Equal((200, 400), (vm.ImageWidth, vm.ImageHeight));
+        WaitForPreview(vm);
+        Assert.Equal(new PixelSize(200, 400), vm.Preview!.PixelSize);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_preview_is_no_larger_than_2048_pixels()
+    {
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(3000, 1000)], TestStore(), Loc("en"));
+        Assert.Equal((3000, 1000), (vm.ImageWidth, vm.ImageHeight));
+        WaitForPreview(vm);
+        Assert.Equal(2048, vm.Preview!.PixelSize.Width);
+        vm.Dispose();
+    }
+
+    // ───────── The window ─────────
+
+    private static (ImageToolWindow Window, ImageToolViewModel Vm) Open(params string[] files)
+    {
+        var vm = new ImageToolViewModel(ImageToolKind.Crop, files, TestStore(), Loc("ko"));
+        var window = new ImageToolWindow { DataContext = vm, Width = 900, Height = 600 };
+        window.Show();
+        WaitForPreview(vm);
+        Dispatcher.UIThread.RunJobs();
+        return (window, vm);
+    }
+
+    [AvaloniaFact]
+    public void Keys_move_between_files_pick_ratios_undo_and_enter_saves()
+    {
+        var (window, vm) = Open(TestImages.Png(400, 200), TestImages.Png(200, 400));
+        Assert.IsType<Filee.App.Views.Tools.CropPanel>(window.FindControl<ContentControl>("ToolPanel")!.Content);
+        Assert.Equal("자르기 · photo.png", window.Title);
+
+        window.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+        Assert.Equal(1, vm.Index);
+        window.KeyPressQwerty(PhysicalKey.Digit3, RawInputModifiers.None);
+        Assert.Equal("1:1", vm.Aspect.Value);
+        window.KeyPressQwerty(PhysicalKey.Z, RawInputModifiers.Control);
+        Assert.Equal("original", vm.Aspect.Value);
+        window.KeyPressQwerty(PhysicalKey.Z, RawInputModifiers.Control | RawInputModifiers.Shift);
+        Assert.Equal("1:1", vm.Aspect.Value);
+
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.True(closed);
+        Assert.Equal(1.0, vm.Result!.Crop!.Aspect);
+    }
+
+    [AvaloniaFact]
+    public void A_typed_size_is_taken_on_enter_and_the_next_enter_saves()
+    {
+        var (window, vm) = Open(TestImages.Png(400, 200));
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "free");
+        var width = window.GetVisualDescendants().OfType<TextBox>().First();
+        Assert.True(width.Focus());
+        width.SelectAll();
+        window.KeyTextInput("100");
+        window.KeyPressQwerty(PhysicalKey.Digit3, RawInputModifiers.None); // typing digits picks no ratio
+        Assert.Equal("free", vm.Aspect.Value);
+        Assert.Equal(400, vm.PixelWidth); // taken when the box is left, not at every key
+
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.Equal(100, vm.PixelWidth);
+        Assert.False(closed);
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.True(closed);
+        Assert.Equal(.25, vm.Result!.Crop!.Width, 6);
+    }
+
+    [AvaloniaFact]
+    public void Escape_closes_without_an_edit()
+    {
+        var (window, vm) = Open(TestImages.Png(400, 200));
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.True(closed);
+        Assert.Null(vm.Result);
+    }
+
+    [AvaloniaFact]
+    public void Dragging_on_the_picture_draws_a_new_box_and_a_double_click_in_it_saves()
+    {
+        var (window, vm) = Open(TestImages.Png(400, 200));
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "free");
+        var canvas = window.FindControl<ImageCanvas>("Picture")!;
+        var image = ImageCanvas.ImageRect(canvas.Bounds.Size, new Size(400, 200), 1, default);
+        Point At(double x, double y) => canvas.TranslatePoint(new Point(image.X + x * image.Width, image.Y + y * image.Height), window)!.Value;
+
+        window.MouseDown(At(.1, .2), MouseButton.Left);
+        window.MouseMove(At(.3, .5));
+        window.MouseMove(At(.6, .8));
+        window.MouseUp(At(.6, .8), MouseButton.Left);
+        Assert.Equal(.1, vm.Crop.X, 2);
+        Assert.Equal(.2, vm.Crop.Y, 2);
+        Assert.Equal(.5, vm.Crop.Width, 2);
+        Assert.Equal(.6, vm.Crop.Height, 2);
+
+        // Moving it: the whole box goes along.
+        window.MouseDown(At(.35, .5), MouseButton.Left);
+        window.MouseMove(At(.45, .5));
+        window.MouseUp(At(.45, .5), MouseButton.Left);
+        Assert.Equal(.2, vm.Crop.X, 2);
+        Assert.Equal(.5, vm.Crop.Width, 2);
+
+        vm.UndoCommand.Execute(null); // each drag is one step
+        Assert.Equal(.1, vm.Crop.X, 2);
+
+        Assert.Null(vm.Result);
+        window.MouseDown(At(.3, .5), MouseButton.Left); // a click changes nothing
+        window.MouseUp(At(.3, .5), MouseButton.Left);
+        Assert.Equal(.1, vm.Crop.X, 2);
+        Assert.Null(vm.Result);
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        window.MouseDown(At(.3, .5), MouseButton.Left); // the second one makes it a double click: saved and closed
+        Assert.True(closed);
+        Assert.NotNull(vm.Result);
+        Assert.Equal(.1, vm.Result.Crop!.X, 2);
+    }
+
+    [AvaloniaFact]
+    public void Opens_near_the_cursor_within_80_percent_of_the_screen_it_is_on()
+    {
+        // A big photo on a 150 % screen to the right of the main one, the cursor in its top-left corner.
+        var area = new PixelRect(1920, 0, 2560, 1400);
+        var (size, position) = ImageToolWindow.Placement(area, 1.5, new PixelPoint(1950, 30), new PixelSize(6000, 4000));
+        Assert.InRange(size.Width, 0, 2560 * .8 / 1.5 + .01);
+        Assert.InRange(size.Height, 0, 1400 * .8 / 1.5 + .01);
+        Assert.Equal(new PixelPoint(1920, 0), position); // pushed onto the screen
+        var picture = new Size(size.Width - ImageToolWindow.Chrome.Width, size.Height - ImageToolWindow.Chrome.Height);
+        Assert.Equal(1.5, picture.Width / picture.Height, 2); // sized to the photo
+
+        // A small picture: the smallest window, centred on the cursor.
+        (size, position) = ImageToolWindow.Placement(new PixelRect(0, 0, 1920, 1040), 1, new PixelPoint(960, 500), new PixelSize(64, 64));
+        Assert.Equal(ImageToolWindow.Smallest, size);
+        Assert.Equal(new PixelPoint(960 - (int)(size.Width / 2), 500 - (int)(size.Height / 2)), position);
+    }
+
+    // ───────── Canvas geometry ─────────
+
+    [AvaloniaFact]
+    public void The_picture_is_fitted_and_centred_and_points_map_to_fractions()
+    {
+        var bounds = new Size(400 + 2 * ImageCanvas.Inset, 300 + 2 * ImageCanvas.Inset);
+        var image = ImageCanvas.ImageRect(bounds, new Size(200, 100), 1, default);
+        Assert.Equal(new Rect(ImageCanvas.Inset, ImageCanvas.Inset + 50, 400, 200), image);
+        Assert.Equal(new Point(.5, .5), ImageCanvas.ToFraction(new Point(bounds.Width / 2, bounds.Height / 2), image));
+        var box = ImageCanvas.ToScreen(new CropRect { X = .25, Y = .5, Width = .5, Height = .5 }, image);
+        Assert.Equal(new Rect(image.X + 100, image.Y + 100, 200, 100), box);
+    }
+
+    [AvaloniaFact]
+    public void Zooming_keeps_the_point_under_the_cursor()
+    {
+        var bounds = new Size(800, 600);
+        var picture = new Size(300, 200);
+        var at = new Point(250, 180);
+        var before = ImageCanvas.ImageRect(bounds, picture, 1, new Vector(10, -20));
+        var pan = ImageCanvas.ZoomAt(bounds, picture, 1, new Vector(10, -20), at, 2.5);
+        var after = ImageCanvas.ImageRect(bounds, picture, 2.5, pan);
+        Assert.Equal(before.Width * 2.5, after.Width, 6);
+        var (u, v) = (ImageCanvas.ToFraction(at, before), ImageCanvas.ToFraction(at, after));
+        Assert.Equal(u.X, v.X, 6);
+        Assert.Equal(u.Y, v.Y, 6);
+    }
+
+    [AvaloniaFact]
+    public void Handles_and_edges_are_hit_before_the_inside()
+    {
+        var box = new Rect(100, 100, 200, 100);
+        Assert.Equal(ImageCanvas.Grip.Left | ImageCanvas.Grip.Top, ImageCanvas.HitTest(box, new Point(103, 98), 8));
+        Assert.Equal(ImageCanvas.Grip.Right | ImageCanvas.Grip.Bottom, ImageCanvas.HitTest(box, new Point(300, 200), 8));
+        Assert.Equal(ImageCanvas.Grip.Right, ImageCanvas.HitTest(box, new Point(305, 150), 8));
+        Assert.Equal(ImageCanvas.Grip.Bottom, ImageCanvas.HitTest(box, new Point(200, 196), 8));
+        Assert.Equal(ImageCanvas.Grip.Move, ImageCanvas.HitTest(box, new Point(200, 150), 8));
+        Assert.Equal(ImageCanvas.Grip.None, ImageCanvas.HitTest(box, new Point(50, 50), 8));
+        Assert.Equal(ImageCanvas.Grip.None, ImageCanvas.HitTest(box, new Point(320, 150), 8));
+    }
+
+    [AvaloniaFact]
+    public void A_corner_keeps_a_fixed_ratio_and_the_box_stays_on_the_picture()
+    {
+        var start = new CropRect { X = .25, Y = .25, Width = .5, Height = .5, Aspect = 2 };
+        var grown = ImageCanvas.Resize(start, ImageCanvas.Grip.Right | ImageCanvas.Grip.Bottom, new Point(1.2, .8), ratio: 1);
+        Assert.Equal((.25, .25, .75, .75), (grown.X, grown.Y, grown.Width, grown.Height)); // stopped by the right edge
+        Assert.Equal(2, grown.Aspect); // the ratio it keeps on other files goes along
+
+        // Pulled up a lot and left a little: the bigger pull sets the size, held by the left edge, from the fixed corner.
+        var up = ImageCanvas.Resize(start, ImageCanvas.Grip.Left | ImageCanvas.Grip.Top, new Point(.6, 0), ratio: 2);
+        Assert.Equal((0, .375, .75, .375), (up.X, up.Y, up.Width, up.Height));
+    }
+
+    [AvaloniaFact]
+    public void An_edge_with_a_ratio_grows_the_other_side_around_the_centre()
+    {
+        var start = new CropRect { X = .4, Y = .4, Width = .2, Height = .2 };
+        var wider = ImageCanvas.Resize(start, ImageCanvas.Grip.Right, new Point(.8, .9), ratio: 1);
+        Assert.Equal(.4, wider.X, 6);
+        Assert.Equal(.4, wider.Width, 6);
+        Assert.Equal(.4, wider.Height, 6);
+        Assert.Equal(.3, wider.Y, 6); // around the same middle
+
+        var free = ImageCanvas.Resize(start, ImageCanvas.Grip.Right, new Point(.8, .9), ratio: null);
+        Assert.Equal((.4, .4, .4, .2), (free.X, free.Y, Math.Round(free.Width, 6), free.Height)); // only that edge moved
+    }
+
+    [AvaloniaFact]
+    public void A_new_box_is_drawn_from_where_the_drag_began_in_any_direction()
+    {
+        var anchor = new CropRect { X = .3, Y = .3, Width = 0, Height = 0 };
+        var box = ImageCanvas.Resize(anchor, ImageCanvas.Grip.Right | ImageCanvas.Grip.Bottom, new Point(.1, .6), ratio: null);
+        Assert.Equal(.1, box.X, 6);
+        Assert.Equal(.3, box.Y, 6);
+        Assert.Equal(.2, box.Width, 6);
+        Assert.Equal(.3, box.Height, 6);
+    }
+
+    [AvaloniaFact]
+    public void Moving_the_box_stops_at_the_edges()
+    {
+        var moved = ImageCanvas.Move(new CropRect { X = .5, Y = .5, Width = .4, Height = .4 }, new Vector(.3, -.9));
+        Assert.Equal((.6, 0.0, .4, .4), (Math.Round(moved.X, 6), moved.Y, moved.Width, moved.Height));
+    }
+}

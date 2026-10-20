@@ -59,6 +59,17 @@
   "donut.same_format": "같은 형식",
   "donut.group_caption": "묶음 · {0}개",
 
+  "tool.crop.title": "자르기",
+  "tool.position": "{1}개 중 {0}",
+  "tool.applies_to_all": "{0}개 파일에 함께 적용돼요",
+  "tool.reset": "초기화",
+  "tool.cancel": "취소",
+  "tool.save": "저장",
+  "tool.crop.aspect": "비율",
+  "tool.crop.free": "자유",
+  "tool.crop.original": "원본",
+  "tool.crop.size": "크기(px)",
+
   "toast.converting": "{0} → {1}",
   "toast.done": "완료",
   "toast.done_errors": "{1}개 중 {0}개 실패",

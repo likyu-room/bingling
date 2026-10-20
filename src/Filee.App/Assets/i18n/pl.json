@@ -59,6 +59,17 @@
   "donut.same_format": "Ten sam format",
   "donut.group_caption": "Grupa: {0}",
 
+  "tool.crop.title": "Przytnij",
+  "tool.position": "{0} z {1}",
+  "tool.applies_to_all": "Dotyczy wszystkich plików ({0})",
+  "tool.reset": "Resetuj",
+  "tool.cancel": "Anuluj",
+  "tool.save": "Zapisz",
+  "tool.crop.aspect": "Proporcje",
+  "tool.crop.free": "Dowolne",
+  "tool.crop.original": "Oryginalne",
+  "tool.crop.size": "Rozmiar (px)",
+
   "toast.converting": "{0} → {1}",
   "toast.done": "Gotowe",
   "toast.done_errors": "Nieudane: {0} z {1}",
