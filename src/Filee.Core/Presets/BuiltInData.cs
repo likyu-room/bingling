@@ -290,6 +290,8 @@ public static class BuiltInData
             i.Quality = 80;
             i.KeepMetadata = false;
             i.Optimize = true;
+            // Re-encoding a WebP or AVIF that was saved smaller can make it bigger (+47 % measured on AVIF q50).
+            i.OnlyIfSmaller = true;
         }),
         Tool("strip-metadata", "preset.strip_metadata", "{name} Clean", i =>
         {

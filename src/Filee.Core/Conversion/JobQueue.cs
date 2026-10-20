@@ -434,6 +434,16 @@ public sealed class JobQueue : IAsyncDisposable
                 inputs = outputs;
             }
 
+            // "Compress" never hands back a bigger file: one that isn't smaller is deleted, and the original stays the result.
+            if (finalOutput && job.Preset.Image.OnlyIfSmaller && inputs.Count > 0 && !IsSmaller(inputs, file.SourcePath)
+                && TryDiscard(inputs))
+            {
+                file.NoticeKey = "toast.skipped_not_smaller";
+                file.State = FileState.Skipped;
+                file.Progress = 1;
+                Notify(job);
+                return [];
+            }
             if (finalOutput)
             {
                 file.Outputs.AddRange(inputs);
@@ -488,6 +498,41 @@ public sealed class JobQueue : IAsyncDisposable
             Notify(job);
             return [];
         }
+    }
+
+    /// <summary>
+    /// True when <paramref name="outputs"/> are smaller than <paramref name="source"/> together, and also when either
+    /// can't be measured (a folder, a file gone): then the output is kept as it would be without the check.
+    /// </summary>
+    private static bool IsSmaller(IReadOnlyList<string> outputs, string source)
+    {
+        try
+        {
+            return outputs.Sum(o => new FileInfo(o).Length) < new FileInfo(source).Length;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>Deletes outputs that are of no use and lets go of their names. False (and kept) when one can't be deleted.</summary>
+    private bool TryDiscard(IReadOnlyList<string> outputs)
+    {
+        try
+        {
+            foreach (var output in outputs)
+                File.Delete(output);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _log.LogWarning(ex, "Could not delete an output that is not smaller than its source; it is kept");
+            return false;
+        }
+        lock (_reservedOutputs)
+            foreach (var output in outputs)
+                _reservedOutputs.Remove(output);
+        return true;
     }
 
     private SemaphoreSlim GateFor(IConverter converter) =>

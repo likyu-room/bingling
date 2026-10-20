@@ -369,6 +369,48 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
         Assert.Equal(0, a.Compare(b, ErrorMetric.Absolute));
     }
 
+    [Theory]
+    [InlineData("avif")]
+    [InlineData("webp")]
+    public async Task Compress_keeps_no_output_that_is_not_smaller_and_leaves_the_original(string format)
+    {
+        // Saved small already (quality 30): encoding it again at compress's quality 80 would make it bigger.
+        var source = Path.Combine(fx.NewFolder(), $"small.{format}");
+        using (var image = Noise(64, 64))
+        {
+            image.Quality = 30;
+            image.Write(source, ImageEncoder.ToMagickFormat(format));
+        }
+        var original = File.ReadAllBytes(source);
+
+        var job = await fx.ConvertAsync([source], Tool("compress-image"));
+
+        Assert.Equal(JobState.Completed, job.State);
+        var file = job.Files.Single();
+        Assert.Equal((FileState.Skipped, "toast.skipped_not_smaller"), (file.State, file.NoticeKey));
+        Assert.Empty(job.Outputs);
+        Assert.Equal([source], Directory.GetFiles(Path.GetDirectoryName(source)!)); // no "small Compressed" next to it
+        Assert.Equal(original, File.ReadAllBytes(source));
+    }
+
+    [Fact]
+    public async Task Compress_keeps_a_jpeg_it_made_smaller()
+    {
+        var source = Path.Combine(fx.NewFolder(), "photo.jpg");
+        using (var image = Noise(128, 128))
+        {
+            image.Quality = 98;
+            image.Write(source, MagickFormat.Jpeg);
+        }
+
+        var job = await fx.ConvertAsync([source], Tool("compress-image"));
+
+        Assert.Equal(FileState.Done, job.Files.Single().State);
+        var output = job.Outputs.Single();
+        Assert.Equal("photo Compressed.jpg", Path.GetFileName(output));
+        Assert.True(new FileInfo(output).Length < new FileInfo(source).Length);
+    }
+
     /// <summary>
     /// Raster formats ImageMagick reads and writes whose tool output is not right, so the tools (crop, compress, strip
     /// metadata) must not be offered for them. The tests below the theory say why for each.

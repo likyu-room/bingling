@@ -34,6 +34,10 @@ public class ImageToolPresetTests
             (c.TargetFormat, c.Image.Quality, c.Image.KeepMetadata, c.Image.Optimize, c.Output.FileNamePattern));
         Assert.Equal((BuiltInData.SameAsSource, 95, false, true, "{name} Clean"),
             (s.TargetFormat, s.Image.Quality, s.Image.KeepMetadata, s.Image.Optimize, s.Output.FileNamePattern));
+        // Compress keeps only a smaller file; stripping the metadata is the point of the other, whatever the size.
+        Assert.True(c.Image.OnlyIfSmaller);
+        Assert.False(s.Image.OnlyIfSmaller);
+        Assert.False(new ImageOptions().OnlyIfSmaller);
     }
 
     [Fact]

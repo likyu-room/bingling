@@ -264,6 +264,13 @@ public sealed class ImageOptions
     public bool Optimize { get; set; }
 
     /// <summary>
+    /// Keep an output only when it is smaller than its source: one that isn't is deleted and the file is skipped (the
+    /// original already is as small as this preset makes it). For "Compress", which must never hand back a bigger file.
+    /// Off by default and for presets saved before the option.
+    /// </summary>
+    public bool OnlyIfSmaller { get; set; }
+
+    /// <summary>
     /// When metadata is removed, still keep the ICC colour profile: without it, wide-gamut photos (Display P3 from
     /// phones) look washed out. Has no effect while <see cref="KeepMetadata"/> is on (everything is kept then).
     /// </summary>

@@ -29,6 +29,30 @@ public class JobQueueTests
     }
 
     [Fact]
+    public async Task An_output_that_is_not_smaller_is_deleted_when_the_preset_keeps_only_smaller_ones()
+    {
+        using var dir = new TempDir();
+        var small = dir.File("small.jpg", "x");                       // the fake engine writes more than one byte
+        var large = dir.File("large.jpg", new string('x', 1000));
+        await using var queue = new JobQueue(new ConverterCatalog([new FakeConverter("magick", new ConversionEdge("jpg", "png"))]));
+
+        var job = await Run(queue, [small, large], new Preset { TargetFormat = "png", Image = { OnlyIfSmaller = true } });
+
+        Assert.Equal(JobState.Completed, job.State);
+        var skipped = job.Files[0];
+        Assert.Equal((FileState.Skipped, "toast.skipped_not_smaller"), (skipped.State, skipped.NoticeKey));
+        Assert.Empty(skipped.Outputs);
+        Assert.False(File.Exists(Path.Combine(dir.Path, "small.png")));
+        Assert.Equal("x", File.ReadAllText(small)); // the original stays as it was
+        Assert.Equal(FileState.Done, job.Files[1].State);
+        Assert.True(File.Exists(Path.Combine(dir.Path, "large.png")));
+
+        // The name the deleted output had is free again: the next conversion writes small.png, not a renamed copy.
+        var again = await Run(queue, [small], new Preset { TargetFormat = "png" });
+        Assert.Equal(Path.Combine(dir.Path, "small.png"), again.Outputs.Single());
+    }
+
+    [Fact]
     public async Task Is_busy_from_enqueueing_until_the_job_has_finished()
     {
         // The app frees memory only while the queue is idle: a waiting or running job must count.

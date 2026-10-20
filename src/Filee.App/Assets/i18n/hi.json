@@ -72,6 +72,7 @@
   "toast.failed": "कन्वर्ज़न विफल रहा",
   "toast.cancelled": "रद्द किया गया",
   "toast.skipped": "छोड़ा गया (फ़ाइल पहले से मौजूद है)",
+  "toast.skipped_not_smaller": "छोड़ा गया (छोटा नहीं हुआ)",
   "toast.open_folder": "दिखाएँ",
   "toast.cancel": "रद्द करें",
   "toast.size_change": "{0} → {1} · {2}% छोटा",

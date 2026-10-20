@@ -154,6 +154,7 @@ internal static class Cli
         {
             FileState.Done => $"ok    {source} -> {string.Join(", ", file.Outputs.Select(Shorten))}"
                 + (file.NoticeKey is null ? "" : $" ({texts[file.NoticeKey]})"),
+            FileState.Skipped when file.NoticeKey == "toast.skipped_not_smaller" => $"skip  {source} (the output was not smaller, so it was not kept)",
             FileState.Skipped => $"skip  {source} (the output file already exists)",
             FileState.Cancelled => $"stop  {source} (cancelled)",
             _ => $"fail  {source}: {Error(file, texts)}",

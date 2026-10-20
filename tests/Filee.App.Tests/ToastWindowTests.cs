@@ -161,7 +161,7 @@ public class ToastWindowTests
         TestServices.EnsureInitialized("ko");
         using var dir = new TempFolder();
         var conversion = new ConversionJob([dir.Bytes("a.txt", 2048), dir.Bytes("b.txt", 2048)], new Preset { TargetFormat = "pdf" }, "PDF");
-        await using (var queue = new JobQueue(new ConverterCatalog([new CancelAfterWriting(conversion)])))
+        await using (var queue = new JobQueue(new ConverterCatalog([new TextToPdf(1024, cancels: conversion)])))
             await queue.RunAsync(conversion);
         Assert.Equal(JobState.Cancelled, conversion.State); // the test job is what it should be: stopped, one file written
         Assert.Single(conversion.Outputs);
@@ -172,6 +172,33 @@ public class ToastWindowTests
         Assert.NotNull(vm.SizeChange);
         Assert.Equal("취소됨", vm.Status);
         Assert.True(vm.ShowsStatus);
+    }
+
+    [AvaloniaFact]
+    public async Task Files_left_out_because_they_got_no_smaller_say_so()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var preset = new Preset { TargetFormat = "pdf", Image = { OnlyIfSmaller = true } };
+        // The converter writes 2 KB: more than a.txt and c.txt, less than b.txt.
+        var some = new ConversionJob([dir.Bytes("a.txt", 1024), dir.Bytes("b.txt", 4096)], preset, "PDF");
+        var all = new ConversionJob([dir.Bytes("c.txt", 1024)], preset, "PDF");
+        await using (var queue = new JobQueue(new ConverterCatalog([new TextToPdf(2048)])))
+        {
+            await queue.RunAsync(some);
+            await queue.RunAsync(all);
+        }
+        var loc = AppHost.Get<ILocalizer>();
+        var platform = AppHost.Get<IPlatformServices>();
+
+        var one = new JobViewModel(some, loc, platform, _ => { });
+        Assert.Equal("완료", one.Status);
+        Assert.Equal("a.txt — 건너뜀 (더 작아지지 않음)", one.Notices);
+
+        // Nothing written: the reason is the status, not "the file exists", and it is not said twice.
+        var none = new JobViewModel(all, loc, platform, _ => { });
+        Assert.Equal("건너뜀 (더 작아지지 않음)", none.Status);
+        Assert.False(none.HasNotices);
     }
 
     [AvaloniaFact]
@@ -384,10 +411,13 @@ public class ToastWindowTests
         return vm;
     }
 
-    /// <summary>"Converts" text to PDF by writing a file, then cancels the job: a job stopped after it wrote something.</summary>
-    private sealed class CancelAfterWriting(ConversionJob job) : IConverter
+    /// <summary>
+    /// "Converts" text to PDF by writing <paramref name="length"/> bytes. With <paramref name="cancels"/> it then cancels that
+    /// job: a job stopped after it wrote something.
+    /// </summary>
+    private sealed class TextToPdf(int length, ConversionJob? cancels = null) : IConverter
     {
-        public string Id => "cancel-after-writing";
+        public string Id => "text-to-pdf";
         public string DisplayName => Id;
         public IReadOnlyList<ConversionEdge> Edges { get; } = [new("txt", "pdf")];
         public int MaxParallelism => 1; // one file after the other: the second finds the job cancelled
@@ -397,8 +427,8 @@ public class ToastWindowTests
         {
             cancellationToken.ThrowIfCancellationRequested();
             var path = step.Output.Allocate("pdf")!;
-            File.WriteAllBytes(path, new byte[1024]);
-            job.Cancel();
+            File.WriteAllBytes(path, new byte[length]);
+            cancels?.Cancel();
             return Task.FromResult<IReadOnlyList<string>>([path]);
         }
     }

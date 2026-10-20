@@ -77,6 +77,7 @@
   "toast.failed": "转换失败",
   "toast.cancelled": "已取消",
   "toast.skipped": "已跳过（文件已存在）",
+  "toast.skipped_not_smaller": "已跳过（没有变小）",
   "toast.open_folder": "查看",
   "toast.cancel": "取消",
   "toast.size_change": "{0} → {1} · 小了 {2}%",

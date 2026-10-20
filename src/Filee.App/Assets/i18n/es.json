@@ -72,6 +72,7 @@
   "toast.failed": "Falló la conversión",
   "toast.cancelled": "Cancelado",
   "toast.skipped": "Omitido (el archivo ya existe)",
+  "toast.skipped_not_smaller": "Omitido (no queda más pequeño)",
   "toast.open_folder": "Mostrar",
   "toast.cancel": "Cancelar",
   "toast.size_change": "{0} → {1} · {2}% más pequeño",

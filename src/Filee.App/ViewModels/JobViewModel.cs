@@ -143,14 +143,18 @@ public sealed partial class JobViewModel : ObservableObject
         if (!unknown.SequenceEqual(UnknownExtensions))
             UnknownExtensions = unknown;
 
-        var noted = Job.Files.Where(f => f.State == FileState.Done && f.NoticeKey is not null).ToList();
+        // Every file left out for the same reason ("not smaller"): that reason is the status, not "the file exists".
+        var allSkipped = Job.Files.All(f => f.State == FileState.Skipped);
+        var skippedFor = allSkipped && Job.Files.Select(f => f.NoticeKey).Distinct().ToList() is [{ } key] ? key : null;
+        var noted = Job.Files.Where(f => f.NoticeKey is not null
+            && (f.State == FileState.Done || (f.State == FileState.Skipped && skippedFor is null))).ToList();
         HasNotices = noted.Count > 0;
         Notices = noted.Count == 0 ? null : string.Join(Environment.NewLine,
             noted.Select(f => $"{Path.GetFileName(f.SourcePath)} — {_loc[f.NoticeKey!]}"));
 
         Status = Job.State switch
         {
-            JobState.Completed when Job.Files.All(f => f.State == FileState.Skipped) => _loc["toast.skipped"],
+            JobState.Completed when allSkipped => _loc[skippedFor ?? "toast.skipped"],
             JobState.Completed => _loc["toast.done"],
             JobState.CompletedWithErrors => _loc.Format("toast.done_errors", failed.Count, Job.Files.Count),
             JobState.Failed => _loc["toast.failed"],

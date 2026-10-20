@@ -77,6 +77,7 @@
   "toast.failed": "변환 실패",
   "toast.cancelled": "취소됨",
   "toast.skipped": "건너뜀 (파일이 이미 있음)",
+  "toast.skipped_not_smaller": "건너뜀 (더 작아지지 않음)",
   "toast.open_folder": "보기",
   "toast.cancel": "취소",
   "toast.size_change": "{0} → {1} · {2}% 작아짐",
