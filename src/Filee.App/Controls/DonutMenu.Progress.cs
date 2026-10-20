@@ -3,7 +3,7 @@
 //
 //   BeginProgress()  → slices collapse (≈0.3 s) → ring springs in
 //   SetProgress(x)   → arc follows smoothly
-//   CompleteProgress → arc fills (success colour) → ✓ / ! pops in the centre → hold → fade → callback
+//   CompleteProgress → arc fills (success colour) → ✓ / ! pops in the centre (the ✓ is drawn, then bumps) → hold → fade → callback
 //   HandOffProgress  → ring shrinks away quickly (the toast window takes over) → callback
 //
 // The ring stays visible for at least MinRingSeconds so very fast conversions still show their ✓ instead of
@@ -41,6 +41,11 @@ public sealed partial class DonutMenu
     private const double FadeSeconds = 0.25;
     private const double HandOffSeconds = 0.22;
 
+    /// <summary>The ✓ is drawn stroke by stroke over this long; then the badge bumps once, up by <see cref="BumpSize"/> and back.</summary>
+    private const double CheckSeconds = 0.22;
+    private const double BumpSeconds = 0.12;
+    private const double BumpSize = 0.06;
+
     // Material "close" icon (24×24) for the cancel button.
     private static readonly Geometry CloseIcon = Geometry.Parse(
         "M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z");
@@ -54,6 +59,7 @@ public sealed partial class DonutMenu
     private DonutProgressOutcome? _pendingOutcome;
     private DonutProgressOutcome? _outcome; // shown outcome (badge visible)
     private Spring _badge;                  // ✓ / ! pop scale
+    private double _checkClock;             // seconds since the badge appeared: draws the ✓, then bumps it
     private double _holdClock = -1;
     private double _fadeClock = -1;
     private double _handOffClock = -1;
@@ -73,6 +79,13 @@ public sealed partial class DonutMenu
 
     /// <summary>Outcome badge currently visible (null while running). For tests.</summary>
     internal DonutProgressOutcome? ShownOutcome => _outcome;
+
+    /// <summary>How much of the ✓ is drawn so far (0 to 1). For tests.</summary>
+    internal double CheckDrawn => _outcome is null ? 0 : Math.Clamp(_checkClock / CheckSeconds, 0, 1);
+
+    /// <summary>Scale of the ✓ badge's bump (1, up to 1 + <see cref="BumpSize"/> once the ✓ is drawn, and back). For tests.</summary>
+    internal double CheckBump =>
+        1 + BumpSize * Math.Sin(Math.PI * Math.Clamp((_checkClock - CheckSeconds) / BumpSeconds, 0, 1));
 
     /// <summary>The × on the ring was clicked while a conversion was running.</summary>
     public event EventHandler? ProgressCancelRequested;
@@ -153,6 +166,7 @@ public sealed partial class DonutMenu
         _pendingOutcome = null;
         _outcome = null;
         _badge = default;
+        _checkClock = 0;
         _holdClock = -1;
         _fadeClock = -1;
         _handOffClock = -1;
@@ -209,6 +223,7 @@ public sealed partial class DonutMenu
         {
             _outcome = pending;
             _holdClock = 0;
+            _checkClock = 0;
             if (animate)
                 _badge.Velocity = 9; // kick → overshoot "pop"
             else
@@ -220,6 +235,7 @@ public sealed partial class DonutMenu
         if (_outcome is { } outcome)
         {
             active |= animate && _badge.Step(1, dt, 420, 14);
+            _checkClock = animate ? _checkClock + dt : CheckSeconds + BumpSeconds;
             if (_fadeClock < 0)
             {
                 _holdClock += dt;
@@ -344,7 +360,7 @@ public sealed partial class DonutMenu
         }
 
         if (_outcome is { } outcome && outcome != DonutProgressOutcome.Cancelled && badge > 0.01)
-            DrawOutcomeBadge(context, center, outcome, badge, bold);
+            DrawOutcomeBadge(context, center, outcome, badge * (outcome == DonutProgressOutcome.Succeeded ? CheckBump : 1), bold);
 
         if (_ringHover && _outcome is null && _handOffClock < 0)
             DrawCancelButton(context, CancelButtonCenter(center));
@@ -372,15 +388,27 @@ public sealed partial class DonutMenu
         using var _ = context.PushTransform(transform);
         if (outcome == DonutProgressOutcome.Succeeded)
         {
+            // The stroke is drawn from its start to its end, the short stroke first.
+            Point start = new(center.X - 9, center.Y + 0.5), corner = new(center.X - 2.5, center.Y + 7), end = new(center.X + 10, center.Y - 6.5);
+            var drawn = CheckDrawn * (Distance(start, corner) + Distance(corner, end));
+            var firstStroke = Distance(start, corner);
             var check = new StreamGeometry();
             using (var g = check.Open())
             {
-                g.BeginFigure(new Point(center.X - 9, center.Y + 0.5), false);
-                g.LineTo(new Point(center.X - 2.5, center.Y + 7));
-                g.LineTo(new Point(center.X + 10, center.Y - 6.5));
+                g.BeginFigure(start, false);
+                if (drawn <= firstStroke)
+                {
+                    g.LineTo(Along(start, corner, drawn / firstStroke));
+                }
+                else
+                {
+                    g.LineTo(corner);
+                    g.LineTo(Along(corner, end, (drawn - firstStroke) / Distance(corner, end)));
+                }
                 g.EndFigure(false);
             }
-            context.DrawGeometry(null, new Pen(glyph, 3.6, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), check);
+            if (drawn > 0)
+                context.DrawGeometry(null, new Pen(glyph, 3.6, lineCap: PenLineCap.Round, lineJoin: PenLineJoin.Round), check);
         }
         else
         {
@@ -475,4 +503,7 @@ public sealed partial class DonutMenu
     }
 
     private static double Lerp(double a, double b, double t) => a + (b - a) * t;
+
+    /// <summary>The point <paramref name="t"/> (0 to 1) of the way from <paramref name="a"/> to <paramref name="b"/>.</summary>
+    private static Point Along(Point a, Point b, double t) => new(Lerp(a.X, b.X, t), Lerp(a.Y, b.Y, t));
 }

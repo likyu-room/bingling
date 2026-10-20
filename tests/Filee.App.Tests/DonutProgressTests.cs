@@ -64,6 +64,67 @@ public class DonutProgressTests
     }
 
     [AvaloniaFact]
+    public void The_check_is_drawn_over_a_fifth_of_a_second_then_the_badge_bumps_once()
+    {
+        var (window, donut) = Create();
+        Motion.Configure(false, () => false); // animations on, whatever the machine reports
+        donut.BeginProgress();
+        donut.CompleteProgress(DonutProgressOutcome.Succeeded, () => { });
+        Run(donut, () => donut.ShownOutcome is not null);
+        DonutMotionTests.Freeze(donut);
+
+        // It has only just appeared: the stroke has barely started, and the badge sits still until it is drawn.
+        Assert.InRange(donut.CheckDrawn, 0, 0.2);
+        Assert.Equal(1, donut.CheckBump);
+
+        var drawn = new List<double> { donut.CheckDrawn };
+        var bumps = new List<double> { donut.CheckBump };
+        var seconds = Frame; // since the badge appeared (the frame it did in counts)
+        double? finished = null;
+        while (seconds < 0.5)
+        {
+            donut.Advance(Frame);
+            seconds += Frame;
+            drawn.Add(donut.CheckDrawn);
+            bumps.Add(donut.CheckBump);
+            finished ??= donut.CheckDrawn >= 1 ? seconds : null;
+            if (drawn.Count == 7)
+                DonutMotionTests.Save(window, "progress-check-drawing.png"); // about half way
+        }
+
+        Assert.Equal(drawn.OrderBy(d => d), drawn); // never undrawn
+        Assert.InRange(finished!.Value, 0.2, 0.26);
+        // Nothing bumps before the stroke is complete; then up by 0.06 and back, once.
+        Assert.All(bumps.Take(drawn.FindIndex(d => d >= 1)), bump => Assert.Equal(1, bump));
+        Assert.InRange(bumps.Max(), 1.05, 1.06 + 1e-9);
+        Assert.Equal(1, bumps[^1], 6);
+        var peak = bumps.IndexOf(bumps.Max());
+        Assert.True(bumps.Take(peak + 1).SequenceEqual(bumps.Take(peak + 1).OrderBy(b => b)));
+        Assert.True(bumps.Skip(peak).SequenceEqual(bumps.Skip(peak).OrderByDescending(b => b)));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void With_animations_off_the_check_is_drawn_whole_at_once()
+    {
+        var (window, donut) = Create();
+        Motion.Set(false);
+        try
+        {
+            donut.BeginProgress();
+            donut.CompleteProgress(DonutProgressOutcome.Succeeded, () => { });
+            Run(donut, () => donut.ShownOutcome is not null);
+            Assert.Equal(1, donut.CheckDrawn);
+            Assert.Equal(1, donut.CheckBump, 6);
+            window.Close();
+        }
+        finally
+        {
+            Motion.Set(true);
+        }
+    }
+
+    [AvaloniaFact]
     public void Hand_off_to_the_toast_is_quick()
     {
         var (window, donut) = Create();

@@ -29,12 +29,22 @@ public sealed partial class DonutMenu
     /// <summary>Width and height of a donut of <paramref name="outerRadius"/>, with room for group rings when asked.</summary>
     public static double SideFor(double outerRadius, bool subRing) => 2 * (outerRadius + PopOut + 14 + (subRing ? SubRingSpace : 0));
 
+    /// <summary>Gap between one slice of a group's ring starting to open and the next one starting.</summary>
+    private const double SubStagger = 0.03;
+
+    /// <summary>How far, inward from its place, a slice of a group's ring starts, and slides out from while it opens.</summary>
+    private const double SubSlide = 6;
+
     // Group slices: the one fanned out (-1 none), the one still drawn while its ring folds away, and the hovered
     // slice of the ring.
     private int _expanded = -1;
     private int _shownExpanded = -1;
     private int _subHover = -1;
-    private Spring _expand;
+
+    // How far each slice of the shown group's ring has opened (0 folded, 1 open), and the time since the ring began to
+    // open: slice k waits until k * SubStagger.
+    private Spring[] _subOpen = [];
+    private double _expandClock;
 
     // A group slice the pointer is on but hasn't opened yet (-1 none), and the closest to the centre it has been on it.
     private int _pendingGroup = -1;
@@ -180,14 +190,70 @@ public sealed partial class DonutMenu
     private void Expand(int group)
     {
         _ringFromKeys = false;
-        // Another group's ring still folding away: this one grows out of its own slice, not from half open.
         if (_shownExpanded != group)
-            _expand = default;
+        {
+            // Another group's ring still folding away: this one grows out of its own slice, not from half open.
+            _subOpen = new Spring[Items![group].Children?.Count ?? 0];
+            _expandClock = 0;
+        }
+        else
+        {
+            _expandClock = SubStagger * _subOpen.Length; // the same ring folding away: its slices go on from where they are
+        }
         _expanded = _shownExpanded = group;
         ClearPending();
         ActiveIndexChanged?.Invoke(this, ActiveIndex);
         StartAnimation();
     }
+
+    /// <summary>
+    /// Moves the slices of the group's ring. Opening, each starts <see cref="SubStagger"/> after the one before it, with a
+    /// soft bounce like the slices of the donut; folding away they all settle at once, without one (the bounce grows the
+    /// ring by about a pixel, well inside the room kept for it, <see cref="SubRingSpace"/>). Returns true while they move.
+    /// </summary>
+    private bool StepSubRing(double dt)
+    {
+        _expandClock += dt;
+        var active = false;
+        for (var k = 0; k < _subOpen.Length; k++)
+        {
+            if (_expanded < 0)
+            {
+                active |= _subOpen[k].Step(0, dt, 320, CriticalDamping);
+                continue;
+            }
+            // Only the part of this frame after the slice's start counts; one that hasn't started waits for more frames.
+            var live = Math.Min(dt, _expandClock - k * SubStagger);
+            active |= live > 0 ? _subOpen[k].Step(1, live, 320, 24) : true;
+        }
+        if (_expanded < 0 && !SubRingVisible)
+            _shownExpanded = -1;
+        return active;
+    }
+
+    /// <summary>The ring's slices at where they end: open when a group is, folded otherwise.</summary>
+    private void SnapSubRing()
+    {
+        for (var k = 0; k < _subOpen.Length; k++)
+            _subOpen[k] = new Spring { Value = _expanded >= 0 ? 1 : 0 };
+        if (_expanded < 0)
+            _shownExpanded = -1;
+    }
+
+    /// <summary>True while any slice of the ring is visible, folding away included.</summary>
+    private bool SubRingVisible
+    {
+        get
+        {
+            foreach (var slice in _subOpen)
+                if (slice.Value > 0.001)
+                    return true;
+            return false;
+        }
+    }
+
+    /// <summary>How far slice <paramref name="sub"/> of the shown group's ring has opened (0 to 1, a little past it while it bounces), for tests.</summary>
+    internal double SubOpenAmount(int sub) => _subOpen[sub].Value;
 
     private void SetSub(int sub)
     {
@@ -369,7 +435,7 @@ public sealed partial class DonutMenu
         return inside > 0 && (inside >= Math.PI / 2 || distance * Math.Sin(inside) >= LeaveEdge);
     }
 
-    /// <summary>The ring an open group fans out, growing out of its slice.</summary>
+    /// <summary>The ring an open group fans out: its slices grow out of the group's slice one after another.</summary>
     private void DrawSubRing(DrawingContext context, Point center, Typeface bold, Typeface regular)
     {
         var group = _shownExpanded;
@@ -377,21 +443,26 @@ public sealed partial class DonutMenu
         var parentMid = DonutGeometry.MidAngle(group, Count);
         var subSpan = SubSpanOf(children.Count);
         var (inner, outer) = SubRadii;
-        var t = Math.Max(0, _expand.Value);
         var opening = _open.Length == 0 ? 1 : Math.Clamp(_open.Average(), 0, 1);
         // Grows outward from the group's slice: scaled about the point where it meets the donut.
         var anchor = DonutGeometry.PointAt(center, inner, parentMid);
-        var scale = 0.8 + 0.2 * t;
-        var transform = Matrix.CreateTranslation(-anchor.X, -anchor.Y) * Matrix.CreateScale(scale, scale) *
-                        Matrix.CreateTranslation(anchor.X, anchor.Y);
 
-        using (context.PushTransform(transform))
-        using (context.PushOpacity(Math.Clamp(t, 0, 1) * opening))
+        for (var k = 0; k < children.Count && k < _subOpen.Length; k++)
         {
-            for (var k = 0; k < children.Count; k++)
+            var t = Math.Max(0, _subOpen[k].Value);
+            if (t <= 0.001)
+                continue;
+            var item = children[k];
+            var mid = DonutGeometry.SubMidAngle(parentMid, k, children.Count, subSpan);
+            // It also slides out from SubSlide px further in, along its own direction.
+            var slide = DonutGeometry.PointAt(default, -SubSlide * (1 - t), mid);
+            var scale = 0.8 + 0.2 * t;
+            var transform = Matrix.CreateTranslation(-anchor.X, -anchor.Y) * Matrix.CreateScale(scale, scale) *
+                            Matrix.CreateTranslation(anchor.X + slide.X, anchor.Y + slide.Y);
+
+            using (context.PushTransform(transform))
+            using (context.PushOpacity(Math.Clamp(t, 0, 1) * opening))
             {
-                var item = children[k];
-                var mid = DonutGeometry.SubMidAngle(parentMid, k, children.Count, subSpan);
                 var wedge = CreateWedge(center, inner, outer, mid, subSpan);
                 DrawGlass(context, wedge, transform);
                 context.DrawGeometry(WithOpacity(SliceBrush, SliceOpacity * (item.IsEnabled ? 1 : 0.55)), BorderPen(), wedge);

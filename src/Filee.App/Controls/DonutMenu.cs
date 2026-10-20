@@ -107,9 +107,27 @@ public sealed partial class DonutMenu : Control
 
     /// <summary>Gap between slices in pixels (keeps the donut "full" while separating slices).</summary>
     private const double GapPixels = 3;
-    private const double PopOut = 7;
-    private const double OpenDuration = 0.42;
-    private const double OpenStagger = 0.028;
+
+    /// <summary>
+    /// How far a lit slice pops out. It is also the room the window keeps round the donut (<see cref="SideFor"/>) and the
+    /// slack of the hit test, so a popped-out slice stays under the pointer.
+    /// </summary>
+    internal const double PopOut = 9;
+
+    /// <summary>How much a lit slice grows (a fraction of its size).</summary>
+    private const double HoverGrow = 0.035;
+
+    /// <summary>How long one slice takes to open; slice i starts <c>i * OpenStagger</c> after the first.</summary>
+    private const double OpenDuration = 0.34;
+    private const double OpenStagger = 0.022;
+
+    /// <summary>The centre circle opens first: it starts at once, from <see cref="CenterStartScale"/>, and the slices after this long.</summary>
+    private const double CenterLead = 0.06;
+    private const double CenterStartScale = 0.85;
+
+    /// <summary>The whole donut shrinks to <see cref="CloseScale"/> and fades out over <see cref="CloseDuration"/> when it closes.</summary>
+    private const double CloseDuration = 0.18;
+    private const double CloseScale = 0.92;
     private const double DragStartDistance = 5;
 
     // Pencil (Material "edit") path in a 24×24 box.
@@ -119,6 +137,9 @@ public sealed partial class DonutMenu : Control
     private Spring[] _hover = [];
     private double[] _open = [];
     private Spring _centerPulse;
+    private double _centerOpen = 1;   // 0 to 1 (and a little past it): the centre circle's own opening
+    private double _closeAmount;      // 0 open to 1 gone: how far the closing donut has shrunk and faded
+    private Matrix _outer = Matrix.Identity; // the closing donut's transform while it is rendered (the glass undoes it)
     private double _openClock = double.MaxValue;
     private TimeSpan? _lastFrame;
     private bool _animating;
@@ -237,18 +258,21 @@ public sealed partial class DonutMenu : Control
         ResetProgress();
         _closing = false;
         _closeCallback = null;
+        _closeAmount = 0;
         if (!Motion.Enabled)
         {
             Array.Fill(_open, 1);
+            _centerOpen = 1;
             InvalidateVisual();
             return;
         }
         Array.Fill(_open, 0);
+        _centerOpen = 0;
         _openClock = 0;
         StartAnimation();
     }
 
-    /// <summary>Shrinks the donut back into the centre, then calls <paramref name="done"/>.</summary>
+    /// <summary>Shrinks the donut a little and fades it out, then calls <paramref name="done"/>.</summary>
     public void PlayCloseAnimation(Action done)
     {
         if (!Motion.Enabled || Count == 0)
@@ -258,6 +282,7 @@ public sealed partial class DonutMenu : Control
         }
         _closing = true;
         _closeCallback = done;
+        _closeAmount = 0;
         _openClock = 0;
         StartAnimation();
     }
@@ -284,6 +309,15 @@ public sealed partial class DonutMenu : Control
 
     /// <summary>How far slice <paramref name="index"/> is drawn lit up right now (0 to 1), for the drag log.</summary>
     public double LitAmount(int index) => index >= 0 && index < _hover.Length ? _hover[index].Value : 0;
+
+    /// <summary>How far slice <paramref name="index"/> has opened (0 to 1, a little past it while it bounces), for tests.</summary>
+    internal double OpenAmount(int index) => _open[index];
+
+    /// <summary>How far the centre circle has opened (0 to 1, a little past it while it bounces), for tests.</summary>
+    internal double CenterOpen => _centerOpen;
+
+    /// <summary>How far the closing donut has shrunk and faded: 0 open to 1 gone, for tests.</summary>
+    internal double CloseAmount => _closeAmount;
 
     /// <summary>Edit mode: the slice being dragged is drawn faded.</summary>
     public void SetDimmedIndex(int index)
@@ -430,7 +464,9 @@ public sealed partial class DonutMenu : Control
         _span = Enumerable.Range(0, n).Select(_ => new Spring { Value = DonutGeometry.Span(n) }).ToArray();
         _expanded = _shownExpanded = _subHover = -1;
         ClearPending();
-        _expand = default;
+        _subOpen = [];
+        _centerOpen = 1;
+        _closeAmount = 0;
         // The window is reused: a keyboard hold from the last time it was open must not swallow the first moves now.
         _keyboardHold = _ringFromKeys = false;
         _keyAnchor = _lastPointer = null;
@@ -699,16 +735,18 @@ public sealed partial class DonutMenu : Control
         for (var i = 0; i < _hover.Length; i++)
             _hover[i] = new Spring { Value = i == ActiveIndex ? 1 : 0 };
         _centerPulse = default;
-        _expand = new Spring { Value = _expanded >= 0 ? 1 : 0 };
-        if (_expanded < 0)
-            _shownExpanded = -1;
+        SnapSubRing();
         StepLayout(0, snap: true);
         if (_openClock < double.MaxValue)
         {
             _openClock = double.MaxValue;
-            Array.Fill(_open, _closing ? 0 : 1);
+            Array.Fill(_open, 1);
+            _centerOpen = 1;
             if (_closing)
+            {
+                _closeAmount = 1;
                 FinishClose();
+            }
         }
         InvalidateVisual();
     }
@@ -744,14 +782,16 @@ public sealed partial class DonutMenu : Control
                 _hover[i].Value = i == ActiveIndex ? 1 : 0;
                 _hover[i].Velocity = 0;
             }
-            Array.Fill(_open, _closing ? 0 : 1);
+            Array.Fill(_open, 1);
+            _centerOpen = 1;
             _centerPulse = default;
-            _expand = new Spring { Value = _expanded >= 0 ? 1 : 0 };
-            if (_expanded < 0)
-                _shownExpanded = -1;
+            SnapSubRing();
             StepLayout(dt);
             if (_closing)
+            {
+                _closeAmount = 1;
                 FinishClose();
+            }
             active |= StepProgress(dt); // hold timers still run without animation
         }
         else
@@ -761,23 +801,32 @@ public sealed partial class DonutMenu : Control
             for (var i = 0; i < _hover.Length; i++)
                 active |= i == ActiveIndex ? _hover[i].Step(1, dt) : _hover[i].Step(0, dt, 320, CriticalDamping);
             active |= _centerPulse.Step(0, dt, 260, 12);
-            // A soft bounce opening, like the slices popping out; folding away settles without one. The bounce grows the
-            // ring by about a pixel, well inside the room kept for it (SubRingSpace).
-            active |= _expanded >= 0 ? _expand.Step(1, dt, 320, 24) : _expand.Step(0, dt, 320, CriticalDamping);
-            if (_expanded < 0 && _expand.Value <= 0.001)
-                _shownExpanded = -1;
+            active |= StepSubRing(dt);
             active |= StepProgress(dt);
             active |= StepLayout(dt);
 
             if (_openClock < double.MaxValue)
             {
                 _openClock += dt;
-                var done = true;
-                for (var i = 0; i < _open.Length; i++)
+                bool done;
+                if (_closing)
                 {
-                    var t = Math.Clamp((_openClock - i * (_closing ? 0.01 : OpenStagger)) / (_closing ? 0.16 : OpenDuration), 0, 1);
-                    _open[i] = _closing ? 1 - EaseInCubic(t) : EaseOutBack(t);
-                    done &= t >= 1;
+                    var t = Math.Clamp(_openClock / CloseDuration, 0, 1);
+                    _closeAmount = EaseInCubic(t);
+                    done = t >= 1;
+                }
+                else
+                {
+                    // The centre circle goes first; each slice follows a little after the one before it.
+                    var centre = Math.Clamp(_openClock / OpenDuration, 0, 1);
+                    _centerOpen = EaseOutBack(centre);
+                    done = centre >= 1;
+                    for (var i = 0; i < _open.Length; i++)
+                    {
+                        var t = Math.Clamp((_openClock - CenterLead - i * OpenStagger) / OpenDuration, 0, 1);
+                        _open[i] = EaseOutBack(t);
+                        done &= t >= 1;
+                    }
                 }
                 if (done)
                 {
@@ -805,7 +854,7 @@ public sealed partial class DonutMenu : Control
 
     private static double EaseOutBack(double t)
     {
-        const double c1 = 1.55;
+        const double c1 = 1.25;
         const double c3 = c1 + 1;
         return 1 + c3 * Math.Pow(t - 1, 3) + c1 * Math.Pow(t - 1, 2);
     }
@@ -819,7 +868,6 @@ public sealed partial class DonutMenu : Control
         var center = Center;
         var r2 = OuterRadius;
         var r1 = InnerRadius;
-        var n = Count;
         var typeface = new Typeface(GetValue(TextElement.FontFamilyProperty), FontStyle.Normal, FontWeight.SemiBold);
         var typefaceRegular = new Typeface(GetValue(TextElement.FontFamilyProperty));
 
@@ -829,6 +877,25 @@ public sealed partial class DonutMenu : Control
             return;
         }
 
+        // Closing: all of it together shrinks and fades. The glass draws through the inverse of this (DrawGlass), so the
+        // screen behind stays where it is. Not closing, nothing is added around the drawing.
+        if (_closeAmount <= 0)
+        {
+            _outer = Matrix.Identity;
+            RenderDonut(context, center, r1, r2, typeface, typefaceRegular);
+            return;
+        }
+        var shrink = 1 - (1 - CloseScale) * _closeAmount;
+        _outer = Matrix.CreateTranslation(-center.X, -center.Y) * Matrix.CreateScale(shrink, shrink) *
+                 Matrix.CreateTranslation(center.X, center.Y);
+        using (context.PushTransform(_outer))
+        using (context.PushOpacity(1 - _closeAmount))
+            RenderDonut(context, center, r1, r2, typeface, typefaceRegular);
+    }
+
+    private void RenderDonut(DrawingContext context, Point center, double r1, double r2, Typeface typeface, Typeface typefaceRegular)
+    {
+        var n = Count;
         DrawSoftShadow(context, center, r2);
 
         if (n == 0)
@@ -862,7 +929,7 @@ public sealed partial class DonutMenu : Control
             var transform =
                 Matrix.CreateTranslation(-center.X, -center.Y) *
                 Matrix.CreateRotation(rotate) *
-                Matrix.CreateScale(scale * (1 + hover * 0.025), scale * (1 + hover * 0.025)) *
+                Matrix.CreateScale(scale * (1 + hover * HoverGrow), scale * (1 + hover * HoverGrow)) *
                 Matrix.CreateTranslation(center.X + offset.X, center.Y + offset.Y);
 
             using (context.PushTransform(transform))
@@ -881,7 +948,7 @@ public sealed partial class DonutMenu : Control
 
                 var hot = (i == ActiveIndex || i == _dropTargetIndex) && item.IsEnabled;
                 DrawLabel(context, item, center, (r1 + r2) / 2, mid, span * (r1 + r2) / 2 - 10,
-                    r2 - r1 - 16, r2 - r1, typeface, typefaceRegular, hot);
+                    r2 - r1 - 16, r2 - r1, typeface, typefaceRegular, hot, Math.Max(0, emphasis));
             }
         }
 
@@ -891,7 +958,7 @@ public sealed partial class DonutMenu : Control
         var reaching = _expanded >= 0 ? _expanded : _pendingGroup;
         if (!IsEditMode && reaching >= 0 && reaching < n && Items![reaching].Children is { Count: > 0 } reachable)
             DrawHitBackdrop(context, center, reaching, reachable.Count);
-        if (!IsEditMode && _shownExpanded >= 0 && _shownExpanded < n && _expand.Value > 0.01)
+        if (!IsEditMode && _shownExpanded >= 0 && _shownExpanded < n && SubRingVisible)
             DrawSubRing(context, center, typeface, typefaceRegular);
 
         DrawCenter(context, center, r1, typeface, typefaceRegular);
@@ -925,7 +992,13 @@ public sealed partial class DonutMenu : Control
         var radius = (r1 - 6) * pulse;
         var cancelHot = _externalCenterHot;
         var disc = new EllipseGeometry(new Rect(center.X - radius, center.Y - radius, 2 * radius, 2 * radius));
-        DrawGlass(context, disc, Matrix.Identity);
+
+        // While the donut opens the centre grows from CenterStartScale, ahead of the slices.
+        var grow = CenterStartScale + (1 - CenterStartScale) * _centerOpen;
+        var transform = Matrix.CreateTranslation(-center.X, -center.Y) * Matrix.CreateScale(grow, grow) *
+                        Matrix.CreateTranslation(center.X, center.Y);
+        using var _ = context.PushTransform(transform);
+        DrawGlass(context, disc, transform);
         context.DrawEllipse(CenterBrush, BorderPen(), center, radius, radius);
         if (cancelHot)
             context.DrawEllipse(WithOpacity(DangerBrush, 0.18), null, center, radius, radius);
@@ -943,8 +1016,9 @@ public sealed partial class DonutMenu : Control
 
     // maxWidth / maxHeight: room for the name across the slice and along the ring (the ring's thickness less a margin).
     // thickness: the ring's thickness itself, which the icon above the name has to fit in too (LabelLayout).
+    // lit: how far the slice is lit up (0 to 1, a slice's hover spring), which the icon grows with; by default all or nothing, as hot.
     private void DrawLabel(DrawingContext context, DonutItem item, Point center, double radius, double angle,
-        double maxWidth, double maxHeight, double thickness, Typeface bold, Typeface regular, bool hot)
+        double maxWidth, double maxHeight, double thickness, Typeface bold, Typeface regular, bool hot, double? lit = null)
     {
         var foreground = hot ? HotText : item.IsEnabled ? Foreground : SecondaryForeground;
         var width = Math.Clamp(maxWidth, 30, 120);
@@ -956,7 +1030,7 @@ public sealed partial class DonutMenu : Control
 
         var anchor = DonutGeometry.PointAt(center, radius, angle);
         var layout = LabelLayout(item.Icon is not null, center, radius, angle, maxWidth, thickness,
-            width, label.Height + (caption?.Height ?? 0), hot ? HotIconScale : 1);
+            width, label.Height + (caption?.Height ?? 0), IconScale(lit ?? (hot ? 1 : 0)));
         DrawCentered(context, label, anchor.X, layout.Text.Top);
         if (caption is not null)
             DrawCentered(context, caption, anchor.X, layout.Text.Top + label.Height);
@@ -979,8 +1053,11 @@ public sealed partial class DonutMenu : Control
     /// <summary>The slice must be at least this wide for an icon (it is 18 px, and a slice narrows towards the hole).</summary>
     private const double IconMinSliceWidth = 28;
 
-    /// <summary>How much bigger the icon of the highlighted slice is.</summary>
-    private const double HotIconScale = 1.12;
+    /// <summary>How much bigger the icon of a fully lit slice is (a fraction of its size).</summary>
+    private const double HotIconGrow = 0.12;
+
+    /// <summary>The icon's scale when its slice is lit <paramref name="lit"/> (0 to 1): it follows the slice's hover spring.</summary>
+    internal static double IconScale(double lit) => 1 + HotIconGrow * lit;
 
     /// <summary>What the callers of <see cref="DrawLabel"/> leave out of a slice's arc, as <c>maxWidth</c>, for the name.</summary>
     private const double SliceMargin = 10;

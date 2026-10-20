@@ -49,6 +49,19 @@ public class DonutGroupTests
 
     private static bool IsOpen(DonutMenu donut) => donut.HitTest(OnRing(donut, 1)).Kind == DonutHitKind.SubSegment;
 
+    /// <summary>
+    /// Lets an open ring finish opening, and draws it. Its slices start one after another, and the headless pointer only
+    /// finds a slice that has been drawn: a mouse sent onto one too soon is "outside" the donut.
+    /// </summary>
+    private static void LetRingOpen(DonutMenu donut)
+    {
+        for (var i = 0; i < 30; i++)
+            donut.Advance(1 / 60.0);
+        donut.InvalidateVisual();
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+    }
+
     [AvaloniaFact]
     public void Passing_over_a_group_on_the_way_elsewhere_does_not_open_it()
     {
@@ -139,6 +152,7 @@ public class DonutGroupTests
         var inner = OnGroup(donut, donut.OuterRadius * 0.6);
         donut.SetExternalHit(donut.HitTest(inner), inner);
         donut.ExpandPendingGroup();
+        LetRingOpen(donut);
 
         // The mouse comes onto the ring first: right after another test's click, a headless press with no move before it
         // can miss the donut.
@@ -210,7 +224,7 @@ public class DonutGroupTests
         donut.ExpandPendingGroup();
 
         // The gap between the popped-out slice and the ring still belongs to the group: no flicker on the way.
-        var gap = OnGroup(donut, donut.OuterRadius + 7 + 3);
+        var gap = OnGroup(donut, donut.OuterRadius + DonutMenu.PopOut + 3);
         Assert.Equal(new DonutHit(DonutHitKind.Segment, Group), donut.HitTest(gap));
         donut.SetExternalHit(donut.HitTest(gap), gap);
         Assert.True(IsOpen(donut));
@@ -305,6 +319,7 @@ public class DonutGroupTests
         window.MouseMove(InWindow(inner));
         window.MouseDown(InWindow(inner), MouseButton.Left);
         window.MouseUp(InWindow(inner), MouseButton.Left);
+        LetRingOpen(donut);
         window.MouseMove(InWindow(OnRing(donut, 1)));
         Assert.True(IsOpen(donut));
         window.MouseMove(new Point(2, 2));
@@ -565,6 +580,7 @@ public class DonutGroupTests
         donut.HandleKey(Key.Right); // to the group
         donut.HandleKey(Key.Enter); // its ring opens
         Assert.True(IsOpen(donut));
+        LetRingOpen(donut);
 
         // The mouse heads for the ring: out of the hole, across the group's slice, to a ring slice.
         foreach (var radius in new[] { 15.0, donut.OuterRadius * 0.3, donut.OuterRadius * 0.7 })
@@ -644,6 +660,44 @@ public class DonutGroupTests
         }
     }
 
+    [AvaloniaFact]
+    public void A_rings_slices_open_one_after_another_and_fold_together()
+    {
+        var (donut, window) = Open();
+        Motion.Configure(false, () => false); // animations on, whatever the machine reports
+        var inner = OnGroup(donut, donut.OuterRadius * 0.6);
+        donut.SetExternalHit(donut.HitTest(inner), inner);
+        donut.ExpandPendingGroup();
+        DonutMotionTests.Freeze(donut);
+
+        // 0.03 s in, the first slice has begun to open and the others, which start 0.03 s apart, have not.
+        donut.Advance(0.03);
+        Assert.True(donut.SubOpenAmount(0) > 0, $"{donut.SubOpenAmount(0)}");
+        Assert.Equal(0, donut.SubOpenAmount(1));
+        Assert.Equal(0, donut.SubOpenAmount(2));
+
+        donut.Advance(0.03); // 0.06 s: the second has started, the third has not
+        Assert.True(donut.SubOpenAmount(0) > donut.SubOpenAmount(1));
+        Assert.True(donut.SubOpenAmount(1) > 0);
+        Assert.Equal(0, donut.SubOpenAmount(2));
+        DonutMotionTests.Save(window, "donut-group-opening.png");
+
+        for (var i = 0; i < 120 && donut.Advance(1 / 60.0); i++)
+        {
+        }
+        Assert.All(Enumerable.Range(0, 3), k => Assert.Equal(1, donut.SubOpenAmount(k)));
+
+        // Folding away is not staggered: all three go at once.
+        donut.CollapseGroup();
+        donut.Advance(1 / 60.0);
+        Assert.All(Enumerable.Range(0, 3), k => Assert.InRange(donut.SubOpenAmount(k), 0.01, 0.99));
+        for (var i = 0; i < 120 && donut.Advance(1 / 60.0); i++)
+        {
+        }
+        Assert.All(Enumerable.Range(0, 3), k => Assert.Equal(0, donut.SubOpenAmount(k)));
+        window.Close();
+    }
+
     [Theory]
     [InlineData(5, 5)]           // top-left corner
     [InlineData(1915, 1075)]     // bottom-right corner
@@ -659,7 +713,7 @@ public class DonutGroupTests
 
         // The ring a group fans out (labels included) is inside the window, and the window inside the screen.
         var center = new PixelPoint(position.X + side / 2, position.Y + side / 2);
-        var ringReach = radius + 7 + DonutMenu.SubRingSpace;
+        var ringReach = radius + DonutMenu.PopOut + DonutMenu.SubRingSpace;
         Assert.True(ringReach <= side / 2.0);
         Assert.True(center.X - ringReach >= area.X && center.X + ringReach <= area.Right, $"x {center.X}");
         Assert.True(center.Y - ringReach >= area.Y && center.Y + ringReach <= area.Bottom, $"y {center.Y}");

@@ -27,7 +27,8 @@ public sealed partial class DonutMenu
     /// <summary>
     /// Draws the backdrop as it lies on screen, clipped to <paramref name="shape"/>, before the shape's colour.
     /// <paramref name="shapeTransform"/> is the transform the shape is drawn with: the picture is drawn through its
-    /// inverse, so it stays where it is while the shape moves.
+    /// inverse, so it stays where it is while the shape moves. The whole donut shrinking as it closes (<c>_outer</c>)
+    /// counts as part of it.
     /// </summary>
     /// <remarks>
     /// A clip and DrawImage, not an ImageBrush: with the brush a frame of the donut took about 50 times longer (Skia on
@@ -35,7 +36,7 @@ public sealed partial class DonutMenu
     /// </remarks>
     private void DrawGlass(DrawingContext context, Geometry shape, Matrix shapeTransform)
     {
-        if (Glass is not { } glass || !shapeTransform.TryInvert(out var inverse))
+        if (Glass is not { } glass || !(shapeTransform * _outer).TryInvert(out var inverse))
             return;
         using (context.PushGeometryClip(shape))
         using (context.PushTransform(inverse))
