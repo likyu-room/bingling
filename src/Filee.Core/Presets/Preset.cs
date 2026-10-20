@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace Filee.Core.Presets;
 
-/// <summary>What a preset is: a conversion, or a group of conversions fanned out on the donut.</summary>
+/// <summary>What a preset is: a conversion, a group of presets fanned out on the donut, or an image tool.</summary>
 public enum PresetKind
 {
     /// <summary>Converts files.</summary>
@@ -16,6 +16,13 @@ public enum PresetKind
     /// conversion is picked (preset list, watch folders, <c>filee --preset</c>).
     /// </summary>
     Group,
+
+    /// <summary>
+    /// Opens an image tool (<see cref="Preset.Tool"/>) before it converts, e.g. the crop window; it runs once the tool
+    /// has set <see cref="ImageOptions.Edit"/>. Never offered where a conversion is picked. Added after the others so
+    /// the numbers of the older values stay.
+    /// </summary>
+    Tool,
 }
 
 /// <summary>
@@ -96,9 +103,16 @@ public sealed class Preset
     /// <summary>Where and how output files are written.</summary>
     public OutputRule Output { get; set; } = new();
 
-    /// <summary>A conversion or a group. A kind this version doesn't know (from a newer Filee) is read as a group.</summary>
+    /// <summary>A conversion, a group or an image tool. A kind this version doesn't know (from a newer Filee) is read as a group.</summary>
     [JsonConverter(typeof(PresetKindJsonConverter))]
     public PresetKind Kind { get; set; } = PresetKind.Convert;
+
+    /// <summary>
+    /// <see cref="PresetKind.Tool"/>: which tool the slice opens. Ignored for other kinds. A tool from a newer Filee
+    /// reads as <see cref="ImageToolKind.Crop"/>.
+    /// </summary>
+    [JsonConverter(typeof(LenientEnumJsonConverter<ImageToolKind>))]
+    public ImageToolKind Tool { get; set; }
 
     /// <summary>Most presets one group fans out: more slices would get too narrow to hit.</summary>
     public const int MaxSubPresets = 6;
@@ -119,6 +133,13 @@ public sealed class Preset
     /// <summary>True for a <see cref="PresetKind.Group"/>.</summary>
     [JsonIgnore]
     public bool IsGroup => Kind == PresetKind.Group;
+
+    /// <summary>
+    /// True for a <see cref="PresetKind.Convert"/>: what the preset list, watch folders and <c>filee --preset</c> offer.
+    /// A group and a tool are only on the donut.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsConversion => Kind == PresetKind.Convert;
 
     /// <summary>
     /// True if converting a <paramref name="sourceFormat"/> file saves every frame as a picture
@@ -148,6 +169,7 @@ public sealed class Preset
         Trace = Trace.Clone(),
         Output = Output.Clone(),
         Kind = Kind,
+        Tool = Tool,
         SubPresetIds = [.. SubPresetIds],
     };
 }
@@ -210,9 +232,15 @@ public sealed class ImageOptions
     [JsonConverter(typeof(LenientEnumJsonConverter<ImageFlip>))]
     public ImageFlip Flip { get; set; }
 
-    /// <summary>Turns or mirrors the image: only engines that do (<see cref="Conversion.IImageTransformer"/>) can run it.</summary>
+    /// <summary>
+    /// What image tools changed in the picture (the crop), applied after the turn and before resizing. Null when no
+    /// tool was used: the conversion then keeps the whole picture.
+    /// </summary>
+    public ImageEdit? Edit { get; set; }
+
+    /// <summary>Turns, mirrors or crops the image: only engines that do (<see cref="Conversion.IImageTransformer"/>) can run it.</summary>
     [JsonIgnore]
-    public bool TurnsOrMirrors => Rotation != ImageRotation.None || Flip != ImageFlip.None;
+    public bool TurnsOrMirrors => Rotation != ImageRotation.None || Flip != ImageFlip.None || Edit?.Crop is not null;
 
     /// <summary>Scale in percent when <see cref="Resize"/> is <see cref="ResizeMode.Percent"/>.</summary>
     public int ResizePercent { get; set; } = 50;
@@ -228,6 +256,12 @@ public sealed class ImageOptions
 
     /// <summary>Keep EXIF / XMP / ICC metadata.</summary>
     public bool KeepMetadata { get; set; } = true;
+
+    /// <summary>
+    /// Spend more time to make the file smaller without changing the picture (stronger lossless compression, optimised
+    /// JPEG tables). Off by default and for presets saved before the option.
+    /// </summary>
+    public bool Optimize { get; set; }
 
     /// <summary>
     /// When metadata is removed, still keep the ICC colour profile: without it, wide-gamut photos (Display P3 from
@@ -294,6 +328,7 @@ public sealed class ImageOptions
     {
         var copy = (ImageOptions)MemberwiseClone();
         copy.IcoSizes = [.. IcoSizes];
+        copy.Edit = Edit?.Clone();
         return copy;
     }
 }

@@ -61,7 +61,8 @@ public sealed class ConversionService
     /// <returns>The job's view model, or null when there was nothing to convert.</returns>
     public JobViewModel? Start(IReadOnlyList<string> files, Preset preset, bool showInToast = true)
     {
-        if (files.Count == 0 || preset.IsGroup)
+        // A tool preset runs with the edit its tool made (the crop box); without one it would only copy the files.
+        if (files.Count == 0 || preset.IsGroup || (preset.Kind == PresetKind.Tool && preset.Image.Edit is null))
             return null;
         // A preset on "Default" saves where Settings > General says (read now, so a changed default applies at once).
         preset = _store.Settings.WithDefaultOutput(preset);

@@ -253,6 +253,27 @@ public sealed class CliTests : IDisposable
     }
 
     [Fact]
+    public async Task A_tool_preset_is_neither_run_nor_listed_but_compress_and_strip_metadata_are()
+    {
+        var png = Png("a.png");
+
+        var (code, _, errors) = await Run("convert", png, "--preset", "crop");
+        Assert.Equal(Cli.UsageError, code);
+        Assert.Contains("opens a tool", errors);
+        Assert.False(File.Exists(Path.Combine(_folder, "a Cropped.png")));
+
+        var (_, list, _) = await Run("presets");
+        Assert.DoesNotContain("crop ", list);
+        Assert.Contains("compress-image", list);
+        Assert.Contains("strip-metadata", list);
+
+        // The "Tools" group names what it holds that can run, not the crop.
+        (code, _, errors) = await Run("convert", png, "--preset", "tools");
+        Assert.Equal(Cli.UsageError, code);
+        Assert.Contains("Use one of: compress-image, strip-metadata", errors);
+    }
+
+    [Fact]
     public async Task Data_files_convert_to_each_other()
     {
         var json = Path.Combine(_folder, "config.json");

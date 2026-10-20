@@ -80,7 +80,7 @@ public class BuiltInDataTests
     }
 
     [Fact]
-    public void Built_in_groups_fan_out_existing_conversions_on_no_default_donut()
+    public void Built_in_groups_fan_out_existing_presets_and_only_the_tools_group_is_on_a_default_donut()
     {
         var presets = BuiltInData.CreatePresets().ToDictionary(p => p.Id);
         var groups = presets.Values.Where(p => p.IsGroup).ToList();
@@ -90,7 +90,9 @@ public class BuiltInDataTests
             Assert.InRange(group.SubPresetIds.Count, 1, Preset.MaxSubPresets);
             Assert.All(group.SubPresetIds, id => Assert.False(presets[id].IsGroup, id));
         }
-        Assert.DoesNotContain(BuiltInData.CreateProfiles(), p => p.PresetIds.Any(id => presets[id].IsGroup));
+        // "Rotate" and "Flip" are for users to add in Settings → Toolbar; "Tools" has its slice on the images donut.
+        var onDonuts = BuiltInData.CreateProfiles().SelectMany(p => p.PresetIds).Where(id => presets[id].IsGroup).ToList();
+        Assert.Equal(["tools"], onDonuts);
     }
 
     [Fact]

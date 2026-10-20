@@ -54,6 +54,9 @@ internal sealed class FakeTurner(string id, params ConversionEdge[] edges) : ICo
 
     public List<(string To, Filee.Core.Presets.ImageRotation Rotation)> Asked { get; } = [];
 
+    /// <summary>Whether each step was asked to apply an edit (a crop): (to, edit given).</summary>
+    public List<(string To, bool Edit)> EditAsked { get; } = [];
+
     public bool Transforms(string from, string to) => true;
 
     public EngineStatus GetStatus() => EngineStatus.Available();
@@ -61,7 +64,10 @@ internal sealed class FakeTurner(string id, params ConversionEdge[] edges) : ICo
     public Task<IReadOnlyList<string>> ConvertAsync(ConversionStep step, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         lock (Asked)
+        {
             Asked.Add((step.To, step.Preset.Image.Rotation));
+            EditAsked.Add((step.To, step.Preset.Image.Edit is not null));
+        }
         return _writer.ConvertAsync(step, progress, cancellationToken);
     }
 }

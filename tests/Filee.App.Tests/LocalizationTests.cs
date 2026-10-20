@@ -45,6 +45,17 @@ public partial class LocalizationTests
     }
 
     [Fact]
+    public void Every_built_in_preset_has_its_name_in_english_and_the_tools_a_short_ring_name()
+    {
+        var english = Load("en");
+        var named = Filee.Core.Presets.BuiltInData.CreatePresets().Where(p => p.NameKey is not null).ToList();
+        Assert.All(named, p => Assert.True(english.ContainsKey(p.NameKey!), $"{p.Id}: {p.NameKey}"));
+        // Shown on the ring the "Tools" group fans out, where the group's name already gives the context.
+        foreach (var id in new[] { "crop", "compress-image", "strip-metadata" })
+            Assert.True(english.ContainsKey(named.Single(p => p.Id == id).NameKey + ".short"), id);
+    }
+
+    [Fact]
     public void Every_key_used_in_xaml_exists()
     {
         var english = Load("en");

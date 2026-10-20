@@ -467,6 +467,8 @@ public sealed class JobQueue : IAsyncDisposable
             var copy = preset.Clone();
             copy.Image.Rotation = ImageRotation.None;
             copy.Image.Flip = ImageFlip.None;
+            // The crop too: cut once, in the step that transforms, not again by an engine before or after it.
+            copy.Image.Edit = null;
             return copy;
         }
 

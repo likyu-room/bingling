@@ -98,6 +98,9 @@ public sealed class AppSettings
 
     public DonutSettings Donut { get; set; } = new();
 
+    /// <summary>What the image tools remember (the crop window's ratio).</summary>
+    public ImageToolSettings ImageTools { get; set; } = new();
+
     public List<TriggerGesture> Triggers { get; set; } = TriggerGesture.Defaults();
 
     /// <summary>Process names (without .exe) in which gestures never trigger.</summary>

@@ -138,8 +138,8 @@ public sealed class UserDataStore
 
     public Preset? FindPreset(string id) => Presets.FirstOrDefault(p => p.Id == id);
 
-    /// <summary>The preset <paramref name="id"/> when it converts (a group doesn't), for every place that runs one.</summary>
-    public Preset? FindConversion(string id) => Presets.FirstOrDefault(p => p.Id == id && !p.IsGroup);
+    /// <summary>The preset <paramref name="id"/> when it converts (a group or a tool doesn't), for every place that runs one.</summary>
+    public Preset? FindConversion(string id) => Presets.FirstOrDefault(p => p.Id == id && p.IsConversion);
 
     /// <summary>Exports presets and profiles to a shareable JSON file.</summary>
     public void Export(string path) =>
@@ -503,7 +503,9 @@ internal static class SettingsMigrations
                     existing.TargetFormat = tool.TargetFormat;
                     changed = true;
                 }
-                else if (!tool.IsGroup && !existing.Image.TurnsOrMirrors)
+                // Only the rotate / flip presets: crop, compress and strip metadata turn nothing, so the same-id preset
+                // that doesn't isn't missing its rotation (and the library isn't "changed" on every start).
+                else if (tool.Image.TurnsOrMirrors && !existing.Image.TurnsOrMirrors)
                 {
                     existing.Image.Rotation = tool.Image.Rotation;
                     existing.Image.Flip = tool.Image.Flip;

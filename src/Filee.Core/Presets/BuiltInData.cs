@@ -258,7 +258,8 @@ public static class BuiltInData
 
     /// <summary>
     /// Rotate and flip presets, and the two groups that fan them out on the donut (added in settings schema 17). On no
-    /// default donut: users add "Rotate" / "Flip" (or single presets) in Settings → Toolbar.
+    /// default donut: users add "Rotate" / "Flip" (or single presets) in Settings → Toolbar. The "Tools" group (crop,
+    /// compress, strip metadata) is the exception: it has its own slice on the images donut.
     /// </summary>
     public static List<Preset> ImageToolPresets() =>
     [
@@ -277,11 +278,34 @@ public static class BuiltInData
             Id = "flip", NameKey = "preset.group_flip", TargetFormat = Preset.GroupTarget, Kind = PresetKind.Group,
             SubPresetIds = ["flip-horizontal", "flip-vertical"],
         },
+        // Crop opens the crop window and runs with the box it returns (PresetKind.Tool); the other two are plain
+        // same-format conversions. Compress trades a little quality for size, strip metadata keeps what the picture looks like.
+        new()
+        {
+            Id = "crop", NameKey = "preset.crop", TargetFormat = SameAsSource, Kind = PresetKind.Tool, Tool = ImageToolKind.Crop,
+            Image = { Quality = 95 }, Output = { FileNamePattern = "{name} Cropped" },
+        },
+        Tool("compress-image", "preset.compress_image", "{name} Compressed", i =>
+        {
+            i.Quality = 80;
+            i.KeepMetadata = false;
+            i.Optimize = true;
+        }),
+        Tool("strip-metadata", "preset.strip_metadata", "{name} Clean", i =>
+        {
+            i.KeepMetadata = false;
+            i.Optimize = true;
+        }),
+        new()
+        {
+            Id = "tools", NameKey = "preset.group_tools", TargetFormat = Preset.GroupTarget, Kind = PresetKind.Group,
+            SubPresetIds = ["crop", "compress-image", "strip-metadata"],
+        },
     ];
 
     /// <summary>
-    /// A rotate / flip preset. A JPG (or WEBP, AVIF) is encoded again when it turns: at 95 rather than the usual 90, so
-    /// turning a good photo doesn't visibly cost it quality.
+    /// A same-format image preset (rotate, flip, compress, strip metadata). A JPG (or WEBP, AVIF) is encoded again
+    /// when it changes: at 95 rather than the usual 90, so a good photo doesn't visibly lose quality.
     /// </summary>
     private static Preset Tool(string id, string nameKey, string pattern, Action<ImageOptions> set)
     {
@@ -318,7 +342,7 @@ public static class BuiltInData
         {
             Id = "images", NameKey = "profile.images",
             Extensions = ExtensionsOf(FormatCategory.Image),
-            PresetIds = ["to-png", "to-jpg", "to-webp", "to-pdf", "trace-svg", "trace-line-art", "to-tiff", "to-bmp", "to-ico", "half-size"],
+            PresetIds = ["to-png", "to-jpg", "to-webp", "to-pdf", "trace-svg", "trace-line-art", "to-tiff", "to-bmp", "to-ico", "tools", "half-size"],
         },
         new()
         {
