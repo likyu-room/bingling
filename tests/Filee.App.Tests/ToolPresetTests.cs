@@ -3,7 +3,9 @@
 
 using Avalonia.Headless.XUnit;
 using Filee.App.Services;
+using Filee.App.ViewModels;
 using Filee.App.ViewModels.Pages;
+using Filee.Core.Conversion;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
 using Filee.Core.Settings;
@@ -74,5 +76,56 @@ public class ToolPresetTests
         Assert.NotNull(job);
         Assert.Equal([drawn], job.Job.Sources);
         job.DismissCommand.Execute(null);
+    }
+
+    [AvaloniaFact]
+    public void Retrying_a_job_with_one_edit_per_file_runs_the_failed_files_with_their_own_edits()
+    {
+        var store = Store();
+        var conversions = AppHost.Get<ConversionService>();
+        var folder = Directory.CreateTempSubdirectory("filee-retry-edits-").FullName;
+        try
+        {
+            // Not pictures, only named like them: every file fails, and is still there to be tried again.
+            var arrow = Path.Combine(folder, "arrow.png");
+            var number = Path.Combine(folder, "number.png");
+            File.WriteAllBytes(arrow, [0x89, 0x50, 0x4E, 0x47]);
+            File.WriteAllBytes(number, [0x89, 0x50, 0x4E, 0x47]);
+            var edits = new Dictionary<string, ImageEdit>
+            {
+                [arrow] = new() { Annotations = [new Annotation { Kind = AnnotationKind.Arrow }] },
+                [number] = new() { Annotations = [new Annotation { Kind = AnnotationKind.Number, Number = 1 }] },
+            };
+            var failed = conversions.Start([arrow, number], store.FindPreset("annotate")!, edits)!;
+            WaitUntilDone(failed);
+            Assert.True(failed.CanRetry);
+
+            failed.RetryCommand.Execute(null);
+
+            // A new card in its place. Without the files' own edits the tool preset would not run at all.
+            var retried = Assert.Single(conversions.Jobs, j => j.Job.Sources.Contains(arrow));
+            Assert.NotSame(failed, retried);
+            Assert.Equal([arrow, number], retried.Job.Sources);
+            Assert.Equal(AnnotationKind.Arrow, Assert.Single(retried.Job.EditsByFile![arrow].Annotations!).Kind);
+            Assert.Equal(AnnotationKind.Number, Assert.Single(retried.Job.EditsByFile[number].Annotations!).Kind);
+            WaitUntilDone(retried); // ends inside the test: a job finishing after it would post to a dispatcher that is gone
+            retried.DismissCommand.Execute(null);
+        }
+        finally
+        {
+            try { Directory.Delete(folder, true); } catch (IOException) { }
+        }
+    }
+
+    /// <summary>Runs the UI thread until <paramref name="job"/> has finished and its card shows it.</summary>
+    private static void WaitUntilDone(JobViewModel job)
+    {
+        for (var i = 0; i < 400 && (job.Job.State is JobState.Queued or JobState.Running || job.IsRunning); i++)
+        {
+            Thread.Sleep(25);
+            Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        Assert.False(job.IsRunning);
     }
 }

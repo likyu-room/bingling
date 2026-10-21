@@ -95,8 +95,10 @@ public sealed class ConversionService
     /// Converts files that failed again with the preset their job ran with (shown in the toast). Files that are no
     /// longer there are left out. Files of a watch folder go through <see cref="WatchRetry"/>.
     /// </summary>
+    /// <param name="perFile">The edit of each file, when the job ran with one per file (<see cref="ConversionJob.EditsByFile"/>).</param>
     /// <returns>The new job, or null when none of the files is left or the watch folder converts them.</returns>
-    public JobViewModel? Retry(IEnumerable<string> sources, Preset preset, string? watchRuleId = null)
+    public JobViewModel? Retry(IEnumerable<string> sources, Preset preset, string? watchRuleId = null,
+        IReadOnlyDictionary<string, ImageEdit>? perFile = null)
     {
         var files = sources.Where(Exists).Distinct(StringComparer.Ordinal).ToList();
         if (files.Count == 0)
@@ -106,7 +108,7 @@ public sealed class ConversionService
             _ = watchRetry(watchRuleId, files, preset);
             return null;
         }
-        return Start(files, preset);
+        return Start(files, preset, perFile);
     }
 
     /// <summary>True when a source file (or folder) is still where it was.</summary>
@@ -117,7 +119,7 @@ public sealed class ConversionService
         var watchRuleId = _watchJobs.GetValueOrDefault(vm.Job.Id);
         var failed = vm.FailedSources.ToList();
         Remove(vm);
-        Retry(failed, vm.Job.Preset, watchRuleId);
+        Retry(failed, vm.Job.Preset, watchRuleId, vm.Job.EditsByFile); // each file again with its own edit (annotate)
     }
 
     /// <summary>
