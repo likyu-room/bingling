@@ -234,6 +234,9 @@ internal static class ImageEncoder
             image.Crop(new MagickGeometry(x, y, (uint)w, (uint)h));
             image.ResetPage(); // else the file keeps the cut-out's place on the old canvas
         }
+        // After the crop (the boxes are fractions of what is kept), before resizing (the edit is drawn at full size).
+        if (options.Edit is { Draws: true } edit)
+            EditBridge.Apply(image, edit);
         // The small preview kept in the EXIF data still shows the picture as it was: Explorer and photo apps that
         // use it would show it unturned. As HeicWriter does, drop it once the pixels turned.
         if (turned && image.GetExifProfile() is { } exif && exif.ThumbnailLength > 0)
@@ -267,7 +270,9 @@ internal static class ImageEncoder
         if (options.Dpi is > 0)
             image.Density = new Density(options.Dpi.Value, options.Dpi.Value, DensityUnit.PixelsPerInch);
 
-        if (!options.KeepMetadata)
+        // A redacted picture loses its metadata whatever the preset says: the EXIF preview, an XMP thumbnail or a caption
+        // can still show what the boxes hide (spec §3.3).
+        if (!options.KeepMetadata || options.Edit?.Redact is not null)
         {
             var colorProfile = options.KeepColorProfile ? image.GetColorProfile() : null;
             image.Strip();
