@@ -158,7 +158,7 @@ internal static class Program
                 return;
             try
             {
-                Filee.Platform.Windows.Elevation.ShowWarning(LocalizationService.EarlyText(key));
+                Filee.Platform.Windows.Elevation.ShowWarning(LocalizationService.EarlyText(key), LocalizationService.EarlyText("app.name"));
             }
             finally
             {

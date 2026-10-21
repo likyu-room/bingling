@@ -11,7 +11,7 @@
       <StackPanel Orientation="Horizontal" Spacing="18">
         <Image Source="avares://Filee/Assets/Icons/filee.png" Width="72" Height="72" />
         <StackPanel VerticalAlignment="Center" Spacing="4">
-          <TextBlock Text="{Binding AppName}" FontSize="24" FontWeight="Bold" />
+          <TextBlock Text="{DynamicResource app.name}" FontSize="24" FontWeight="Bold" />
           <TextBlock Classes="muted" Text="{Binding Version}" />
           <TextBlock Classes="muted" Text="{Binding BasedOn}" TextWrapping="Wrap" />
           <TextBlock Classes="muted" Text="{DynamicResource about.license}" />

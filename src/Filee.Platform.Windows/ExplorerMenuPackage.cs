@@ -1,4 +1,4 @@
-// The sparse ("packaged with external location") MSIX that puts "Convert with Filee Plus" into the top-level Windows 11
+// The sparse ("packaged with external location") MSIX that puts "Convert with Bingling" into the top-level Windows 11
 // File Explorer context menu. The package holds only AppxManifest.xml and a logo; the COM server it declares is the
 // native FileeExplorerMenu.dll in the Filee install folder (src/Filee.ExplorerMenu).
 

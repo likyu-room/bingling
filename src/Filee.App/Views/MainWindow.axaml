@@ -1,12 +1,11 @@
 <!-- Main window = settings: navigation on the left, current page on the right. Closing hides to the tray. -->
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:core="using:Filee.Core"
         xmlns:vm="using:Filee.App.ViewModels"
         x:Class="Filee.App.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Classes="glassy"
-        Title="{x:Static core:AppIdentity.Name}"
+        Title="{DynamicResource app.name}"
         Icon="avares://Filee/Assets/Icons/filee.ico"
         Width="1080" Height="760" MinWidth="820" MinHeight="560"
         WindowStartupLocation="CenterScreen">
@@ -17,7 +16,7 @@
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="8,0,0,20">
           <Image Source="avares://Filee/Assets/Icons/filee.png" Width="30" Height="30" />
           <StackPanel VerticalAlignment="Center">
-            <TextBlock Text="{x:Static core:AppIdentity.Name}" FontSize="18" FontWeight="Bold" />
+            <TextBlock Text="{DynamicResource app.name}" FontSize="18" FontWeight="Bold" />
             <TextBlock Classes="caption" Text="{DynamicResource app.tagline}" />
           </StackPanel>
         </StackPanel>

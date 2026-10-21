@@ -115,11 +115,11 @@ public static class Elevation
         }
     }
 
-    /// <summary>Shows a plain Windows message box (for problems before Filee's own windows can open). No-op off Windows.</summary>
-    public static void ShowWarning(string text)
+    /// <summary>Shows a plain Windows message box (for problems before the app's own windows can open). No-op off Windows.</summary>
+    public static void ShowWarning(string text, string? title = null)
     {
         if (OperatingSystem.IsWindows())
-            NativeMethods.MessageBox(0, text, AppIdentity.Name,
+            NativeMethods.MessageBox(0, text, title ?? AppIdentity.Name,
                 NativeMethods.MB_OK | NativeMethods.MB_ICONWARNING | NativeMethods.MB_SETFOREGROUND | NativeMethods.MB_TOPMOST);
     }
 

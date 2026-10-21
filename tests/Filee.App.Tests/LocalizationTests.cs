@@ -70,6 +70,53 @@ public partial class LocalizationTests
         Assert.Empty(missing);
     }
 
+    [Theory]
+    [MemberData(nameof(Languages))]
+    public void No_string_still_calls_this_app_Filee_Plus(string code)
+    {
+        // Keys about the original Filee (the "Filee classic" look, the support and sponsor texts) say "Filee" on purpose;
+        // none of them ever said "Filee Plus", so no key needs an exception.
+        var old = Load(code).Where(p => p.Value.Contains("Filee Plus", StringComparison.OrdinalIgnoreCase)).Select(p => p.Key);
+        Assert.Empty(old);
+        Assert.DoesNotContain(Load("en"), p => p.Value.Contains("Filee Plus", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void The_app_is_called_Bingling_and_the_original_Filee_keeps_its_name()
+    {
+        Assert.Equal("빙글링", Load("ko")["app.name"]);
+        foreach (var code in new[] { "en", "es", "hi", "pl", "zh-CN" })
+            Assert.Equal("Bingling", Load(code)["app.name"]);
+
+        foreach (var code in new[] { "en", "ko", "es", "hi", "pl", "zh-CN" })
+        {
+            var strings = Load(code);
+            Assert.Contains("Filee", strings["theme.style.Classic"]);
+            Assert.Contains("Filee", strings["about.support_title"]);
+            Assert.Contains("Filee", strings["sponsor.title"]);
+            Assert.Contains("{0}", strings["about.based_on"]);
+        }
+    }
+
+    [Fact]
+    public void Korean_particles_after_the_name_fit_a_final_consonant()
+    {
+        // 빙글링 ends in ㅇ: 을 / 이 / 으로 / 과 / 은, never 를 / 가 / 로 / 와 / 는.
+        var wrong = Load("ko").Where(p => WrongParticle().IsMatch(p.Value)).Select(p => p.Key);
+        Assert.Empty(wrong);
+
+        var ko = Load("ko");
+        Assert.Equal("빙글링을 계속 실행할까요?", ko["close.title"]);
+        Assert.Equal("빙글링으로 변환", ko["general.context_menu_label"]);
+        Assert.Equal("로그인할 때 빙글링 시작", ko["general.start_with_system"]);
+        Assert.Equal("빙글링 열기", ko["tray.open"]);
+        Assert.Equal("빙글링이 관리자 권한으로 실행 중이에요", ko["elevation.notice_title"]);
+    }
+
+    /// <summary>The name followed by a particle that belongs after a vowel.</summary>
+    [GeneratedRegex("빙글링(?:를|가|는|와|로|랑|라)")]
+    internal static partial Regex WrongParticle();
+
     private static HashSet<string> Placeholders(string text) =>
         PlaceholderPattern().Matches(text).Select(m => m.Value).ToHashSet();
 

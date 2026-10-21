@@ -28,7 +28,6 @@ public sealed partial class AboutPageViewModel : ObservableObject, IDisposable
         updates.PropertyChanged += OnUpdatesChanged;
     }
 
-    public string AppName => AppIdentity.Name;
     public string Version { get; }
 
     /// <summary>"Based on Filee 1.12.0 by KnifeLemon (MIT license)": the upstream project this fork builds on.</summary>

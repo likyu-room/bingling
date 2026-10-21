@@ -136,7 +136,7 @@ public class CloseActionTests
         using var page = new GeneralPageViewModel(store, AppHost.Get<ILocalizer>(), AppHost.Get<Filee.Core.Platform.IPlatformServices>());
         try
         {
-            Assert.Equal(["Ask every time", "Keep Filee Plus running in the tray", "Quit Filee Plus"], page.CloseChoices.Select(c => c.Label));
+            Assert.Equal(["Ask every time", "Keep Bingling running in the tray", "Quit Bingling"], page.CloseChoices.Select(c => c.Label));
             page.CloseChoice = page.CloseChoices.Single(c => c.Value == CloseAction.Quit);
             Assert.Equal(CloseAction.Quit, store.Settings.CloseAction);
         }

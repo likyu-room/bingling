@@ -81,7 +81,7 @@ public class ExplorerMenuTests
         Assert.Equal(ExplorerMenuPackage.ClassId, fromSource);
 
         Assert.Contains($"#define LIST_PREFIX L\"{CommandLine.ListFilePrefix}\"", source);
-        // The DLL reads the title file from the data folder of Filee Plus, not from the original Filee's.
+        // The DLL reads the title file from the data folder of Bingling, not from the original Filee's.
         Assert.Contains($"#define TITLE_FILE L\"{AppIdentity.Folder}\\\\{ExplorerMenuPackage.TitleFileName}\"", source);
     }
 

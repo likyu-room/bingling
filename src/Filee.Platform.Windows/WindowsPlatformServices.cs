@@ -200,6 +200,8 @@ public sealed class WindowsPlatformServices : IPlatformServices
     public void SetStartWithSystem(bool enabled, string executablePath)
     {
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
+        // 1.1.0 filed its entry under its old name; the app applies this on every start, so that entry never stays behind.
+        key.DeleteValue(AppIdentity.LegacyName, throwOnMissingValue: false);
         if (enabled)
             key.SetValue(AppName, $"\"{executablePath}\" --background");
         else
@@ -207,7 +209,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
     }
 
     /// <summary>
-    /// Registers a per-user "Convert with Filee Plus" verb for all files (no admin rights needed) and a Send To shortcut.
+    /// Registers a per-user "Convert with Bingling" verb for all files (no admin rights needed) and a Send To shortcut.
     /// On Windows 11 the classic verb appears under "Show more options"; the top-level entry is the packaged
     /// IExplorerCommand (<see cref="ExplorerMenuRegistration"/>), which this switches on and off through its title file.
     /// When that package is registered the classic verb is removed, because Windows also lists the packaged command
@@ -218,6 +220,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
         if (ExplorerMenuRegistration.IsSupportedOs)
             ExplorerMenuRegistration.SetTitle(enabled ? label : null);
 
+        TryDelete(LegacySendToShortcutPath);
         if (!enabled)
         {
             RemoveClassicVerb();
@@ -301,6 +304,10 @@ public sealed class WindowsPlatformServices : IPlatformServices
 
     private static string SendToShortcutPath =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.SendTo), AppIdentity.Name + ".lnk");
+
+    /// <summary>The Send To shortcut 1.1.0 created under its old name.</summary>
+    private static string LegacySendToShortcutPath =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.SendTo), AppIdentity.LegacyName + ".lnk");
 
     private static nint RootWindowAt(int x, int y)
     {

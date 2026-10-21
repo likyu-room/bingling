@@ -35,7 +35,7 @@ public sealed class TrayService(UserDataStore store, ILocalizer loc, WindowServi
         {
             Icon = new WindowIcon(iconStream),
             // Set before the icon is attached: on macOS Avalonia passes the tooltip to native code, which can't take null.
-            ToolTipText = AppIdentity.Name,
+            ToolTipText = loc["app.name"],
             Menu = new NativeMenu { Items = { _open, _pause, new NativeMenuItemSeparator(), _quit } },
             IsVisible = true,
         };
