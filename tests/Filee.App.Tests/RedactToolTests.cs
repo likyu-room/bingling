@@ -312,6 +312,35 @@ public class RedactToolTests
     }
 
     [AvaloniaFact]
+    public void A_drag_is_dropped_when_the_boxes_change_under_it()
+    {
+        var (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Png(400, 200));
+        vm.Redact = Boxes(RedactMode.Black, Box(.1, .1, .2, .3), Box(.5, .5, .3, .3));
+
+        // The first box is being moved when Delete takes it away: letting go must not put it over the second one, which
+        // would show what that one hides.
+        var from = At(window, Picture, .2, .25);
+        window.MouseDown(from, MouseButton.Left);
+        window.MouseMove(from + new Point(20, 20));
+        Assert.Equal(0, vm.SelectedIndex);
+        window.KeyPressQwerty(PhysicalKey.Delete, RawInputModifiers.None);
+        window.MouseMove(from + new Point(40, 40));
+        window.MouseUp(from + new Point(40, 40), MouseButton.Left);
+        Assert.Equal([(.5, .5, .3, .3)], vm.Redact.Boxes.Select(Tuple), new BoxComparer());
+
+        // The box left, now the first, is being moved when Ctrl+Z brings the deleted one back: the undo stands.
+        from = At(window, Picture, .65, .65);
+        window.MouseDown(from, MouseButton.Left);
+        window.MouseMove(from + new Point(-20, -20));
+        window.KeyPressQwerty(PhysicalKey.Z, RawInputModifiers.Control);
+        window.MouseMove(from + new Point(-40, -40));
+        window.MouseUp(from + new Point(-40, -40), MouseButton.Left);
+        Assert.Equal([(.1, .1, .2, .3), (.5, .5, .3, .3)], vm.Redact.Boxes.Select(Tuple), new BoxComparer());
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
     public void Box_is_clamped_inside_the_picture()
     {
         var (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Png(400, 200));

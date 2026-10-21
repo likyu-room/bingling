@@ -79,6 +79,57 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
     }
 
     [Fact]
+    public void Mosaic_cells_at_box_edges_off_the_grid_are_never_thinner_than_a_cell()
+    {
+        // 400 × 300: cells of 8 px on a grid from the top left corner. The first box runs from x 3 to 24 and from y 5 to the
+        // bottom edge (300 = 37 × 8 + 4): cut at the grid lines alone, its first column would be 5 px wide, its first row
+        // 3 px and its last 4, and its corner 5 × 3 px of nearly the picture itself. The second, 6 × 6 px across the grid
+        // lines at x 200 and y 104, is smaller than a cell: one cell.
+        using var picture = new SKBitmap(Info(400, 300));
+        var random = new Random(2);
+        for (var y = 0; y < 300; y++)
+        {
+            for (var x = 0; x < 400; x++)
+                picture.SetPixel(x, y, new SKColor((byte)random.Next(256), (byte)random.Next(256), (byte)random.Next(256)));
+        }
+        var edit = new ImageEdit
+        {
+            Redact = new RedactEdit
+            {
+                Mode = RedactMode.Mosaic,
+                Boxes =
+                [
+                    new EditRect { X = 3 / 400.0, Y = 5 / 300.0, Width = 21 / 400.0, Height = 295 / 300.0 },
+                    new EditRect { X = 196 / 400.0, Y = 100 / 300.0, Width = 6 / 400.0, Height = 6 / 300.0 },
+                ],
+            },
+        };
+
+        using var r = ImageEditRenderer.Render(picture, edit);
+
+        // A run of one colour along a row or a column of the box is a cell's side (noise averages differ cell to cell).
+        for (var y = 5; y < 300; y++)
+            Assert.All(Runs(Region(r, 3, y, 21, 1)), run => Assert.True(run >= 8, $"a cell {run} px wide in row {y}"));
+        for (var x = 3; x < 24; x++)
+            Assert.All(Runs(Region(r, x, 5, 1, 295)), run => Assert.True(run >= 8, $"a cell {run} px high in column {x}"));
+        Assert.Single(Region(r, 196, 100, 6, 6).Distinct());
+    }
+
+    /// <summary>The lengths of the runs of one colour along <paramref name="line"/>, in order.</summary>
+    private static List<int> Runs(SKColor[] line)
+    {
+        var runs = new List<int> { 1 };
+        for (var i = 1; i < line.Length; i++)
+        {
+            if (line[i] == line[i - 1])
+                runs[^1]++;
+            else
+                runs.Add(1);
+        }
+        return runs;
+    }
+
+    [Fact]
     public void Mosaic_on_a_see_through_picture_shows_nothing_through_its_cells()
     {
         // Half transparent noise: a picture drawn under the half transparent cells would show through them.

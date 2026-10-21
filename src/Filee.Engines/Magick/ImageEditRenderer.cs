@@ -368,7 +368,8 @@ public static class ImageEditRenderer
         var columns = Cuts(box.Left, box.Right, cell);
         var rows = Cuts(box.Top, box.Bottom, cell);
         var width = box.Right - box.Left;
-        using var strip = new SKBitmap(new SKImageInfo(width, (int)Math.Ceiling(cell) + 1, SKColorType.Rgba8888, SKAlphaType.Premul));
+        var tallest = Enumerable.Range(0, rows.Count - 1).Max(j => rows[j + 1] - rows[j]); // an end row takes up to two cells
+        using var strip = new SKBitmap(new SKImageInfo(width, tallest, SKColorType.Rgba8888, SKAlphaType.Premul));
         for (var j = 0; j + 1 < rows.Count; j++)
         {
             var height = rows[j + 1] - rows[j];
@@ -383,7 +384,11 @@ public static class ImageEditRenderer
         }
     }
 
-    /// <summary>The grid lines (multiples of <paramref name="cell"/>, rounded) between <paramref name="from"/> and <paramref name="to"/>, with both ends.</summary>
+    /// <summary>
+    /// The grid lines (multiples of <paramref name="cell"/>, rounded) between <paramref name="from"/> and <paramref name="to"/>,
+    /// with both ends. A piece at an end narrower than a cell goes to its neighbour, so no cell is thinner than a cell (a
+    /// sliver would give away more of what it hides); a box smaller than a cell is one cell.
+    /// </summary>
     private static List<int> Cuts(int from, int to, double cell)
     {
         var cuts = new List<int> { from };
@@ -396,6 +401,11 @@ public static class ImageEditRenderer
                 cuts.Add(cut);
         }
         cuts.Add(to);
+        // Half a pixel of slack: a whole cell of a preview's fractional grid, rounded, may be that much short.
+        if (cuts.Count > 2 && cuts[1] - cuts[0] < cell - 0.5)
+            cuts.RemoveAt(1);
+        if (cuts.Count > 2 && cuts[^1] - cuts[^2] < cell - 0.5)
+            cuts.RemoveAt(cuts.Count - 2);
         return cuts;
     }
 

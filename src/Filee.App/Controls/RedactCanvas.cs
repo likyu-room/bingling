@@ -4,6 +4,7 @@
 // PictureView's, and the box geometry is ImageCanvas's (Grip, HitTest, Resize, Move), used as it is on CropRects.
 //
 // The boxes go in and out as one RedactEdit (fractions of the picture), set back once per drag, when the button is let go.
+// When the boxes change under a drag (an undo, a delete), that drag is dropped.
 
 using Avalonia;
 using Avalonia.Data;
@@ -55,6 +56,15 @@ public sealed class RedactCanvas : PictureView
 
     /// <summary>The boxes drawn by the renderer, with the one being dragged where it is now.</summary>
     protected override ImageEdit? EditToDraw => new() { Redact = Shown().Redact };
+
+    protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
+    {
+        base.OnPropertyChanged(change);
+        // This canvas sets the boxes only once its drag is over: a change now is someone else's (an undo, a delete), and
+        // the drag would land on a box that is no longer the one it took, or bring back one taken away.
+        if (change.Property == RedactProperty && _press is not null)
+            EndPress();
+    }
 
     // ───────── Geometry ─────────
 
