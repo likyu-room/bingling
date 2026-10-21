@@ -819,5 +819,5 @@
   "watch.status_watching": "देख रहा है",
   "watch.status_starting": "शुरू हो रहा है…",
   "watch.status_error": "इस फ़ोल्डर को नहीं देखा जा सकता: {0}",
-  "watch.cli_hint": "कमांड लाइन पर भी: filee watch <folder> --to <format>"
+  "watch.cli_hint": "कमांड लाइन पर भी: bingling watch <folder> --to <format>"
 }

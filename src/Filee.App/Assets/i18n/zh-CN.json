@@ -838,5 +838,5 @@
   "watch.status_watching": "正在监视",
   "watch.status_starting": "正在启动…",
   "watch.status_error": "无法监视此文件夹：{0}",
-  "watch.cli_hint": "也可以在命令行中使用：filee watch <文件夹> --to <格式>"
+  "watch.cli_hint": "也可以在命令行中使用：bingling watch <文件夹> --to <格式>"
 }

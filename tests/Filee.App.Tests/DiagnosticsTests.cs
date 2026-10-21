@@ -157,7 +157,7 @@ public class StartupDiagnosticsTests
     {
         var line = StartupDiagnostics.Describe("1.11.0", "/opt/filee/Filee", "portable",
             new ElevationState(IntegrityLevel.High, IntegrityLevel.Medium, true), "Microsoft Windows 10.0.26200 X64", 3);
-        Assert.Equal("Filee 1.11.0 starting: /opt/filee/Filee (portable), integrity High (elevated), Explorer Medium, " +
+        Assert.Equal("Bingling 1.11.0 starting: /opt/filee/Filee (portable), integrity High (elevated), Explorer Medium, " +
                      "Microsoft Windows 10.0.26200 X64, 3 argument(s)", line);
     }
 
@@ -165,7 +165,7 @@ public class StartupDiagnosticsTests
     public void An_unknown_path_and_state_still_give_a_line()
     {
         var line = StartupDiagnostics.Describe("1.0.0", null, "development build", ElevationState.Unknown, "Linux", 0);
-        Assert.Equal("Filee 1.0.0 starting: (unknown path) (development build), integrity unknown, Linux, 0 argument(s)", line);
+        Assert.Equal("Bingling 1.0.0 starting: (unknown path) (development build), integrity unknown, Linux, 0 argument(s)", line);
     }
 
     [Theory]
@@ -187,9 +187,39 @@ public class StartupDiagnosticsTests
         try
         {
             var log = StartupDiagnostics.CreateEarlyLogger(folder);
-            log.LogInformation("{Startup}", "Filee test starting");
-            var file = Assert.Single(Directory.GetFiles(folder, "filee-*.log"));
-            Assert.Contains("Program: Filee test starting", File.ReadAllText(file));
+            log.LogInformation("{Startup}", "Bingling test starting");
+            var file = Assert.Single(Directory.GetFiles(folder, "*.log"));
+            Assert.StartsWith("bingling-", Path.GetFileName(file));
+            Assert.Contains("Program: Bingling test starting", File.ReadAllText(file));
+        }
+        finally
+        {
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Logs_older_than_a_week_go_including_those_Filee_Plus_left_in_the_moved_folder()
+    {
+        var folder = Directory.CreateTempSubdirectory("filee-old-logs-").FullName;
+        try
+        {
+            string Log(string name, int daysAgo)
+            {
+                var path = Path.Combine(folder, name);
+                File.WriteAllText(path, "line");
+                File.SetLastWriteTime(path, DateTime.Now.AddDays(-daysAgo));
+                return path;
+            }
+            var oldBingling = Log("bingling-20260101.log", 8);
+            var oldFileePlus = Log("filee-20260101.log", 8);
+            var recent = Log("filee-20261020.log", 1);
+
+            _ = new FileLoggerProvider(folder);
+
+            Assert.False(File.Exists(oldBingling));
+            Assert.False(File.Exists(oldFileePlus));
+            Assert.True(File.Exists(recent));
         }
         finally
         {

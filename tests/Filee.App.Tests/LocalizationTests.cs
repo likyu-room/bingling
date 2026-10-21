@@ -81,6 +81,24 @@ public partial class LocalizationTests
         Assert.DoesNotContain(Load("en"), p => p.Value.Contains("Filee Plus", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [MemberData(nameof(Languages))]
+    public void Only_texts_about_the_original_Filee_say_Filee(string code)
+    {
+        // The "Filee classic" look, the support card and the sponsor window name the original Filee; nothing else
+        // names Filee, and the command line is "bingling".
+        foreach (var language in new[] { code, "en" })
+        {
+            var other = Load(language)
+                .Where(p => p.Value.Contains("filee", StringComparison.OrdinalIgnoreCase))
+                .Where(p => p.Key != "theme.style.Classic" && !p.Key.StartsWith("about.support_", StringComparison.Ordinal)
+                            && !p.Key.StartsWith("sponsor.", StringComparison.Ordinal))
+                .Select(p => p.Key);
+            Assert.Empty(other);
+            Assert.Contains("bingling watch ", Load(language)["watch.cli_hint"]);
+        }
+    }
+
     [Fact]
     public void The_app_is_called_Bingling_and_the_original_Filee_keeps_its_name()
     {

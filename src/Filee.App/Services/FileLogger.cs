@@ -1,4 +1,4 @@
-// Minimal file logger: %APPDATA%\Bingling\logs\filee-yyyyMMdd.log, keeps the last 7 days.
+// Minimal file logger: %APPDATA%\Bingling\logs\bingling-yyyyMMdd.log, keeps the last 7 days.
 
 using Microsoft.Extensions.Logging;
 
@@ -10,11 +10,15 @@ public sealed class FileLoggerProvider : ILoggerProvider
     private static readonly Lock WriteLock = new();
     private readonly string _directory;
 
+    /// <summary>Start of the daily log file names (StartupFailure writes the same files).</summary>
+    internal const string FilePrefix = "bingling-";
+
     public FileLoggerProvider(string directory)
     {
         _directory = directory;
         Directory.CreateDirectory(directory);
-        foreach (var old in Directory.EnumerateFiles(directory, "filee-*.log")
+        // filee-*.log: the logs of Filee Plus (1.1.0), which came along with its moved data folder.
+        foreach (var old in new[] { FilePrefix + "*.log", "filee-*.log" }.SelectMany(p => Directory.EnumerateFiles(directory, p))
                      .Where(f => File.GetLastWriteTime(f) < DateTime.Now.AddDays(-7)))
         {
             try { File.Delete(old); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
@@ -31,7 +35,7 @@ public sealed class FileLoggerProvider : ILoggerProvider
         {
             try
             {
-                File.AppendAllText(Path.Combine(_directory, $"filee-{DateTime.Now:yyyyMMdd}.log"), line + Environment.NewLine);
+                File.AppendAllText(Path.Combine(_directory, $"{FilePrefix}{DateTime.Now:yyyyMMdd}.log"), line + Environment.NewLine);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
         }

@@ -15,8 +15,8 @@ labels: bug
 **Files involved** (formats, sizes — attach a sample if you can share it)
 
 **Environment**
-- Filee version (Settings → About):
+- Bingling version (Settings → About):
 - Windows version:
 - Engines page status (screenshot helps):
 
-**Log** – `%APPDATA%\Filee\logs\filee-<date>.log` (last lines)
+**Log** – `%APPDATA%\Bingling\logs\bingling-<date>.log` (last lines)

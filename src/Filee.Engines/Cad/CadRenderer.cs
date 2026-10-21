@@ -127,8 +127,8 @@ internal static class CadRenderer
         var metadata = new SKDocumentPdfMetadata
         {
             Title = title,
-            Creator = "Filee",
-            Producer = "Filee (SkiaSharp)",
+            Creator = Filee.Core.AppIdentity.Name,
+            Producer = Filee.Core.AppIdentity.Name + " (SkiaSharp)",
             RasterDpi = 300,
             Creation = DateTime.Now,
             Modified = DateTime.Now,

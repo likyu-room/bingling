@@ -21,7 +21,7 @@ public partial class GeneralPage : UserControl
             return;
         var file = await top.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            SuggestedFileName = "filee-presets.json",
+            SuggestedFileName = "bingling-presets.json",
             DefaultExtension = "json",
             FileTypeChoices = [JsonType],
         });

@@ -838,5 +838,5 @@
   "watch.status_watching": "Watching",
   "watch.status_starting": "Starting…",
   "watch.status_error": "Can't watch this folder: {0}",
-  "watch.cli_hint": "Also on the command line: filee watch <folder> --to <format>"
+  "watch.cli_hint": "Also on the command line: bingling watch <folder> --to <format>"
 }

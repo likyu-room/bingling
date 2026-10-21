@@ -198,7 +198,7 @@ public sealed class EngineInstaller
                     Replace(component.Id, staging);
                     break;
                 case "msi":
-                    await UnpackMsiAsync(component.Id, file, staging, Path.Combine(Path.GetTempPath(), "filee-msiexec.log"), cancellationToken);
+                    await UnpackMsiAsync(component.Id, file, staging, Path.Combine(Path.GetTempPath(), "bingling-msiexec.log"), cancellationToken);
                     Replace(component.Id, MsiProgramFolder(component.Id, staging));
                     break;
                 case "conda":

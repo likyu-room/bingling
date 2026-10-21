@@ -838,5 +838,5 @@
   "watch.status_watching": "감시 중",
   "watch.status_starting": "시작하는 중…",
   "watch.status_error": "이 폴더를 감시할 수 없어요: {0}",
-  "watch.cli_hint": "명령줄에서도 쓸 수 있어요: filee watch <폴더> --to <형식>"
+  "watch.cli_hint": "명령줄에서도 쓸 수 있어요: bingling watch <폴더> --to <형식>"
 }

@@ -376,7 +376,7 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
         var image = frames[0];
         image.AutoOrient();
         image.Resize(new MagickGeometry(PreviewEdge, PreviewEdge)); // fits inside, keeping the shape
-        var copy = Path.Combine(Path.GetTempPath(), $"filee-backdrop-{Guid.NewGuid():N}.png");
+        var copy = Path.Combine(Path.GetTempPath(), $"bingling-backdrop-{Guid.NewGuid():N}.png");
         image.Write(copy, MagickFormat.Png); // PNG keeps a see-through picture see-through
         return copy;
     }

@@ -362,7 +362,7 @@ internal static class ThreeMfFormat
             writer.WriteAttributeString("xmlns", "m", null, MaterialNs);
         writer.WriteStartElement("metadata", CoreNs);
         writer.WriteAttributeString("name", "Application");
-        writer.WriteString("Filee");
+        writer.WriteString(Filee.Core.AppIdentity.Name);
         writer.WriteEndElement();
 
         writer.WriteStartElement("resources", CoreNs);

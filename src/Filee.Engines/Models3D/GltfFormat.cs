@@ -177,7 +177,7 @@ internal static class GltfFormat
     public static void Write(Model3D model, Stream output, bool binary, CancellationToken cancellationToken)
     {
         var root = ModelRoot.CreateModel();
-        root.Asset.Generator = "Filee";
+        root.Asset.Generator = Filee.Core.AppIdentity.Name;
         var scene = root.UseScene("Scene");
 
         var images = new Dictionary<Texture3D, Image>();

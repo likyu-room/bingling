@@ -1,4 +1,4 @@
-// Parses the "filee" command line. Kept dependency-free: a handful of commands and options.
+// Parses the "bingling" command line. Kept dependency-free: a handful of commands and options.
 
 using Filee.Core.Presets;
 

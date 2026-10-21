@@ -1,10 +1,10 @@
 ---
 name: Feature request
-about: A preset option, engine or idea (a file type Filee can't open goes in "Format request")
+about: A preset option, engine or idea (a file type Bingling can't open goes in "Format request")
 labels: enhancement
 ---
 
-**What would you like Filee to do?**
+**What would you like Bingling to do?**
 
 **Why / when would you use it?**
 

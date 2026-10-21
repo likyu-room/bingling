@@ -32,7 +32,7 @@ internal sealed class ArchivePacker(SevenZip? sevenZip)
     {
         var dir = Path.GetDirectoryName(Path.GetFullPath(outputPath))!;
         Directory.CreateDirectory(dir);
-        var temp = Path.Combine(dir, $".{Path.GetFileName(outputPath)}.filee-{Guid.NewGuid().ToString("N")[..8]}.tmp");
+        var temp = Path.Combine(dir, $".{Path.GetFileName(outputPath)}.bingling-{Guid.NewGuid().ToString("N")[..8]}.tmp");
         try
         {
             switch (format)
@@ -73,7 +73,7 @@ internal sealed class ArchivePacker(SevenZip? sevenZip)
                     await RunSevenZipAsync(type, await NamedAsAsync(items, workDirectory, cancellationToken), temp, level, workDirectory, progress, 0, cancellationToken);
                     break;
                 default:
-                    throw new NotSupportedException($"Filee cannot write {format} archives.");
+                    throw new NotSupportedException($"Bingling cannot write {format} archives.");
             }
             File.Move(temp, outputPath, overwrite: true);
         }

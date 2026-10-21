@@ -186,7 +186,7 @@ public sealed class EngineDownloadService
         _loc = loc;
         // Redirects are followed by the installer (mirrors may use plain HTTP; files are verified by SHA-256).
         var http = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = Timeout.InfiniteTimeSpan };
-        http.DefaultRequestHeaders.UserAgent.ParseAdd($"Filee/{typeof(EngineDownloadService).Assembly.GetName().Version}");
+        http.DefaultRequestHeaders.UserAgent.ParseAdd($"{Filee.Core.AppIdentity.Folder}/{typeof(EngineDownloadService).Assembly.GetName().Version}");
         _installer = new EngineInstaller(http, logger: logger);
         Packages = EngineDownloads.Packages.Select(p => new EnginePackageState(p, loc)).ToList();
         if (loc is LocalizationService localization)

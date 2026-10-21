@@ -119,8 +119,8 @@ internal static class SvgRenderer
         const float pointsPerPixel = 72f / CssDpi;
         var metadata = SKDocumentPdfMetadata.Default;
         metadata.Title = title;
-        metadata.Creator = "Filee";
-        metadata.Producer = "Filee (Skia PDF)";
+        metadata.Creator = Filee.Core.AppIdentity.Name;
+        metadata.Producer = Filee.Core.AppIdentity.Name + " (Skia PDF)";
         metadata.Creation = DateTime.Now;
         metadata.Modified = DateTime.Now;
         metadata.RasterDpi = 300;

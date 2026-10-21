@@ -3,6 +3,7 @@
 // gesture came with an empty log; these lines are what tells such cases apart.
 
 using System.Runtime.InteropServices;
+using Filee.Core;
 using Filee.Core.Platform;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -28,12 +29,12 @@ internal static class StartupDiagnostics
     }
 
     /// <summary>
-    /// The start-up line: "Filee 1.11.0 starting: C:\…\Bingling.exe (installed), integrity Medium, Explorer Medium,
+    /// The start-up line: "Bingling 1.11.0 starting: C:\…\Bingling.exe (installed), integrity Medium, Explorer Medium,
     /// Microsoft Windows 10.0.26200 X64, 2 argument(s)". Arguments are counted, not written: they are file paths.
     /// </summary>
     public static string Describe(string version, string? executable, string installKind, ElevationState elevation,
         string operatingSystem, int argumentCount) =>
-        $"Filee {version} starting: {executable ?? "(unknown path)"} ({installKind}), {elevation}, {operatingSystem}, " +
+        $"{AppIdentity.Name} {version} starting: {executable ?? "(unknown path)"} ({installKind}), {elevation}, {operatingSystem}, " +
         $"{argumentCount} argument(s)";
 
     /// <summary>How this copy got here: Setup, a release archive, or a build from source.</summary>

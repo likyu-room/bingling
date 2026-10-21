@@ -819,5 +819,5 @@
   "watch.status_watching": "Supervisando",
   "watch.status_starting": "Iniciando…",
   "watch.status_error": "No se puede supervisar esta carpeta: {0}",
-  "watch.cli_hint": "También en la línea de comandos: filee watch <carpeta> --to <formato>"
+  "watch.cli_hint": "También en la línea de comandos: bingling watch <carpeta> --to <formato>"
 }

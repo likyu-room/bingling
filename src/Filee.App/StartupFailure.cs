@@ -14,7 +14,7 @@ internal static class StartupFailure
         {
             var logs = Path.Combine(UserDataStore.DefaultDirectory, "logs");
             Directory.CreateDirectory(logs);
-            File.AppendAllText(Path.Combine(logs, $"filee-{DateTime.Now:yyyyMMdd}.log"),
+            File.AppendAllText(Path.Combine(logs, $"{Services.FileLoggerProvider.FilePrefix}{DateTime.Now:yyyyMMdd}.log"),
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [Error] Startup: {message}{Environment.NewLine}{exception}{Environment.NewLine}");
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -31,7 +31,7 @@ internal static class StartupFailure
                 ArgumentList =
                 {
                     "-e", "on run argv",
-                    "-e", "display alert \"Filee\" message (item 1 of argv) as critical buttons {\"OK\"}",
+                    "-e", "display alert \"Bingling\" message (item 1 of argv) as critical buttons {\"OK\"}",
                     "-e", "end run",
                     message,
                 },

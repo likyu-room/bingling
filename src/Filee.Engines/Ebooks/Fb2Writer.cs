@@ -153,9 +153,9 @@ internal sealed class Fb2Writer
 
         xml.WriteStartElement("document-info", Fb2);
         xml.WriteStartElement("author", Fb2);
-        xml.WriteElementString("nickname", Fb2, "Filee");
+        xml.WriteElementString("nickname", Fb2, Filee.Core.AppIdentity.Name);
         xml.WriteEndElement();
-        xml.WriteElementString("program-used", Fb2, "Filee");
+        xml.WriteElementString("program-used", Fb2, Filee.Core.AppIdentity.Name);
         xml.WriteStartElement("date", Fb2);
         xml.WriteAttributeString("value", DateTime.Now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));
         xml.WriteString(DateTime.Now.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture));

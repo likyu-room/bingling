@@ -161,7 +161,7 @@ public sealed class RadialController(
         // Explorer's drag out (Filee runs as administrator). Tells "the donut didn't react" reports apart.
         if (!_dragReachedDonut && Throttle.TryEnter("no-drag-enter", out var held))
             log.LogInformation("Drag gesture ended without a drag entering the donut{Elevation}{Held}",
-                Program.Elevation.ShellCannotReachFilee ? " (Filee runs as administrator: Windows blocks drops from Explorer)" : "",
+                Program.Elevation.ShellCannotReachFilee ? " (Bingling runs as administrator: Windows blocks drops from Explorer)" : "",
                 LogThrottle.HeldText(held));
         // Nothing was brought to the donut: the window is invisible but catches clicks, so go right away.
         if (!viewModel.HasFiles && !_window!.DonutControl.IsInProgressMode)
@@ -250,7 +250,7 @@ public sealed class RadialController(
         var extensions = FormatRequest.UnknownExtensions(viewModel.Files).Where(_formatRequestsOffered.Add).ToList();
         if (extensions.Count == 0)
             return;
-        log.LogInformation("Donut closed on files Filee can't read: {Extensions}", FormatRequest.Label(extensions));
+        log.LogInformation("Donut closed on files Bingling can't read: {Extensions}", FormatRequest.Label(extensions));
         windows.ShowFormatRequestNotice(extensions);
     }
 
@@ -267,7 +267,7 @@ public sealed class RadialController(
         window.DragWithoutFiles += formats =>
         {
             if (Throttle.TryEnter("drag-without-files", out var held))
-                log.LogInformation("A drag without files Filee reads entered the donut; it offered: {Formats}{Held}",
+                log.LogInformation("A drag without files Bingling reads entered the donut; it offered: {Formats}{Held}",
                     formats, LogThrottle.HeldText(held));
         };
         window.FilesEntered += OnFilesEntered;

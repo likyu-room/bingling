@@ -1,5 +1,5 @@
 name: Format request
-description: A file type Filee can't open yet
+description: A file type Bingling can't open yet
 title: "Format request: "
 labels: ["enhancement"]
 body:
@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         > [!IMPORTANT]
-        > **Filee can't convert files that are encrypted or copy-protected (DRM), whatever their format.** Converting them means breaking that protection, so these requests are closed.
+        > **Bingling can't convert files that are encrypted or copy-protected (DRM), whatever their format.** Converting them means breaking that protection, so these requests are closed.
         >
         > Some examples, not a complete list:
         > - music downloaded in a streaming app (NetEase Cloud Music `.ncm`, QQ Music `.qmc` / `.mflac` / `.mgg`, Kugou `.kgm`, Apple Music, Spotify)
@@ -33,7 +33,7 @@ body:
   - type: input
     id: target
     attributes:
-      label: What should Filee convert them to?
+      label: What should Bingling convert them to?
       placeholder: "PDF, MP3, PNG…"
   - type: textarea
     id: details

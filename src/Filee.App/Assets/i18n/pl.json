@@ -838,5 +838,5 @@
   "watch.status_watching": "Obserwuję",
   "watch.status_starting": "Uruchamianie…",
   "watch.status_error": "Nie można obserwować tego folderu: {0}",
-  "watch.cli_hint": "Także w wierszu poleceń: filee watch <folder> --to <format>"
+  "watch.cli_hint": "Także w wierszu poleceń: bingling watch <folder> --to <format>"
 }

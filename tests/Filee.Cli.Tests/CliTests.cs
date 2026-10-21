@@ -1,4 +1,4 @@
-// End-to-end tests of the "filee" command: real engines, a temporary settings folder, files in a temporary folder.
+// End-to-end tests of the "bingling" command: real engines, a temporary settings folder, files in a temporary folder.
 
 using System.Text.Json;
 using Filee.Core.Presets;
@@ -154,6 +154,7 @@ public sealed class CliTests : IDisposable
 
         Assert.Equal(Cli.UsageError, code);
         Assert.Contains(message, errors, StringComparison.OrdinalIgnoreCase);
+        Assert.StartsWith("bingling: ", errors);
     }
 
     [Fact]
@@ -296,10 +297,18 @@ public sealed class CliTests : IDisposable
         var (code, output, _) = await Run("help", "convert");
         Assert.Equal(Cli.Success, code);
         Assert.Contains("--to", output);
+        Assert.StartsWith("Usage: bingling convert ", output);
+
+        // The command is called bingling everywhere it names itself.
+        foreach (var topic in new[] { "help", "convert", "watch", "formats", "presets" })
+        {
+            (_, output, _) = await Run("help", topic);
+            Assert.DoesNotContain("filee", output, StringComparison.OrdinalIgnoreCase);
+        }
 
         (code, output, _) = await Run("--version");
         Assert.Equal(Cli.Success, code);
-        Assert.StartsWith("filee ", output);
+        Assert.StartsWith("bingling ", output);
     }
 
     [Fact]
