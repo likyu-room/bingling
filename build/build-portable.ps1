@@ -53,7 +53,7 @@ if ((Test-Path -LiteralPath $archive) -or (Test-Path -LiteralPath $sums)) {
 }
 $stage = Join-Path $root ('build/.cache/portable/' + [Guid]::NewGuid().ToString('N'))
 $package = Join-Path $stage $packageName
-$appBundle = Join-Path $package 'Filee.app'
+$appBundle = Join-Path $package 'Bingling.app'
 $publish = if ($Runtime.StartsWith('osx-')) { Join-Path $appBundle 'Contents/MacOS' } else { $package }
 New-Item -ItemType Directory -Force -Path $publish | Out-Null
 
@@ -79,7 +79,7 @@ if ($RhwpOverride) {
 else {
     & (Join-Path $PSScriptRoot 'fetch-portable-engines.ps1') -Runtime $Runtime -Destination $engines
 }
-foreach ($name in @('Filee', 'filee-cli')) {
+foreach ($name in @('Bingling', 'bingling-cli')) {
     $executable = Join-Path $publish $name
     if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw "Publish did not produce $name" }
     Invoke-Checked 'Executable permissions' { chmod +x $executable }
@@ -110,7 +110,7 @@ if ($Runtime.StartsWith('osx-')) {
         }
     }
     Invoke-Checked 'Create app icon' { iconutil -c icns $iconset -o (Join-Path $resources 'filee.icns') }
-    # Translations of the service title ("Convert with Filee") in Finder's right-click menu.
+    # Translations of the service title ("Convert with Bingling") in Finder's right-click menu.
     foreach ($localization in Get-ChildItem -LiteralPath (Join-Path $root 'installer/macos') -Directory -Filter '*.lproj') {
         Copy-Item -LiteralPath $localization.FullName -Destination $resources -Recurse
     }
@@ -119,7 +119,7 @@ if ($Runtime.StartsWith('osx-')) {
     if ($SigningIdentity -ne '-') { $signOptions += @('--timestamp', '--options', 'runtime') }
     # Every file in Contents/MacOS is code to codesign, the .NET assemblies too (their signature goes into extended
     # attributes): signing the main executable checks all of them. Deepest paths first, the main executable last.
-    $mainExecutable = Join-Path $publish 'Filee'
+    $mainExecutable = Join-Path $publish 'Bingling'
     $files = Get-ChildItem -LiteralPath $publish -Recurse -File | Where-Object { $_.FullName -ne $mainExecutable } |
         Sort-Object { $_.FullName.Length } -Descending
     foreach ($file in $files) {

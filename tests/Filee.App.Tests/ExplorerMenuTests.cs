@@ -1,5 +1,5 @@
 // Tests for the Windows 11 File Explorer menu: package manifest, registration scripts, the --convert-list hand-over
-// and (when build/build-explorer-menu.ps1 has run) the native FileeExplorerMenu.dll loaded in-process.
+// and (when build/build-explorer-menu.ps1 has run) the native BinglingExplorerMenu.dll loaded in-process.
 
 using System.Globalization;
 using System.IO.Compression;
@@ -52,7 +52,7 @@ public class ExplorerMenuTests
         Assert.Equal("10.0.22000.0", (string?)manifest.Descendants(F + "TargetDeviceFamily").Single().Attribute("MinVersion"));
 
         var app = manifest.Descendants(F + "Application").Single();
-        Assert.Equal("Filee.exe", (string?)app.Attribute("Executable"));
+        Assert.Equal("Bingling.exe", (string?)app.Attribute("Executable"));
         Assert.Equal("mediumIL", (string?)app.Attribute(Uap10 + "TrustLevel"));
         Assert.Equal("win32App", (string?)app.Attribute(Uap10 + "RuntimeBehavior"));
         Assert.Equal("none", (string?)app.Element(Uap + "VisualElements")!.Attribute("AppListEntry"));
@@ -86,12 +86,14 @@ public class ExplorerMenuTests
     }
 
     [Fact]
-    public void The_package_and_class_id_differ_from_the_original_Filee_so_both_can_be_installed()
+    public void The_package_and_class_id_differ_from_the_original_Filee_and_Filee_Plus()
     {
         Assert.Equal("Bingling.ExplorerMenu", ExplorerMenuPackage.PackageName);
         Assert.StartsWith(ExplorerMenuPackage.PackageName + "_", ExplorerMenuPackage.FamilyName);
         Assert.NotEqual(new Guid("6DB0E670-807F-4D22-BE3F-20492D0F4AB1"), ExplorerMenuPackage.ClassId);
-        Assert.Equal(new Guid("27B50CD9-598E-4AB1-8BBD-AC36085FB4DE"), ExplorerMenuPackage.ClassId);
+        Assert.NotEqual(new Guid("27B50CD9-598E-4AB1-8BBD-AC36085FB4DE"), ExplorerMenuPackage.ClassId); // Filee Plus 1.1.0
+        Assert.Equal(new Guid("4E812CE3-362A-4823-BB60-46148A883B44"), ExplorerMenuPackage.ClassId);
+        Assert.StartsWith("CN=Bingling,", ExplorerMenuPackage.Publisher);
     }
 
     [Fact]
@@ -142,9 +144,9 @@ public class ExplorerMenuTests
     [Fact]
     public void Add_script_registers_the_package_unsigned_with_the_install_folder_as_external_location()
     {
-        var script = ExplorerMenuRegistration.BuildAddScript(@"C:\Apps\Filee\current\FileeExplorerMenu.msix",
+        var script = ExplorerMenuRegistration.BuildAddScript(@"C:\Apps\Filee\current\BinglingExplorerMenu.msix",
             @"C:\Apps\Filee\current", @"C:\Temp\err.txt");
-        Assert.Contains(@"Add-AppxPackage -Path 'C:\Apps\Filee\current\FileeExplorerMenu.msix' -ExternalLocation 'C:\Apps\Filee\current' -AllowUnsigned", script);
+        Assert.Contains(@"Add-AppxPackage -Path 'C:\Apps\Filee\current\BinglingExplorerMenu.msix' -ExternalLocation 'C:\Apps\Filee\current' -AllowUnsigned", script);
         Assert.Contains(@"[IO.File]::WriteAllText('C:\Temp\err.txt', $_.Exception.Message); exit 1", script);
         Assert.DoesNotContain("\"", script);
 
@@ -237,8 +239,8 @@ public class ExplorerMenuTests
         using var command = NativeCommand.Create(dll);
         // The title comes from the file the app writes into its data folder; without it the English default is used.
         var expectedTitle = ExplorerMenuRegistration.ReadTitle();
-        Assert.Equal(expectedTitle ?? "Convert with Filee", command.GetTitle());
-        Assert.Equal(Path.Combine(BuiltFolder, "Filee.exe") + ",0", command.GetIcon(), ignoreCase: true);
+        Assert.Equal(expectedTitle ?? "Convert with Bingling", command.GetTitle());
+        Assert.Equal(Path.Combine(BuiltFolder, "Bingling.exe") + ",0", command.GetIcon(), ignoreCase: true);
         Assert.Equal(ExplorerMenuPackage.ClassId, command.GetCanonicalName());
 
         const int enabled = 0, hidden = 2;
@@ -256,7 +258,7 @@ public class ExplorerMenuTests
         }
     }
 
-    /// <summary>Calls FileeExplorerMenu.dll through its exports and the raw IExplorerCommand vtable.</summary>
+    /// <summary>Calls BinglingExplorerMenu.dll through its exports and the raw IExplorerCommand vtable.</summary>
     private sealed class NativeCommand : IDisposable
     {
         private static readonly Guid IidClassFactory = new("00000001-0000-0000-C000-000000000046");

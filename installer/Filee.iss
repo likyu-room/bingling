@@ -23,7 +23,7 @@
 #endif
 
 #define AppName "Bingling"
-#define AppExe "Filee.exe"
+#define AppExe "Bingling.exe"
 ; Never change: Windows finds the installed Bingling by this id (uninstall key "{<id>}_is1"). It differs from the original Filee's id, so both install.
 #define AppGuid "A10409B5-6A21-4C67-9A0C-84B49B4629AF"
 
@@ -128,9 +128,9 @@ Filename: "{app}\{#AppExe}"; Parameters: "--uninstall-cleanup"; Flags: runhidden
 const
   // ExplorerMenuPackage in src/Filee.Platform.Windows (InstallerScriptTests keeps these in sync).
   ExplorerMenuName = 'Bingling.ExplorerMenu';
-  ExplorerMenuFamily = 'Bingling.ExplorerMenu_c73vxh346rtay';
-  ExplorerMenuDll = 'FileeExplorerMenu.dll';
-  ExplorerMenuPackageFile = 'FileeExplorerMenu.msix';
+  ExplorerMenuFamily = 'Bingling.ExplorerMenu_sryjq816xeb38';
+  ExplorerMenuDll = 'BinglingExplorerMenu.dll';
+  ExplorerMenuPackageFile = 'BinglingExplorerMenu.msix';
   ExplorerMenuMinimumBuild = 22000;
   // EngineInstaller marks every installed engine folder with this file.
   EngineMarker = '.filee-component';

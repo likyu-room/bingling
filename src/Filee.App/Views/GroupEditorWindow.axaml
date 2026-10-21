@@ -7,7 +7,7 @@
         x:DataType="vm:GroupEditorViewModel"
         Classes="glassy"
         Title="{DynamicResource group.editor_title}"
-        Icon="avares://Filee/Assets/Icons/filee.ico"
+        Icon="avares://Bingling/Assets/Icons/filee.ico"
         Width="480" Height="560" MinWidth="400" MinHeight="420"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False">

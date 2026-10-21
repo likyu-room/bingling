@@ -95,7 +95,7 @@ public sealed partial class UpdateService : ObservableObject
     public static string LatestReleaseUrl => RepositoryUrl.TrimEnd('/') + "/releases/latest";
 
     /// <summary>
-    /// True when this copy was installed by Setup (Inno Setup puts its uninstaller next to Filee.exe). Only then can
+    /// True when this copy was installed by Setup (Inno Setup puts its uninstaller next to Bingling.exe). Only then can
     /// the new installer update it in place; the portable zip and a copy run from source have no uninstaller.
     /// </summary>
     public static bool IsInstalled { get; } = OperatingSystem.IsWindows()

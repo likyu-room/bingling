@@ -26,9 +26,9 @@ BEGIN
             VALUE "CompanyName", "Beomsuk Kim (LikeU)"
             VALUE "FileDescription", "Bingling File Explorer context menu"
             VALUE "FileVersion", FILEE_VERSION_TEXT
-            VALUE "InternalName", "FileeExplorerMenu"
+            VALUE "InternalName", "BinglingExplorerMenu"
             VALUE "LegalCopyright", "Copyright (c) 2026 Beomsuk Kim (LikeU), based on Filee. MIT License."
-            VALUE "OriginalFilename", "FileeExplorerMenu.dll"
+            VALUE "OriginalFilename", "BinglingExplorerMenu.dll"
             VALUE "ProductName", "Bingling"
             VALUE "ProductVersion", FILEE_VERSION_TEXT
         END

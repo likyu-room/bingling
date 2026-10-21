@@ -194,7 +194,7 @@ internal static class Program
                 if (!instance.WaitForFirstToExit(left > TimeSpan.FromSeconds(5) ? left : TimeSpan.FromSeconds(5)))
                     return 1;
             }
-            // The mutex is released just before the process ends: wait for the end, so Filee.exe is no longer in use.
+            // The mutex is released just before the process ends: wait for the end, so Bingling.exe is no longer in use.
             if (!WaitForOtherProcessesOfThisExe(deadline))
                 return 1;
             if (Options.UninstallCleanup)
@@ -282,4 +282,4 @@ internal static class Program
 /// <c>#Noto Sans Devanagari</c>.</summary>
 internal sealed class FileeFontCollection() : Avalonia.Media.Fonts.EmbeddedFontCollection(
     new Uri("fonts:Filee", UriKind.Absolute),
-    new Uri("avares://Filee/Assets/Fonts", UriKind.Absolute));
+    new Uri("avares://Bingling/Assets/Fonts", UriKind.Absolute));

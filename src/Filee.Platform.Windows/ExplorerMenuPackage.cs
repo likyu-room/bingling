@@ -1,6 +1,6 @@
 // The sparse ("packaged with external location") MSIX that puts "Convert with Bingling" into the top-level Windows 11
 // File Explorer context menu. The package holds only AppxManifest.xml and a logo; the COM server it declares is the
-// native FileeExplorerMenu.dll in the Filee install folder (src/Filee.ExplorerMenu).
+// native BinglingExplorerMenu.dll in the install folder (built from src/Filee.ExplorerMenu).
 
 using System.Globalization;
 using System.Xml.Linq;
@@ -19,15 +19,16 @@ public static class ExplorerMenuPackage
 
     /// <summary>
     /// Publisher of the unsigned package. Windows 11 only registers unsigned packages whose publisher contains this
-    /// special OID, so they can never collide with (or spoof) a signed package.
+    /// special OID, so they can never collide with (or spoof) a signed package. CN differs from the publisher the
+    /// original Filee and Filee Plus used, so the family (and the registration) is Bingling's own.
     /// </summary>
-    public const string Publisher = "CN=Filee, OID.2.25.311729368913984317654407730594956997722=1";
+    public const string Publisher = "CN=Bingling, OID.2.25.311729368913984317654407730594956997722=1";
 
     /// <summary>
     /// Package family name = name + "_" + a hash of <see cref="Publisher"/> (checked by a test against
     /// <c>PackageFamilyNameFromId</c>). Used to look the registration up without PowerShell.
     /// </summary>
-    public const string FamilyName = PackageName + "_c73vxh346rtay";
+    public const string FamilyName = PackageName + "_sryjq816xeb38";
 
     /// <summary>
     /// Version of the manifest, deliberately independent of the app version: registering an unsigned package with a
@@ -37,14 +38,17 @@ public static class ExplorerMenuPackage
     /// </summary>
     public static readonly Version ManifestVersion = new(1, 0, 0, 0);
 
-    /// <summary>CLSID of the IExplorerCommand in FileeExplorerMenu.dll (kClsidCommand in FileeExplorerMenu.c).</summary>
-    public static readonly Guid ClassId = new("27B50CD9-598E-4AB1-8BBD-AC36085FB4DE");
+    /// <summary>
+    /// CLSID of the IExplorerCommand in BinglingExplorerMenu.dll (kClsidCommand in FileeExplorerMenu.c). New for
+    /// Bingling: neither the original Filee's nor Filee Plus's, so no stale registration of theirs can load this DLL.
+    /// </summary>
+    public static readonly Guid ClassId = new("4E812CE3-362A-4823-BB60-46148A883B44");
 
-    /// <summary>The native COM server next to Filee.exe.</summary>
-    public const string DllFileName = "FileeExplorerMenu.dll";
+    /// <summary>The native COM server next to Bingling.exe.</summary>
+    public const string DllFileName = "BinglingExplorerMenu.dll";
 
-    /// <summary>The package file next to Filee.exe.</summary>
-    public const string PackageFileName = "FileeExplorerMenu.msix";
+    /// <summary>The package file next to Bingling.exe.</summary>
+    public const string PackageFileName = "BinglingExplorerMenu.msix";
 
     /// <summary>
     /// File in the data folder (%APPDATA%\Bingling, TITLE_FILE in FileeExplorerMenu.c) whose first line is the menu title
@@ -58,7 +62,7 @@ public static class ExplorerMenuPackage
     /// <summary>Windows 11 (build 22000) is the first version with the new context menu and unsigned packages.</summary>
     public const int MinimumBuild = 22000;
 
-    /// <summary>Path of the logo inside the package (shown in package lists only; the menu uses Filee.exe's icon).</summary>
+    /// <summary>Path of the logo inside the package (shown in package lists only; the menu uses Bingling.exe's icon).</summary>
     public const string LogoPath = @"Assets\Logo.png";
 
     private static readonly XNamespace Foundation = "http://schemas.microsoft.com/appx/manifest/foundation/windows10";
@@ -70,7 +74,7 @@ public static class ExplorerMenuPackage
     private static readonly XNamespace Rescap = "http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities";
 
     /// <summary>
-    /// Builds AppxManifest.xml. Paths in it (Filee.exe, the DLL) are relative to the external location, i.e. the
+    /// Builds AppxManifest.xml. Paths in it (Bingling.exe, the DLL) are relative to the external location, i.e. the
     /// install folder given at registration.
     /// </summary>
     public static string CreateManifest()
@@ -107,8 +111,8 @@ public static class ExplorerMenuPackage
                 new XElement(Rescap + "Capability", new XAttribute("Name", "unvirtualizedResources"))),
             new XElement(Foundation + "Applications",
                 new XElement(Foundation + "Application",
-                    new XAttribute("Id", "Filee"),
-                    new XAttribute("Executable", "Filee.exe"),
+                    new XAttribute("Id", "Bingling"),
+                    new XAttribute("Executable", "Bingling.exe"),
                     new XAttribute(Uap10 + "TrustLevel", "mediumIL"),
                     new XAttribute(Uap10 + "RuntimeBehavior", "win32App"),
                     // AppListEntry="none": the package only carries the shell extension, it adds no Start menu entry.
@@ -128,7 +132,7 @@ public static class ExplorerMenuPackage
                                 new XElement(Desktop5 + "ItemType",
                                     new XAttribute("Type", "*"),
                                     new XElement(Desktop5 + "Verb",
-                                        new XAttribute("Id", "ConvertWithFilee"),
+                                        new XAttribute("Id", "ConvertWithBingling"),
                                         new XAttribute("Clsid", clsid))))),
                         new XElement(Com + "Extension",
                             new XAttribute("Category", "windows.comServer"),

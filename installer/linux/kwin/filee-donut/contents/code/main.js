@@ -1,9 +1,9 @@
-// KWin script (Plasma 6) for the experimental Wayland gesture. Wayland gives Filee no cursor position and no say
-// over where its window opens, so this moves the donut window (class "Filee", title "Filee Donut") to the cursor
+// KWin script (Plasma 6) for the experimental Wayland gesture. Wayland gives Bingling no cursor position and no say
+// over where its window opens, so this moves the donut window (class "Bingling", title "Bingling Donut") to the cursor
 // whenever it is mapped. Install it with kpackagetool6 and enable it; see installer/linux/INSTALL.txt.
 
 function isDonut(w) {
-    return String(w.resourceClass).toLowerCase() === "filee" && w.caption === "Filee Donut";
+    return String(w.resourceClass).toLowerCase() === "bingling" && w.caption === "Bingling Donut";
 }
 
 function centreOnCursor(w) {
@@ -20,7 +20,7 @@ workspace.windowAdded.connect(function (w) {
     if (!isDonut(w)) {
         return;
     }
-    // Filee also positions the window itself (twice, to cope with DPI changes), so win the last few moves.
+    // Bingling also positions the window itself (twice, to cope with DPI changes), so win the last few moves.
     var left = 4;
     centreOnCursor(w);
     w.frameGeometryChanged.connect(function () {

@@ -4,7 +4,7 @@
   only; the app downloads the large engines on demand, see src/Filee.Engines/Infrastructure/EngineInstaller.cs).
 
 .DESCRIPTION
-  Produces this layout (next to Filee.exe in a published build, or in the repo root for development):
+  Produces this layout (next to Bingling.exe in a published build, or in the repo root for development):
 
     engines/
       libreoffice/   LibreOffice (MPL-2.0), extracted from the official MSI via an administrative install

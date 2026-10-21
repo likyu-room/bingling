@@ -4,7 +4,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <AssemblyName>Filee</AssemblyName>
+    <AssemblyName>Bingling</AssemblyName>
     <!-- The file description Task Manager and the start-up list show: tells this app from the original Filee. -->
     <AssemblyTitle>Bingling</AssemblyTitle>
     <RootNamespace>Filee.App</RootNamespace>

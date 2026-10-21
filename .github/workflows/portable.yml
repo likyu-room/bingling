@@ -186,13 +186,13 @@ jobs:
         shell: bash
         run: python3 build/smoke-launch-app.py
 
-      - name: Collect Filee logs
+      - name: Collect Bingling logs
         if: always()
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/filee-screens"
-          for logs in "$HOME/Library/Application Support/Filee/logs" "$HOME/.config/Filee/logs"; do
-            if [ -d "$logs" ]; then cp -R "$logs" "$RUNNER_TEMP/filee-screens/"; fi
+          mkdir -p "$RUNNER_TEMP/bingling-screens"
+          for logs in "$HOME/Library/Application Support/Bingling/logs" "$HOME/.config/Bingling/logs"; do
+            if [ -d "$logs" ]; then cp -R "$logs" "$RUNNER_TEMP/bingling-screens/"; fi
           done
 
       - name: Upload packages
@@ -212,8 +212,8 @@ jobs:
           path: |
             TestResults/${{ matrix.rid }}/
             tests/Filee.App.Tests/bin/Release/net10.0/screenshots/
-            ${{ runner.temp }}/filee-startup.log
-            ${{ runner.temp }}/filee-screens/
+            ${{ runner.temp }}/bingling-startup.log
+            ${{ runner.temp }}/bingling-screens/
           if-no-files-found: ignore
 
   # The packages built above, unpacked and started on the oldest supported Ubuntu, with only the runtime libraries a
@@ -263,12 +263,12 @@ jobs:
         shell: bash
         run: python3 build/smoke-launch-app.py
 
-      - name: Collect Filee logs
+      - name: Collect Bingling logs
         if: always()
         shell: bash
         run: |
-          mkdir -p "$RUNNER_TEMP/filee-screens"
-          if [ -d "$HOME/.config/Filee/logs" ]; then cp -R "$HOME/.config/Filee/logs" "$RUNNER_TEMP/filee-screens/"; fi
+          mkdir -p "$RUNNER_TEMP/bingling-screens"
+          if [ -d "$HOME/.config/Bingling/logs" ]; then cp -R "$HOME/.config/Bingling/logs" "$RUNNER_TEMP/bingling-screens/"; fi
 
       - name: Upload diagnostics
         if: always()
@@ -276,6 +276,6 @@ jobs:
         with:
           name: ubuntu-22-04-results-${{ matrix.rid }}
           path: |
-            ${{ runner.temp }}/filee-startup.log
-            ${{ runner.temp }}/filee-screens/
+            ${{ runner.temp }}/bingling-startup.log
+            ${{ runner.temp }}/bingling-screens/
           if-no-files-found: ignore

@@ -1,2 +1,2 @@
-/* Finder's right-click menu: the title of Filee's service (NSServices in Info.plist). */
-"Convert with Filee" = "用 Filee 转换";
+/* Finder's right-click menu: the title of Bingling's service (NSServices in Info.plist). */
+"Convert with Bingling" = "用 Bingling 转换";

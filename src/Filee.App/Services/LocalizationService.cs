@@ -115,7 +115,7 @@ public sealed class LocalizationService : ILocalizer
     /// </summary>
     internal static Dictionary<string, string> LoadStrings(string code, IAssetLoader? loader = null)
     {
-        var uri = new Uri($"avares://Filee/Assets/i18n/{code}.json");
+        var uri = new Uri($"avares://Bingling/Assets/i18n/{code}.json");
         if (!(loader?.Exists(uri) ?? AssetLoader.Exists(uri)))
             return [];
         using var stream = loader?.Open(uri) ?? AssetLoader.Open(uri);

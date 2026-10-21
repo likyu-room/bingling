@@ -23,7 +23,7 @@ public static class ExplorerMenuRegistration
     private static readonly TimeSpan Timeout = TimeSpan.FromMinutes(3);
 
     /// <summary>A registered copy of the package.</summary>
-    /// <param name="FullName">Package full name, e.g. <c>Filee.ExplorerMenu_1.0.0.0_x64__c73vxh346rtay</c>.</param>
+    /// <param name="FullName">Package full name, e.g. <c>Bingling.ExplorerMenu_1.0.0.0_x64__sryjq816xeb38</c>.</param>
     /// <param name="Version">Identity version from the full name.</param>
     /// <param name="ExternalLocation">Folder the package points at (null when Windows does not say).</param>
     public sealed record RegisteredPackage(string FullName, Version Version, string? ExternalLocation);
@@ -36,12 +36,12 @@ public static class ExplorerMenuRegistration
     /// <summary>The title file the DLL reads (see <see cref="ExplorerMenuPackage.TitleFileName"/>).</summary>
     public static string TitleFilePath => Path.Combine(UserDataStore.DefaultDirectory, ExplorerMenuPackage.TitleFileName);
 
-    /// <summary>True when the DLL and the package were shipped next to Filee.exe (installed builds).</summary>
+    /// <summary>True when the DLL and the package were shipped next to Bingling.exe (installed builds).</summary>
     public static bool HasFiles(string installFolder) =>
         File.Exists(Path.Combine(installFolder, ExplorerMenuPackage.DllFileName))
         && File.Exists(Path.Combine(installFolder, ExplorerMenuPackage.PackageFileName));
 
-    /// <summary>State of the top-level menu entry for the Filee in <paramref name="installFolder"/>.</summary>
+    /// <summary>State of the top-level menu entry for the copy in <paramref name="installFolder"/>.</summary>
     public static ModernContextMenuState GetState(string installFolder)
     {
         if (!IsSupportedOs || !HasFiles(installFolder))
@@ -115,7 +115,7 @@ public static class ExplorerMenuRegistration
         }
     }
 
-    /// <summary>Registers the package that ships next to Filee.exe, with the install folder as external location.</summary>
+    /// <summary>Registers the package that ships next to Bingling.exe, with the install folder as external location.</summary>
     public static async Task<ModernContextMenuResult> AddAsync(string installFolder)
     {
         if (!IsSupportedOs)
@@ -229,7 +229,7 @@ public static class ExplorerMenuRegistration
 
     private static async Task<ModernContextMenuResult> RunPowerShellAsync(Func<string, string> buildScript, bool elevated)
     {
-        var errorFile = Path.Combine(Path.GetTempPath(), $"Filee-explorer-menu-{Guid.NewGuid():N}.txt");
+        var errorFile = Path.Combine(Path.GetTempPath(), $"Bingling-explorer-menu-{Guid.NewGuid():N}.txt");
         try
         {
             using var process = Process.Start(CreateStartInfo(buildScript(errorFile), elevated));

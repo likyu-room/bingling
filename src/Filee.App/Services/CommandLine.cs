@@ -1,17 +1,17 @@
 // Command line options:
-//   Filee.exe                          open the main window
-//   Filee.exe --background             start in the tray only (used by "start with Windows")
-//   Filee.exe --settings               open the main window
-//   Filee.exe --convert a b ...        open the donut for these files (Explorer context menu / Send To)
-//   Filee.exe --convert-list <file>    same, with one path per line in a UTF-8 file (Windows 11 Explorer menu, for
+//   Bingling.exe                       open the main window
+//   Bingling.exe --background          start in the tray only (used by "start with Windows")
+//   Bingling.exe --settings            open the main window
+//   Bingling.exe --convert a b ...     open the donut for these files (Explorer context menu / Send To)
+//   Bingling.exe --convert-list <file> same, with one path per line in a UTF-8 file (Windows 11 Explorer menu, for
 //                                      selections too long for a command line); the app deletes the file afterwards
 // Used by the installer (installer/Filee.iss):
-//   Filee.exe --install-engines=a,b    download these engine packages (EngineDownloads ids) in the engine window;
+//   Bingling.exe --install-engines=a,b download these engine packages (EngineDownloads ids) in the engine window;
 //                                      an empty list means the user chose none, so the first-run choice is skipped
-//   Filee.exe --start-with-windows=on|off, --context-menu=on|off
+//   Bingling.exe --start-with-windows=on|off, --context-menu=on|off
 //                                      set the matching options on the General page
-//   Filee.exe --quit                   ask a running Filee to exit, and wait until it has (no window otherwise)
-//   Filee.exe --uninstall-cleanup      quit Filee, then remove what it registered for this user (UninstallCleanup)
+//   Bingling.exe --quit                ask a running copy to exit, and wait until it has (no window otherwise)
+//   Bingling.exe --uninstall-cleanup   quit the app, then remove what it registered for this user (UninstallCleanup)
 
 using System.Text;
 
@@ -33,8 +33,8 @@ public sealed record CommandLine(
     bool? StartWithWindows = null,
     bool? ContextMenu = null)
 {
-    /// <summary>File name prefix of list files written by FileeExplorerMenu.dll (LIST_PREFIX there) into %TEMP%.</summary>
-    public const string ListFilePrefix = "Filee-convert-";
+    /// <summary>File name prefix of list files written by BinglingExplorerMenu.dll (LIST_PREFIX there) into %TEMP%.</summary>
+    public const string ListFilePrefix = "Bingling-convert-";
 
     public static CommandLine Parse(IReadOnlyList<string> args)
     {
@@ -130,7 +130,7 @@ public sealed record CommandLine(
         catch (UnauthorizedAccessException) { }
     }
 
-    /// <summary>True for <c>%TEMP%\Filee-convert-*.txt</c>.</summary>
+    /// <summary>True for <c>%TEMP%\Bingling-convert-*.txt</c>.</summary>
     internal static bool IsOwnListFile(string path)
     {
         try

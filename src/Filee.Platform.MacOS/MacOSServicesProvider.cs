@@ -1,7 +1,8 @@
-// "Convert with Filee" in Finder's right-click menu, as a service Filee.app provides itself (NSServices in its
-// Info.plist). macOS hands the selected files straight to the running Filee: no Automator workflow, no shell, no
-// second process. Info.plist names the message (convertFiles) and the port (Filee); this registers the object
-// that answers it, an NSObject subclass made at run time with one method, convertFiles:userData:error:.
+// "Convert with Bingling" in Finder's right-click menu, as a service Bingling.app provides itself (NSServices in its
+// Info.plist). macOS hands the selected files straight to the running Bingling: no Automator workflow, no shell, no
+// second process. Info.plist names the message (convertFiles) and the port (Bingling, the executable's name); this
+// registers the object that answers it, an NSObject subclass made at run time with one method,
+// convertFiles:userData:error:.
 
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -11,7 +12,7 @@ namespace Filee.Platform.MacOS;
 public static class MacOSServicesProvider
 {
     /// <summary>The service's menu title in Info.plist; ServicesMenu.strings in each .lproj translates it.</summary>
-    public const string MenuItem = "Convert with Filee";
+    public const string MenuItem = "Convert with Bingling";
 
     /// <summary>The selector macOS sends, without its argument labels (NSMessage in Info.plist).</summary>
     public const string Message = "convertFiles";
@@ -29,7 +30,7 @@ public static class MacOSServicesProvider
 
     /// <summary>
     /// Answers the service from now on; <paramref name="handler"/> gets the files (on the main thread). Call it on the
-    /// main thread early at start: a service picked while Filee wasn't running is delivered once this is set. When the
+    /// main thread early at start: a service picked while the app wasn't running is delivered once this is set. When the
     /// pasteboard names no existing file, <paramref name="nothingUsable"/> gets the types it offered instead.
     /// </summary>
     [SupportedOSPlatform("macos")]

@@ -17,7 +17,7 @@ public sealed class TrayService(UserDataStore store, ILocalizer loc, WindowServi
 
     public void Create(Application app)
     {
-        using var iconStream = AssetLoader.Open(new Uri("avares://Filee/Assets/Icons/filee.ico"));
+        using var iconStream = AssetLoader.Open(new Uri("avares://Bingling/Assets/Icons/filee.ico"));
         _open = new NativeMenuItem();
         _open.Click += (_, _) => windows.ShowMain();
         _pause = new NativeMenuItem();

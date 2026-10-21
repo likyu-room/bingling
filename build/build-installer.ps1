@@ -24,7 +24,7 @@
 param(
     # Defaults to <Version> in Directory.Build.props.
     [string]$Version,
-    # A finished publish folder (Filee.exe, FileeExplorerMenu.dll/.msix, engines\); skips publishing.
+    # A finished publish folder (Bingling.exe, BinglingExplorerMenu.dll/.msix, engines\); skips publishing.
     [string]$PublishDir,
     [string]$OutputDir = (Join-Path $PSScriptRoot '..\Releases'),
     [switch]$Portable,
@@ -87,10 +87,10 @@ New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 $OutputDir = (Resolve-Path $OutputDir).Path
 
 if ($CheckOnly) {
-    # The script only needs a folder with Filee.exe in it.
+    # The script only needs a folder with Bingling.exe in it.
     $PublishDir = Join-Path $cache 'installer-check\app'
     New-Item -ItemType Directory -Force -Path $PublishDir | Out-Null
-    Set-Content (Join-Path $PublishDir 'Filee.exe') 'stub' -NoNewline
+    Set-Content (Join-Path $PublishDir 'Bingling.exe') 'stub' -NoNewline
     $OutputDir = Join-Path $cache 'installer-check'
 }
 elseif (-not $PublishDir) {
@@ -100,21 +100,22 @@ elseif (-not $PublishDir) {
         dotnet publish (Join-Path $root 'src\Filee.App\Filee.App.csproj') -c Release -r win-x64 --self-contained `
             "-p:Version=$Version" -p:PublishReadyToRun=true -p:FileeRelease=true -o $PublishDir
     }
-    # The command line, in the same folder so it shares the runtime and the engines (filee-cli.exe). Its name can't
-    # be filee.exe next to Filee.exe, so the "filee" command is cli\filee.cmd, which the installer can put on PATH.
+    # The command line, in the same folder so it shares the runtime and the engines (bingling-cli.exe). Its name
+    # can't be bingling.exe next to Bingling.exe, so the "bingling" command is cli\bingling.cmd, which the installer can
+    # put on PATH.
     Invoke-Checked 'dotnet publish (cli)' {
         dotnet publish (Join-Path $root 'src\Filee.Cli\Filee.Cli.csproj') -c Release -r win-x64 --self-contained `
             "-p:Version=$Version" -p:PublishReadyToRun=true -p:FileeRelease=true -o $PublishDir
     }
     New-Item -ItemType Directory -Force -Path (Join-Path $PublishDir 'cli') | Out-Null
-    Set-Content (Join-Path $PublishDir 'cli\filee.cmd') "@`"%~dp0..\filee-cli.exe`" %*" -Encoding ascii
-    # Next to Filee.exe: the Explorer menu package's external location is the install folder.
+    Set-Content (Join-Path $PublishDir 'cli\bingling.cmd') "@`"%~dp0..\bingling-cli.exe`" %*" -Encoding ascii
+    # Next to Bingling.exe: the Explorer menu package's external location is the install folder.
     & (Join-Path $PSScriptRoot 'build-explorer-menu.ps1') -Destination $PublishDir -Version $Version
     # Only the small rhwp and 7-Zip are bundled; the app downloads the others when the user picks them.
     & (Join-Path $PSScriptRoot 'fetch-engines.ps1') -Only rhwp, 7zip -Destination (Join-Path $PublishDir 'engines')
 }
 $PublishDir = (Resolve-Path $PublishDir).Path
-if (-not (Test-Path (Join-Path $PublishDir 'Filee.exe'))) { throw "Filee.exe is missing in $PublishDir" }
+if (-not (Test-Path (Join-Path $PublishDir 'Bingling.exe'))) { throw "Bingling.exe is missing in $PublishDir" }
 
 $iscc = Get-Iscc
 Push-Location $root

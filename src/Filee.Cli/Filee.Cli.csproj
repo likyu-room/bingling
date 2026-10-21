@@ -1,12 +1,12 @@
 <!--
-  Filee.Cli: the "filee" command line. Converts files and watches folders without the tray app, with the same
-  engines, presets and settings. Published next to Filee.exe as filee-cli.exe (one runtime for both); the installer
-  puts a "filee" shim on PATH (cli\filee.cmd).
+  Filee.Cli: the "bingling" command line. Converts files and watches folders without the tray app, with the same
+  engines, presets and settings. Published next to Bingling.exe as bingling-cli.exe (one runtime for both); the
+  installer can put a "bingling" shim on PATH (cli\bingling.cmd).
 -->
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <AssemblyName>filee-cli</AssemblyName>
+    <AssemblyName>bingling-cli</AssemblyName>
     <AssemblyTitle>Bingling CLI</AssemblyTitle>
     <RootNamespace>Filee.Cli</RootNamespace>
     <ApplicationIcon>..\Filee.App\Assets\Icons\filee.ico</ApplicationIcon>

@@ -10,21 +10,21 @@ if [ -e "$install_dir" ] || [ -L "$install_dir" ]; then
     printf '%s\n' "An installation already exists at $install_dir. Run its uninstall.sh first."
     exit 1
 fi
-if [ -e "$bin_dir/filee" ] || [ -L "$bin_dir/filee" ]; then
-    printf '%s\n' "$bin_dir/filee already exists. Remove or rename it before installing Filee."
+if [ -e "$bin_dir/bingling" ] || [ -L "$bin_dir/bingling" ]; then
+    printf '%s\n' "$bin_dir/bingling already exists. Remove or rename it before installing Bingling."
     exit 1
 fi
 if [ -e "$desktop_file" ] || [ -L "$desktop_file" ]; then
-    printf '%s\n' "$desktop_file already exists. Remove or rename it before installing Filee."
+    printf '%s\n' "$desktop_file already exists. Remove or rename it before installing Bingling."
     exit 1
 fi
 command -v python3 >/dev/null
-test -x "$source_dir/Filee"
-test -x "$source_dir/filee-cli"
+test -x "$source_dir/Bingling"
+test -x "$source_dir/bingling-cli"
 mkdir -p "$data_dir/filee" "$bin_dir" "$data_dir/applications"
 cp -R "$source_dir" "$install_dir"
 printf '%s\n' 'com.filee.app' > "$install_dir/.filee-package"
-ln -s "$install_dir/filee-cli" "$bin_dir/filee"
+ln -s "$install_dir/bingling-cli" "$bin_dir/bingling"
 python3 - "$install_dir" "$desktop_file" <<'PY'
 import pathlib
 import sys
@@ -40,13 +40,13 @@ def desktop_value(value):
     return str(value).replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r')
 
 desktop.write_text(
-    '[Desktop Entry]\nType=Application\nName=Filee\n'
-    'Comment=Convert files with Filee\n'
-    f'Exec={quoted_exec(str(app / "Filee"))} --convert %F\n'
+    '[Desktop Entry]\nType=Application\nName=Bingling\n'
+    'Comment=Convert files with Bingling\n'
+    f'Exec={quoted_exec(str(app / "Bingling"))} --convert %F\n'
     f'Icon={desktop_value(app / "filee.png")}\n'
     'Terminal=false\nCategories=Utility;\nX-Filee-Managed=true\n', encoding='utf-8')
 PY
 if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$data_dir/applications"
 fi
-printf '%s\n' "Installed Filee at $install_dir" "CLI: $bin_dir/filee (add $bin_dir to PATH if needed)."
+printf '%s\n' "Installed Bingling at $install_dir" "CLI: $bin_dir/bingling (add $bin_dir to PATH if needed)."

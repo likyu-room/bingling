@@ -13,16 +13,16 @@
   <Application.Resources>
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
-        <ResourceInclude Source="avares://Filee/Styles/Icons.axaml" />
-        <ResourceInclude Source="avares://Filee/Styles/Brands.axaml" />
+        <ResourceInclude Source="avares://Bingling/Styles/Icons.axaml" />
+        <ResourceInclude Source="avares://Bingling/Styles/Brands.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>
 
   <Application.Styles>
     <FluentTheme />
-    <StyleInclude Source="avares://Filee/Styles/Soft.axaml" />
-    <StyleInclude Source="avares://Filee/Styles/Chips.axaml" />
-    <StyleInclude Source="avares://Filee/Styles/TagEditor.axaml" />
+    <StyleInclude Source="avares://Bingling/Styles/Soft.axaml" />
+    <StyleInclude Source="avares://Bingling/Styles/Chips.axaml" />
+    <StyleInclude Source="avares://Bingling/Styles/TagEditor.axaml" />
   </Application.Styles>
 </Application>

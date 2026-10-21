@@ -7,7 +7,7 @@
         x:DataType="vm:RenameToolViewModel"
         Classes="glassy"
         Title="{DynamicResource watch.rename_title}"
-        Icon="avares://Filee/Assets/Icons/filee.ico"
+        Icon="avares://Bingling/Assets/Icons/filee.ico"
         Width="880" Height="640" MinWidth="640" MinHeight="420"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False">

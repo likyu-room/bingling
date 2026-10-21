@@ -9,7 +9,7 @@
 param(
     [Parameter(Mandatory)][ValidateSet('linux-x64', 'linux-arm64', 'osx-x64', 'osx-arm64')][string]$Runtime,
     [string]$Packages = (Join-Path $PSScriptRoot '../Releases'),
-    [string]$WorkDir = (Join-Path ($env:RUNNER_TEMP ?? [IO.Path]::GetTempPath()) 'filee-smoke')
+    [string]$WorkDir = (Join-Path ($env:RUNNER_TEMP ?? [IO.Path]::GetTempPath()) 'bingling-smoke')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -31,10 +31,10 @@ $smoke = (Resolve-Path -LiteralPath $WorkDir).Path
 Invoke-Checked 'Archive extraction' { tar -xzf $archive.FullName -C $smoke }
 $package = Join-Path $smoke ($archive.Name.Replace('.tar.gz', ''))
 if ($IsMacOS) {
-    Invoke-Checked 'Extracted app signature' { codesign --verify --deep --strict (Join-Path $package 'Filee.app') }
+    Invoke-Checked 'Extracted app signature' { codesign --verify --deep --strict (Join-Path $package 'Bingling.app') }
 }
-$bin = if ($IsMacOS) { Join-Path $package 'Filee.app/Contents/MacOS' } else { $package }
-$cli = Join-Path $bin 'filee-cli'
+$bin = if ($IsMacOS) { Join-Path $package 'Bingling.app/Contents/MacOS' } else { $package }
+$cli = Join-Path $bin 'bingling-cli'
 
 Invoke-Checked 'CLI start' { & $cli version }
 Invoke-Checked 'rhwp start' { & (Join-Path $bin 'engines/rhwp/rhwp') --version }
@@ -54,7 +54,7 @@ function Convert-Smoke([string]$source, [string]$target) {
 }
 
 $inputFile = Join-Path $smoke 'sample.txt'
-'Filee 한글 conversion smoke test' | Set-Content -LiteralPath $inputFile -Encoding utf8NoBOM
+'Bingling 한글 conversion smoke test' | Set-Content -LiteralPath $inputFile -Encoding utf8NoBOM
 $hwpx = Convert-Smoke $inputFile 'hwpx'
 # HWPX -> HWP and HWP -> PDF are rhwp's routes: they run the bundled rhwp from the package.
 $hwp = Convert-Smoke $hwpx 'hwp'
@@ -72,7 +72,7 @@ if ($IsLinux) {
 }
 
 if ($env:GITHUB_ENV) {
-    "FILEE_SMOKE_APP=$(Join-Path $bin 'Filee')" >> $env:GITHUB_ENV
+    "FILEE_SMOKE_APP=$(Join-Path $bin 'Bingling')" >> $env:GITHUB_ENV
     "FILEE_SMOKE_PACKAGE=$package" >> $env:GITHUB_ENV
 }
 Write-Host "Package checks passed: $package"

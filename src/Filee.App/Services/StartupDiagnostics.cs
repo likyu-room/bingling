@@ -28,7 +28,7 @@ internal static class StartupDiagnostics
     }
 
     /// <summary>
-    /// The start-up line: "Filee 1.11.0 starting: C:\…\Filee.exe (installed), integrity Medium, Explorer Medium,
+    /// The start-up line: "Filee 1.11.0 starting: C:\…\Bingling.exe (installed), integrity Medium, Explorer Medium,
     /// Microsoft Windows 10.0.26200 X64, 2 argument(s)". Arguments are counted, not written: they are file paths.
     /// </summary>
     public static string Describe(string version, string? executable, string installKind, ElevationState elevation,

@@ -56,7 +56,7 @@ public sealed partial class ElevationService : ObservableObject
         executable ??= Environment.ProcessPath;
         if (string.IsNullOrEmpty(executable))
         {
-            _log.LogWarning("Restart without administrator rights: the path of Filee.exe is unknown");
+            _log.LogWarning("Restart without administrator rights: the path of Bingling.exe is unknown");
             RestartFailed = true;
             return false;
         }

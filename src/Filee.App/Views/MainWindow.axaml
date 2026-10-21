@@ -6,7 +6,7 @@
         x:DataType="vm:MainWindowViewModel"
         Classes="glassy"
         Title="{DynamicResource app.name}"
-        Icon="avares://Filee/Assets/Icons/filee.ico"
+        Icon="avares://Bingling/Assets/Icons/filee.ico"
         Width="1080" Height="760" MinWidth="820" MinHeight="560"
         WindowStartupLocation="CenterScreen">
   <Grid ColumnDefinitions="230,*">
@@ -14,7 +14,7 @@
     <Border Classes="bar" BorderBrush="{DynamicResource SubtleBorderBrush}" BorderThickness="0,0,1,0">
       <DockPanel Margin="14,18">
         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="8,0,0,20">
-          <Image Source="avares://Filee/Assets/Icons/filee.png" Width="30" Height="30" />
+          <Image Source="avares://Bingling/Assets/Icons/filee.png" Width="30" Height="30" />
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="{DynamicResource app.name}" FontSize="18" FontWeight="Bold" />
             <TextBlock Classes="caption" Text="{DynamicResource app.tagline}" />

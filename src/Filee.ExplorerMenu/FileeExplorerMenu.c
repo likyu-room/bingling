@@ -1,11 +1,11 @@
 // "Convert with Bingling" in the top-level Windows 11 File Explorer context menu: a tiny in-process COM server
-// (IClassFactory + IExplorerCommand) that Explorer loads through the Filee sparse package. Built with
+// (IClassFactory + IExplorerCommand) that Explorer loads through the Bingling sparse package. Built with
 // build/build-explorer-menu.ps1; the package side lives in src/Filee.Platform.Windows/ExplorerMenu*.cs.
 //
 // This code runs inside explorer.exe, so it is deliberately small and defensive:
 //  - no C runtime (linked with -nostdlib): only kernel32/user32/ole32/shell32/shlwapi are used;
 //  - menu construction (GetTitle/GetState) only reads one tiny local file and shell attributes;
-//  - Invoke starts Filee.exe next to this DLL and returns immediately (no waiting, no network).
+//  - Invoke starts Bingling.exe next to this DLL and returns immediately (no waiting, no network).
 
 #define WIN32_LEAN_AND_MEAN
 #define COBJMACROS
@@ -15,8 +15,8 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 
-// {27B50CD9-598E-4AB1-8BBD-AC36085FB4DE}; must match ExplorerMenuPackage.ClassId (C#) and the package manifest.
-static const CLSID kClsidCommand = {0x27b50cd9, 0x598e, 0x4ab1, {0x8b, 0xbd, 0xac, 0x36, 0x08, 0x5f, 0xb4, 0xde}};
+// {4E812CE3-362A-4823-BB60-46148A883B44}; must match ExplorerMenuPackage.ClassId (C#) and the package manifest.
+static const CLSID kClsidCommand = {0x4e812ce3, 0x362a, 0x4823, {0xbb, 0x60, 0x46, 0x14, 0x8a, 0x88, 0x3b, 0x44}};
 // Local copies of the interface and folder ids, so the DLL does not need libuuid.
 static const IID kIidUnknown = {0x00000000, 0x0000, 0x0000, {0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}};
 static const IID kIidClassFactory = {0x00000001, 0x0000, 0x0000, {0xc0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46}};
@@ -29,8 +29,8 @@ static const KNOWNFOLDERID kFolderRoamingAppData = {0x3eb685db, 0x65f9, 0x4cf6, 
 // the entry off and on again without re-registering the package (which needs administrator rights).
 // Must match ExplorerMenuPackage.TitleFileName.
 #define TITLE_FILE L"Bingling\\explorer-menu.txt"
-#define APP_EXE L"Filee.exe"
-#define LIST_PREFIX L"Filee-convert-"       // CommandLine.ListFilePrefix in the app
+#define APP_EXE L"Bingling.exe"
+#define LIST_PREFIX L"Bingling-convert-"    // CommandLine.ListFilePrefix in the app
 // CreateProcess accepts at most 32767 characters; longer selections go through a list file.
 #define MAX_COMMAND_LINE 32000
 
@@ -99,7 +99,7 @@ static void TextFree(Text *text)
     text->length = text->capacity = 0;
 }
 
-/// Full path of a file next to this DLL (the Filee install folder, i.e. the package's external location).
+/// Full path of a file next to this DLL (the install folder, i.e. the package's external location).
 static BOOL PathNextToModule(const WCHAR *name, WCHAR *buffer, DWORD size)
 {
     DWORD length = GetModuleFileNameW(g_module, buffer, size);
@@ -158,7 +158,7 @@ static BOOL ReadTitle(WCHAR *title, int size)
     return chars > 0;
 }
 
-/// Writes the paths (one per line, UTF-8) to a new file in %TEMP% for `Filee.exe --convert-list <file>`.
+/// Writes the paths (one per line, UTF-8) to a new file in %TEMP% for `Bingling.exe --convert-list <file>`.
 static BOOL WriteListFile(const Text *lines, WCHAR *path, DWORD size)
 {
     WCHAR folder[MAX_PATH + 1];
@@ -193,7 +193,7 @@ static BOOL WriteListFile(const Text *lines, WCHAR *path, DWORD size)
     return written;
 }
 
-/// Starts Filee.exe with the given command line and returns without waiting for it.
+/// Starts Bingling.exe with the given command line and returns without waiting for it.
 static HRESULT StartFilee(const WCHAR *exe, WCHAR *commandLine)
 {
     WCHAR folder[1024];
@@ -208,7 +208,7 @@ static HRESULT StartFilee(const WCHAR *exe, WCHAR *commandLine)
     startup.cb = sizeof(startup);
     if (!CreateProcessW(exe, commandLine, NULL, NULL, FALSE, 0, NULL, folder, &startup, &process))
         return HRESULT_FROM_WIN32(GetLastError());
-    // Explorer owns the foreground; let the running Filee bring its donut to the front.
+    // Explorer owns the foreground; let the running Bingling bring its donut to the front.
     AllowSetForegroundWindow(process.dwProcessId);
     CloseHandle(process.hThread);
     CloseHandle(process.hProcess);

@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds the Windows 11 File Explorer menu extension: FileeExplorerMenu.dll + FileeExplorerMenu.msix.
+  Builds the Windows 11 File Explorer menu extension: BinglingExplorerMenu.dll + BinglingExplorerMenu.msix.
 
 .DESCRIPTION
   The DLL (src/Filee.ExplorerMenu, plain C, no C runtime) is compiled with a pinned, portable Zig toolchain that is
@@ -8,7 +8,7 @@
   on GitHub's windows-latest runner. The unsigned sparse package is packed by build/tools/make-explorer-package.cs
   through the packaging API that ships with Windows.
 
-  Both files belong next to Filee.exe; the release workflow passes the publish folder as -Destination.
+  Both files belong next to Bingling.exe; the release workflow passes the publish folder as -Destination.
 
 .EXAMPLE
   pwsh build/build-explorer-menu.ps1
@@ -95,8 +95,8 @@ $rc = Join-Path $obj 'FileeExplorerMenu.rc'
 $defines = "#define FILEE_VERSION_MAJOR $major`r`n#define FILEE_VERSION_MINOR $minor`r`n#define FILEE_VERSION_PATCH $patch`r`n#define FILEE_VERSION_TEXT `"$Version`"`r`n"
 Set-Content -Path $rc -Value ($defines + (Get-Content (Join-Path $source 'FileeExplorerMenu.rc') -Raw)) -Encoding utf8NoBOM -NoNewline
 
-Write-Host "build FileeExplorerMenu.dll $Version"
-$dll = Join-Path $obj 'FileeExplorerMenu.dll'
+Write-Host "build BinglingExplorerMenu.dll $Version"
+$dll = Join-Path $obj 'BinglingExplorerMenu.dll'
 # -nostdlib: no C runtime inside explorer.exe; the entry point is DllMain itself. -s strips symbols.
 & $zig cc -target x86_64-windows-gnu -shared -O2 -s -nostdlib -Wall -Wextra -Werror `
     -isystem (Join-Path (Split-Path $zig) 'lib\libc\include\any-windows-any') `
@@ -105,7 +105,7 @@ $dll = Join-Path $obj 'FileeExplorerMenu.dll'
 if ($LASTEXITCODE -ne 0) { throw "zig cc failed with exit code $LASTEXITCODE" }
 Copy-Item $dll $Destination -Force
 
-Write-Host "pack FileeExplorerMenu.msix"
+Write-Host "pack BinglingExplorerMenu.msix"
 $Destination = (Resolve-Path $Destination).Path
 Push-Location $root
 try {
