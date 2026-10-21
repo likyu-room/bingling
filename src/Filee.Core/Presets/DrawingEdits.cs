@@ -50,8 +50,13 @@ public enum AnnotationKind
 /// <summary>How thick an <see cref="Annotation"/> is drawn. A level from a newer Filee reads as <see cref="Thin"/>.</summary>
 public enum StrokeLevel
 {
+    /// <summary>The thinnest lines and the smallest text and numbers.</summary>
     Thin,
+
+    /// <summary>The middle size.</summary>
     Normal,
+
+    /// <summary>The thickest lines and the largest text and numbers.</summary>
     Thick,
 }
 
@@ -93,6 +98,7 @@ public sealed class EditRect
     /// <summary>Height, as a fraction of the picture's height.</summary>
     public double Height { get; set; }
 
+    /// <summary>A copy of the box.</summary>
     public EditRect Clone() => (EditRect)MemberwiseClone();
 }
 
@@ -106,6 +112,7 @@ public sealed class RedactEdit
     /// <summary>What to hide.</summary>
     public List<EditRect> Boxes { get; set; } = [];
 
+    /// <summary>A deep copy: its boxes are copies too, so changing one changes nothing here.</summary>
     public RedactEdit Clone() => new() { Mode = Mode, Boxes = [.. Boxes.Select(b => b.Clone())] };
 }
 
@@ -135,6 +142,7 @@ public sealed class Annotation
     /// <summary>The figure in a <see cref="AnnotationKind.Number"/>; 0 for the others.</summary>
     public int Number { get; set; }
 
+    /// <summary>A deep copy: its points are copies too, so moving one moves nothing here.</summary>
     public Annotation Clone()
     {
         var copy = (Annotation)MemberwiseClone();
@@ -168,5 +176,6 @@ public sealed class BackgroundEdit
     /// <summary>The shape of the result: <c>auto</c> (the picture and its padding), <c>1:1</c>, <c>16:9</c>, <c>9:16</c>, <c>4:5</c> or <c>4:3</c>.</summary>
     public string Aspect { get; set; } = "auto";
 
+    /// <summary>A copy of the backdrop settings.</summary>
     public BackgroundEdit Clone() => (BackgroundEdit)MemberwiseClone();
 }

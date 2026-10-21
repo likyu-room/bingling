@@ -5,6 +5,7 @@
 
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -797,6 +798,10 @@ public class AnnotateToolTests
         foreach (var text in new[] { "색", "굵기", "가늘게", "보통", "굵게", "사용자 색" })
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == text);
         Assert.Equal(9, window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "ToolCells").ItemCount);
+        // The colour chips are named for people who cannot see them, not by their codes.
+        var colors = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "ColorChips");
+        Assert.Equal(["빨강", "주황", "노랑", "초록", "파랑", "보라", "검정", "흰색"],
+            colors.GetVisualDescendants().OfType<Border>().Select(AutomationProperties.GetName).Where(name => !string.IsNullOrEmpty(name)));
 
         // A wavy pen stroke.
         window.MouseDown(At(window, .06, .7, size), MouseButton.Left);

@@ -58,6 +58,16 @@ public sealed class AnnotateCanvas : PictureView
     /// <summary>Room between the text box's edge and the text in it: its border and padding.</summary>
     private const double EditorInset = 3;
 
+    /// <summary>The size <see cref="MeasureFont"/> is made at, in pixels.</summary>
+    private const float MeasureSize = 100;
+
+    /// <summary>
+    /// The renderer's font, made once, that texts are measured with for picking and outlining: with linear metrics and no
+    /// hinting a text's width grows in step with its size, so every size is this one scaled. Made per text instead, a mouse
+    /// move over the picture would make a native font for every text on it.
+    /// </summary>
+    private static readonly SkiaSharp.SKFont MeasureFont = AnnotationFonts.Create(MeasureSize);
+
     private static readonly IPen OutlinePen = new Pen(Brushes.White, 1.5, new DashStyle([4, 3], 0));
     private static readonly IPen OutlineShadowPen = new Pen(new SolidColorBrush(Avalonia.Media.Color.FromArgb(150, 0, 0, 0)), 3);
 
@@ -229,8 +239,7 @@ public sealed class AnnotateCanvas : PictureView
                 // As the renderer lays it out: lines 1.25 sizes apart, from the anchor at the top left.
                 var size = sizes.Text * ShortSide(image);
                 var lines = (note.Text ?? "").Split('\n');
-                using (var font = AnnotationFonts.Create((float)size))
-                    return new Rect(points[0], new Size(lines.Max(l => font.MeasureText(l)), lines.Length * 1.25 * size));
+                return new Rect(points[0], new Size(lines.Max(l => MeasureFont.MeasureText(l)) * size / MeasureSize, lines.Length * 1.25 * size));
             case AnnotationKind.Number:
                 var radius = sizes.Sticker * ShortSide(image) / 2;
                 return new Rect(points[0].X - radius, points[0].Y - radius, 2 * radius, 2 * radius);

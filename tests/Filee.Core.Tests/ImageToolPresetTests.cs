@@ -171,7 +171,7 @@ public class ImageToolPresetTests
         Assert.Equal(RedactMode.Mosaic, edit.Redact!.Mode);
         Assert.Equal([(.1, .2, .3, .4), (.5, .5, .25, .125)], edit.Redact.Boxes.Select(b => (b.X, b.Y, b.Width, b.Height)));
         Assert.Equal([AnnotationKind.Arrow, AnnotationKind.Text, AnnotationKind.Number], edit.Annotations!.Select(a => a.Kind));
-        var arrow = edit.Annotations[0];
+        var arrow = edit.Annotations![0];
         Assert.Equal(("#00AAFF", StrokeLevel.Thick, 2), (arrow.Color, arrow.Width, arrow.Points.Count));
         Assert.Equal((.8, .9), (arrow.Points[1].X, arrow.Points[1].Y));
         Assert.Equal("Hello 한글", edit.Annotations[1].Text);

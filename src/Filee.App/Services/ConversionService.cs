@@ -59,7 +59,8 @@ public sealed class ConversionService
     /// <param name="preset">Preset to apply.</param>
     /// <param name="perFile">
     /// For a tool that makes one edit per picture (annotate): the edit of each file, by its full path. The job holds only
-    /// the files that have one, so a picture nothing was done to is left out of it, and has one card for all of them.
+    /// the files that have one, so a picture nothing was done to is left out of it, and the job shows one card for all of
+    /// them.
     /// </param>
     /// <param name="showInToast">False when another view (the donut's progress ring) displays the job first.</param>
     /// <returns>The job's view model, or null when there was nothing to convert.</returns>

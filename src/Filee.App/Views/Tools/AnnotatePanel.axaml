@@ -70,7 +70,7 @@
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="tools:ColorSwatch">
             <Border Width="22" Height="22" CornerRadius="11" Background="{Binding Brush}" BorderThickness="1"
-                    BorderBrush="{DynamicResource SubtleBorderBrush}" AutomationProperties.Name="{Binding Hex}" />
+                    BorderBrush="{DynamicResource SubtleBorderBrush}" AutomationProperties.Name="{Binding Label}" />
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>

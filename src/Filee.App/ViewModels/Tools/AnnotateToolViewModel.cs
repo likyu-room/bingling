@@ -15,14 +15,18 @@ namespace Filee.App.ViewModels.Tools;
 
 /// <summary>A colour chip of the annotate panel.</summary>
 /// <param name="Hex">The colour, <c>#RRGGBB</c>.</param>
+/// <param name="Label">Its name, for people who can't see it.</param>
 /// <param name="Brush">What the chip is painted with.</param>
-public sealed record ColorSwatch(string Hex, IBrush Brush);
+public sealed record ColorSwatch(string Hex, string Label, IBrush Brush);
 
 /// <summary>The annotate tool: each file's own drawings, and the tool, colour and thickness they are drawn with.</summary>
 public sealed class AnnotateToolViewModel : ImageToolViewModel
 {
     /// <summary>The tool keys in the order of the panel's cells: V the select tool, then the <see cref="AnnotationKind"/>s in order.</summary>
     private static readonly Key[] ToolKeys = [Key.V, Key.P, Key.H, Key.A, Key.L, Key.R, Key.E, Key.T, Key.N];
+
+    /// <summary>The names of <see cref="ImageEditRenderer.AnnotationColors"/>, in their order, as <c>tool.annotate.color.*</c> keys.</summary>
+    private static readonly string[] ColorIds = ["red", "orange", "yellow", "green", "blue", "purple", "black", "white"];
 
     private readonly IReadOnlyList<Annotation>[] _drawings; // by file; never changed in place, so an undo step can hold one
     private int _selected = -1;
@@ -47,7 +51,11 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
         _tool = _lastKind = settings.LastTool;
         _color = BackgroundToolViewModel.HexColor(settings.PenColor) ?? ImageEditRenderer.AnnotationColors[0];
         _width = settings.PenWidth;
-        Colors = [.. ImageEditRenderer.AnnotationColors.Select(hex => new ColorSwatch(hex, new SolidColorBrush(Avalonia.Media.Color.Parse(hex))))];
+        Colors =
+        [
+            .. ImageEditRenderer.AnnotationColors.Zip(ColorIds, (hex, id) =>
+                new ColorSwatch(hex, loc[$"tool.annotate.color.{id}"], new SolidColorBrush(Avalonia.Media.Color.Parse(hex)))),
+        ];
         Widths =
         [
             new(StrokeLevel.Thin, loc["tool.annotate.thin"]), new(StrokeLevel.Normal, loc["tool.annotate.normal"]),

@@ -103,7 +103,8 @@ public class BackgroundToolTests
 
         // The chips: the renderer's 8 gradients, then 6 colours, each named for people who cannot see it.
         Assert.Equal(8, vm.Swatches.Count(s => s.Kind == BackgroundKind.Gradient));
-        Assert.Equal(6, vm.Swatches.Count(s => s.Kind == BackgroundKind.Solid));
+        Assert.Equal(["#FFFFFF", "#000000", "#8E8E93", "#FFD8BE", "#BEE3FF", "#BFF0DC"],
+            vm.Swatches.Where(s => s.Kind == BackgroundKind.Solid).Select(s => s.Value));
         Assert.Equal(ImageEditRenderer.Gradients.Select(g => g.Id), vm.Swatches.Take(8).Select(s => s.Id));
         Assert.Equal("흰색", vm.Swatches.Single(s => s.Id == "solid-white").Label);
         Assert.Equal(vm.Swatches.Count, vm.Swatches.Select(s => s.Label).Distinct().Count());

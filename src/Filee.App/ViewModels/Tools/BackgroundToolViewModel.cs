@@ -33,8 +33,8 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
 
     /// <summary>The colour chips after the gradients, <c>#RRGGBB</c>: white, black, grey, peach, sky, mint.</summary>
     internal static readonly IReadOnlyList<(string Id, string Hex)> Solids =
-        [("solid-white", "#FFFFFF"), ("solid-black", "#000000"), ("solid-gray", "#8E8E93"), ("solid-peach", "#FFCBA4"),
-            ("solid-sky", "#8EC5FC"), ("solid-mint", "#B5EAD7")];
+        [("solid-white", "#FFFFFF"), ("solid-black", "#000000"), ("solid-gray", "#8E8E93"), ("solid-peach", "#FFD8BE"),
+            ("solid-sky", "#BEE3FF"), ("solid-mint", "#BFF0DC")];
 
     private readonly List<string> _copies = []; // preview copies of the user's picture, in the temp folder
     private readonly Dictionary<string, string> _previewOf = new(StringComparer.OrdinalIgnoreCase); // picture → what the preview draws
