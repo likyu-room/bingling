@@ -41,7 +41,8 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
     internal AnnotateToolViewModel(IReadOnlyList<string> files, UserDataStore store, ILocalizer loc, ILogger? log)
         : base(ImageToolKind.Annotate, files, store, loc, log)
     {
-        _drawings = [.. files.Select(_ => (IReadOnlyList<Annotation>)[])];
+        // A list of each file's own, never one shared empty array: the canvas tells files apart by their lists.
+        _drawings = [.. files.Select(_ => (IReadOnlyList<Annotation>)new List<Annotation>())];
         var settings = store.Settings.ImageTools;
         _tool = _lastKind = settings.LastTool;
         _color = BackgroundToolViewModel.HexColor(settings.PenColor) ?? ImageEditRenderer.AnnotationColors[0];

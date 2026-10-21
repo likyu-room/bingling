@@ -32,6 +32,12 @@ public partial class ImageToolWindow : Window
     /// <summary>The tool's picture view: zoom, pan and the keys go to it.</summary>
     private PictureView? _picture;
 
+    /// <summary>The view model is done (Save, or Cancel agreed to): closing asks nothing more.</summary>
+    private bool _finished;
+
+    /// <summary>A close is being decided in <see cref="OnClosing"/>: Finished must not start another one.</summary>
+    private bool _deciding;
+
     public ImageToolWindow()
     {
         InitializeComponent();
@@ -44,11 +50,15 @@ public partial class ImageToolWindow : Window
     {
         base.OnDataContextChanged(e);
         if (_model is not null)
+        {
             _model.Finished -= OnFinished;
+            _model.FileLeaving -= OnFileLeaving;
+        }
         _model = DataContext as ImageToolViewModel;
         if (_model is null)
             return;
         _model.Finished += OnFinished;
+        _model.FileLeaving += OnFileLeaving;
         // Each tool its own view and panel (Views/Tools); a tool without them never gets here (ImageToolViewModel.Create).
         (ToolPanel.Content, _picture) = _model switch
         {
@@ -102,7 +112,37 @@ public partial class ImageToolWindow : Window
         [!AnnotateCanvas.StrokeWidthProperty] = CompiledBinding.Create<AnnotateToolViewModel, StrokeLevel>(vm => vm.StrokeWidth),
     };
 
-    private void OnFinished(object? sender, EventArgs e) => Close();
+    private void OnFinished(object? sender, EventArgs e)
+    {
+        _finished = true;
+        if (!_deciding)
+            Close();
+    }
+
+    /// <summary>‹ ›, ← / → (or anything else) is about to show another file: the picture view ends its work on this one first.</summary>
+    private void OnFileLeaving(object? sender, EventArgs e) => _picture?.LeaveFile();
+
+    /// <summary>
+    /// The title bar's X, Alt+F4 or a close from code: the same as Cancel, which may ask first (annotate, with drawings).
+    /// While it asks, the window stays; its "yes" finishes the view model, and that closes the window again. A close after
+    /// Save, or by the app or the system shutting down, asks nothing.
+    /// </summary>
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        base.OnClosing(e);
+        if (_finished || e.Cancel || _model is null || e.CloseReason is WindowCloseReason.ApplicationShutdown or WindowCloseReason.OSShutdown)
+            return;
+        _deciding = true;
+        try
+        {
+            _model.CancelCommand.Execute(null); // done at once when there is nothing to ask
+        }
+        finally
+        {
+            _deciding = false;
+        }
+        e.Cancel = !_finished;
+    }
 
     protected override void OnOpened(EventArgs e)
     {
@@ -209,7 +249,10 @@ public partial class ImageToolWindow : Window
     protected override void OnClosed(EventArgs e)
     {
         if (_model is not null)
+        {
             _model.Finished -= OnFinished;
+            _model.FileLeaving -= OnFileLeaving;
+        }
         base.OnClosed(e);
     }
 }

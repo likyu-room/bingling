@@ -490,7 +490,169 @@ public class AnnotateToolTests
         vm.Dispose();
     }
 
+    /// <summary>A click on the window's button for <paramref name="command"/> (‹ or ›), then the file's preview read.</summary>
+    private static void ClickButton(Window window, ImageToolViewModel vm, System.Windows.Input.ICommand command)
+    {
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == command);
+        Click(window, button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value);
+        WaitForPreview(vm);
+        Dispatcher.UIThread.RunJobs();
+    }
+
+    [AvaloniaFact]
+    public void A_file_switch_puts_typed_text_on_the_file_it_was_typed_on()
+    {
+        var (window, vm) = Open(files: 2);
+
+        // Both files bare, the › button while typing: the text stays on the first file, it does not go along.
+        Key(window, PhysicalKey.T);
+        Click(window, At(window, .3, .4));
+        window.KeyTextInput("안녕");
+        ClickButton(window, vm, vm.NextCommand);
+        Assert.Equal(1, vm.Index);
+        Assert.Empty(vm.Annotations);
+        Assert.Null(Editor(window));
+        Assert.Equal("표시한 1개만 저장돼요", vm.FooterText);
+
+        // ← / → while typing move the caret, not the file; Enter puts the text here.
+        Click(window, At(window, .5, .5));
+        window.KeyTextInput("둘");
+        Key(window, PhysicalKey.ArrowLeft);
+        Key(window, PhysicalKey.ArrowRight);
+        Assert.Equal(1, vm.Index);
+        Key(window, PhysicalKey.Enter);
+        Assert.Equal("둘", Assert.Single(vm.Annotations).Text);
+
+        // The ‹ button while typing on a file with a drawing: the text joins it, nothing is lost or asked.
+        Click(window, At(window, .2, .8));
+        window.KeyTextInput("셋");
+        ClickButton(window, vm, vm.PreviousCommand);
+        Assert.Equal(0, vm.Index);
+        Assert.Equal("안녕", Assert.Single(vm.Annotations).Text);
+        Turn(window, vm, PhysicalKey.ArrowRight);
+        Assert.Equal(["둘", "셋"], vm.Annotations.Select(a => a.Text));
+        Assert.Equal("표시한 2개만 저장돼요", vm.FooterText);
+
+        // Each text is one undo step of its own file.
+        Key(window, PhysicalKey.Z, RawInputModifiers.Control);
+        Assert.Equal("둘", Assert.Single(vm.Annotations).Text);
+        Turn(window, vm, PhysicalKey.ArrowLeft);
+        Assert.Single(vm.Annotations);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_file_switch_drops_a_drag_in_progress()
+    {
+        var (window, vm) = Open(files: 2);
+
+        // A pen stroke when → is pressed: dropped, on neither file.
+        var from = At(window, .2, .2);
+        window.MouseDown(from, MouseButton.Left);
+        window.MouseMove(from + new Point(30, 10));
+        Key(window, PhysicalKey.ArrowRight);
+        WaitForPreview(vm);
+        window.MouseMove(from + new Point(60, 20));
+        window.MouseUp(from + new Point(60, 20), MouseButton.Left);
+        Assert.Equal(1, vm.Index);
+        Assert.Empty(vm.Annotations);
+
+        // The same when the › button's command runs (the mouse that drags can't click it, but anything else may run it).
+        Turn(window, vm, PhysicalKey.ArrowLeft);
+        Assert.Empty(vm.Annotations);
+        window.MouseDown(from, MouseButton.Left);
+        window.MouseMove(from + new Point(30, 10));
+        vm.NextCommand.Execute(null);
+        WaitForPreview(vm);
+        window.MouseMove(from + new Point(60, 20));
+        window.MouseUp(from + new Point(60, 20), MouseButton.Left);
+        Assert.Empty(vm.Annotations);
+        Assert.Equal("", vm.FooterText);
+
+        // A drawing being moved stays where it was, on its own file.
+        Key(window, PhysicalKey.L);
+        Drag(window, At(window, .1, .5), At(window, .5, .5));
+        Key(window, PhysicalKey.V);
+        window.MouseDown(At(window, .3, .5), MouseButton.Left);
+        window.MouseMove(At(window, .3, .5) + new Point(20, 20));
+        Turn(window, vm, PhysicalKey.ArrowLeft);
+        window.MouseMove(At(window, .3, .5) + new Point(40, 40));
+        window.MouseUp(At(window, .3, .5) + new Point(40, 40), MouseButton.Left);
+        Assert.Empty(vm.Annotations);
+        Turn(window, vm, PhysicalKey.ArrowRight);
+        Assert.Equal([(.1, .5), (.5, .5)], Assert.Single(vm.Annotations).Points.Select(Xy), new PointComparer());
+        window.Close();
+        vm.Dispose();
+    }
+
     // ───────── Saving and closing ─────────
+
+    [AvaloniaFact]
+    public void Closing_the_window_asks_like_esc_and_saving_does_not()
+    {
+        var asked = 0;
+        var answer = new TaskCompletionSource<bool>();
+        var (window, vm) = Open();
+        vm.Ask = _ =>
+        {
+            asked++;
+            return answer.Task;
+        };
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+
+        // Nothing drawn: the title bar's X (a close) closes at once.
+        window.Close();
+        Assert.True(closed);
+        Assert.Equal(0, asked);
+        vm.Dispose();
+
+        // Drawn: one question, however often X is pressed; the window stays while asked and on "no".
+        (window, vm) = Open();
+        vm.Ask = _ =>
+        {
+            asked++;
+            return answer.Task;
+        };
+        closed = false;
+        window.Closed += (_, _) => closed = true;
+        Drag(window, At(window, .1, .2), At(window, .6, .8));
+        window.Close();
+        window.Close();
+        Assert.Equal(1, asked);
+        Assert.False(closed);
+        answer.SetResult(false);
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(closed);
+        Assert.True(window.IsVisible);
+
+        // "Yes": closed, with nothing to run.
+        answer = new TaskCompletionSource<bool>();
+        window.Close();
+        Assert.Equal(2, asked);
+        answer.SetResult(true);
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(closed);
+        Assert.Null(vm.Result);
+        vm.Dispose();
+
+        // Save closes without a question.
+        (window, vm) = Open();
+        vm.Ask = _ =>
+        {
+            asked++;
+            return Task.FromResult(false);
+        };
+        closed = false;
+        window.Closed += (_, _) => closed = true;
+        Drag(window, At(window, .1, .2), At(window, .6, .8));
+        Key(window, PhysicalKey.Enter);
+        Assert.True(closed);
+        Assert.Equal(2, asked);
+        Assert.NotNull(vm.Result);
+        vm.Dispose();
+    }
 
     [AvaloniaFact]
     public void Save_returns_per_file_edits_for_marked_files_only()

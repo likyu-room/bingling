@@ -361,7 +361,7 @@ public sealed class AnnotateCanvas : PictureView
         {
             case AnnotationKind.Text:
                 var text = HitTest(notes, image, p) is var i && i >= 0 && notes[i].Kind == AnnotationKind.Text ? i : -1;
-                StartTyping(text, text >= 0 ? notes[text].Clone() : new Annotation { Kind = kind, Points = [at] });
+                StartTyping(text, text >= 0 ? notes[text].Clone() : new Annotation { Kind = kind, Color = Color, Width = StrokeWidth, Points = [at] });
                 break;
             case AnnotationKind.Number:
                 // The biggest number on this file plus one: a sticker taken away leaves a gap rather than a second one of a number.
@@ -436,6 +436,14 @@ public sealed class AnnotateCanvas : PictureView
         EndPress(); // lost mid-drag (another window took the mouse): the drawings stay as they were
     }
 
+    /// <summary>Another file is about to be shown: a drag on this one is dropped, and a text being typed goes on this one.</summary>
+    internal override void LeaveFile()
+    {
+        if (_press is not null)
+            EndPress();
+        CommitText();
+    }
+
     private void EndPress()
     {
         _press = null;
@@ -482,8 +490,8 @@ public sealed class AnnotateCanvas : PictureView
     private void StartTyping(int index, Annotation note)
     {
         _typing = new Typing(index, note);
-        var color = index < 0 ? Color : note.Color; // a new text gets the colour of new drawings, an old one keeps its own
-        _editor.Foreground = Avalonia.Media.Color.TryParse(color, out var parsed) ? new SolidColorBrush(parsed) : null;
+        // A new text has the colour and thickness of new drawings when its box opens; an old one keeps its own.
+        _editor.Foreground = Avalonia.Media.Color.TryParse(note.Color, out var parsed) ? new SolidColorBrush(parsed) : null;
         _editor.Text = note.Text ?? "";
         _editor.CaretIndex = _editor.Text.Length;
         _editor.IsVisible = true;
@@ -493,8 +501,8 @@ public sealed class AnnotateCanvas : PictureView
     }
 
     /// <summary>
-    /// Ends the typing and puts the text in the drawings: a new one at the end, in the colour and thickness of now; a changed
-    /// one in its place. Nothing typed makes none, and an old text emptied is taken out.
+    /// Ends the typing and puts the text in the drawings: a new one at the end, a changed one in its place. Nothing typed
+    /// makes none, and an old text emptied is taken out.
     /// </summary>
     private void CommitText()
     {
@@ -507,7 +515,7 @@ public sealed class AnnotateCanvas : PictureView
         {
             if (text.Length == 0)
                 return;
-            (note.Text, note.Color, note.Width) = (text, Color, StrokeWidth);
+            note.Text = text;
             Commit(-1, note);
         }
         else if (text.Length == 0)
@@ -559,8 +567,7 @@ public sealed class AnnotateCanvas : PictureView
         {
             // The text box's text where the text will be drawn, as large as it is drawn at this zoom.
             var image = PictureRectIn(finalSize);
-            var width = typing.Index < 0 ? StrokeWidth : typing.Note.Width;
-            _editor.FontSize = Math.Max(ImageEditRenderer.Sizes(width).Text * ShortSide(image), 1);
+            _editor.FontSize = Math.Max(ImageEditRenderer.Sizes(typing.Note.Width).Text * ShortSide(image), 1);
             _editor.LineHeight = 1.25 * _editor.FontSize;
             var at = ToScreen(typing.Note.Points[0], image) - new Point(EditorInset, EditorInset);
             _editor.Arrange(new Rect(at, _editor.DesiredSize));

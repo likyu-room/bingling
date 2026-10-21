@@ -96,6 +96,11 @@ public class PictureView : Control
     /// </summary>
     protected virtual double ActualSizeWidth(int fileWidth) => fileWidth;
 
+    /// <summary>Another file is about to be shown: a tool's canvas ends what it is in the middle of, on the file it was for.</summary>
+    internal virtual void LeaveFile()
+    {
+    }
+
     /// <summary>Shows the whole picture again (Ctrl+0).</summary>
     public void Fit()
     {

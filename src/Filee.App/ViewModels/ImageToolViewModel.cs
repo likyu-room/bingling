@@ -117,6 +117,12 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <summary>Save or Cancel: the window closes.</summary>
     public event EventHandler? Finished;
 
+    /// <summary>
+    /// Another file is about to be shown (<see cref="Index"/> is still the one before): the window has the picture view
+    /// end what it is in the middle of on this file (annotate: a text being typed goes on it, a drag is dropped).
+    /// </summary>
+    public event EventHandler? FileLeaving;
+
     /// <summary>The store the tool remembers its last choices in; Save writes it.</summary>
     protected UserDataStore Store { get; }
 
@@ -269,6 +275,7 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     {
         if (index < 0 || index >= Count || index == Index)
             return;
+        FileLeaving?.Invoke(this, EventArgs.Empty);
         Index = index;
         (ImageWidth, ImageHeight) = OrientedSize(Files[index]);
         SetPreview(null);
