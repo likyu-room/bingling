@@ -14,7 +14,7 @@ internal static class Help
         "convert" => Convert,
         "watch" => Watch,
         "formats" => "Usage: filee formats [<format>]\n\nLists every format, or what one format converts to.\n",
-        "presets" => "Usage: filee presets\n\nLists the presets saved in Filee (built-in and your own).\n",
+        "presets" => "Usage: filee presets\n\nLists the presets saved in Bingling (built-in and your own).\n",
         _ => General,
     };
 

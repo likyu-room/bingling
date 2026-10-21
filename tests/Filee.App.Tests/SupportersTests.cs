@@ -36,17 +36,12 @@ public class SupportersTests
     }
 
     [Fact]
-    public void Every_listed_supporter_is_in_every_readme_and_has_its_logo()
+    public void Every_listed_supporter_has_its_logo()
     {
+        // The list is the original Filee's supporters; Bingling's README introduces this fork and doesn't repeat it.
         var folder = Path.Combine(RepoRoot, "src", "Filee.App", "Assets", "Sponsors");
         var list = Supporters.Parse(File.ReadAllText(Path.Combine(folder, "sponsors.json")));
 
-        foreach (var readme in new[] { "README.md", "README.ko.md", "README.zh-CN.md" })
-        {
-            var text = File.ReadAllText(Path.Combine(RepoRoot, readme));
-            Assert.Contains("<!-- sponsors: src/Filee.App/Assets/Sponsors/sponsors.json -->", text);
-            Assert.All(list.Sponsors.Concat(list.Backers), s => Assert.Contains(s.Name, text));
-        }
         Assert.All(list.Sponsors.SelectMany(s => new[] { s.Logo, s.LogoDark }).OfType<string>(),
             logo => Assert.True(File.Exists(Path.Combine(folder, logo)), logo));
     }

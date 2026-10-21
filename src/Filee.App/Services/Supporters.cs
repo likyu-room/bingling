@@ -1,5 +1,5 @@
-// The people and companies who sponsor Filee, shown in the Sponsor window and on the About page, and listed in the
-// README's Sponsor section. They ship with each release (Assets/Sponsors/sponsors.json); nothing is downloaded.
+// The people and companies who sponsor the original Filee, shown in the Sponsor window and on the About page (the
+// original's README lists them too). They ship with each release (Assets/Sponsors/sponsors.json); nothing is downloaded.
 //
 //   "sponsors": the logo tier, { "name", "url", "logo", "logoDark" }. The logos are transparent PNGs next to the
 //               file; "logoDark" is optional, for the dark theme.

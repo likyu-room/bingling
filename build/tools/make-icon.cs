@@ -10,8 +10,8 @@ const int Size = 512;
 const double C = Size / 2.0;
 const double R2 = 236, R1 = 104;
 const int Segments = 6;
-string[] colors = ["#7F77DD", "#6A62C9", "#7F77DD", "#6A62C9", "#7F77DD", "#6A62C9"];
-const int Highlight = 1; // this slice pops out in teal
+string[] colors = ["#FFC29A", "#FFAD7A", "#FFC29A", "#FFAD7A", "#FFC29A", "#FFAD7A"];
+const int Highlight = 1; // this slice pops out in the Peach Glass accent
 
 string F(double v) => v.ToString("0.##", CultureInfo.InvariantCulture);
 (double X, double Y) P(double r, double a) => (C + r * Math.Cos(a), C + r * Math.Sin(a));
@@ -29,12 +29,12 @@ for (var i = 0; i < Segments; i++)
     var r2 = i == Highlight ? R2 - 14 : R2 - 20;
     var (x1, y1) = P(r2, s); var (x2, y2) = P(r2, e);
     var (x3, y3) = P(R1, e); var (x4, y4) = P(R1, s);
-    var fill = i == Highlight ? "#1D9E75" : colors[i];
+    var fill = i == Highlight ? "#FF7A1A" : colors[i];
     svg.Append($"<path transform='translate({F(dx)},{F(dy)})' fill='{fill}' d='M{F(x1)} {F(y1)} A{F(r2)} {F(r2)} 0 0 1 {F(x2)} {F(y2)} L{F(x3)} {F(y3)} A{R1} {R1} 0 0 0 {F(x4)} {F(y4)} Z'/>");
 }
 // Centre: a small "file" glyph.
-svg.Append($"<path fill='#3C3489' d='M{F(C - 34)} {F(C - 44)} h44 l24 24 v64 h-68 z'/>");
-svg.Append($"<path fill='#AFA9EC' d='M{F(C + 10)} {F(C - 44)} v24 h24 z'/>");
+svg.Append($"<path fill='#8A3B12' d='M{F(C - 34)} {F(C - 44)} h44 l24 24 v64 h-68 z'/>");
+svg.Append($"<path fill='#FFD8BE' d='M{F(C + 10)} {F(C - 44)} v24 h24 z'/>");
 svg.Append("</svg>");
 
 var outDir = Path.Combine("src", "Filee.App", "Assets", "Icons");

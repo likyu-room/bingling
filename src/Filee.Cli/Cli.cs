@@ -3,6 +3,7 @@
 // 2 wrong arguments or a missing input, 3 nothing to convert.
 
 using System.Text.Json;
+using Filee.Core;
 using Filee.Core.Conversion;
 using Filee.Core.Formats;
 using Filee.Core.Localization;
@@ -220,7 +221,7 @@ internal static class Cli
             }
             if (!format.Writable)
             {
-                errors.WriteLine($"filee: Filee reads {format.DisplayName} but can't write it.");
+                errors.WriteLine($"filee: {AppIdentity.Name} reads {format.DisplayName} but can't write it.");
                 return null;
             }
             preset = new Preset { TargetFormat = format.Id };
@@ -329,7 +330,7 @@ internal static class Cli
             output.WriteLine($"{from.DisplayName} ({string.Join(", ", from.Extensions)}) converts to:");
             output.WriteLine(now.Count > 0 ? "  " + string.Join(", ", now) : "  (nothing with the engines installed now)");
             if (later.Count > 0)
-                output.WriteLine($"With optional engines (install them in Filee, Settings → Engines):{Environment.NewLine}  {string.Join(", ", later)}");
+                output.WriteLine($"With optional engines (install them in {AppIdentity.Name}, Settings → Engines):{Environment.NewLine}  {string.Join(", ", later)}");
             return Success;
         }
 
