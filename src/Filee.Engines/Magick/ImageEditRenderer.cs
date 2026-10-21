@@ -128,8 +128,11 @@ public static class ImageEditRenderer
         return result;
     }
 
-    /// <summary>Line width, text size and number sticker diameter as fractions of the short side. A level from a newer Filee is thin.</summary>
-    private static (double Line, double Text, double Sticker) Sizes(StrokeLevel level) => level switch
+    /// <summary>
+    /// Line width, text size and number sticker diameter as fractions of the short side. A level from a newer Filee is
+    /// thin. The annotate window picks and outlines drawings by these, so it reaches where they are drawn.
+    /// </summary>
+    internal static (double Line, double Text, double Sticker) Sizes(StrokeLevel level) => level switch
     {
         StrokeLevel.Thick => (0.016, 0.070, 0.090),
         StrokeLevel.Normal => (0.008, 0.045, 0.065),

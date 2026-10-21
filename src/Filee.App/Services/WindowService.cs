@@ -232,6 +232,7 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
         }
         Motion.Refresh();
         var window = new ImageToolWindow { DataContext = vm };
+        vm.Ask = question => ConfirmAsync(window, question); // annotate: throw the drawings away?
         window.PlaceNear(cursor);
         var closed = new TaskCompletionSource();
         window.Closed += (_, _) => closed.TrySetResult();

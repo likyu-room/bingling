@@ -31,9 +31,10 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <summary>Longest side of the preview: enough for a window on a 4K screen, far less than a camera's photo.</summary>
     internal const int PreviewEdge = 2048;
 
-    private readonly Stack<object> _undo = new();
-    private readonly Stack<object> _redo = new();
+    // The undo and redo steps, by file for a tool with an edit per file (UndoPerFile), else all under 0.
+    private readonly Dictionary<int, (Stack<object> Undo, Stack<object> Redo)> _history = [];
     private bool _disposed;
+    private bool _asking;
 
     /// <param name="tool">The tool.</param>
     /// <param name="files">The pictures it edits.</param>
@@ -60,6 +61,7 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
             ImageToolKind.Crop => new CropToolViewModel(files, store, loc, log),
             ImageToolKind.AddBackground => new BackgroundToolViewModel(files, store, loc, log),
             ImageToolKind.Redact => new RedactToolViewModel(files, store, loc, log),
+            ImageToolKind.Annotate => new AnnotateToolViewModel(files, store, loc, log),
             _ => null,
         };
 
@@ -83,7 +85,13 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     public string PositionText => Loc.Format("tool.position", Index + 1, Count);
 
     /// <summary>The note left of the buttons: "Applies to all 3 files", empty for one file.</summary>
-    public string FooterText => HasMany ? Loc.Format("tool.applies_to_all", Count) : "";
+    public virtual string FooterText => HasMany ? Loc.Format("tool.applies_to_all", Count) : "";
+
+    /// <summary>
+    /// Asks the user a yes / no question, such as whether to throw drawings away (the window service sets it: a dialog over
+    /// the window). Null: there is no one to ask, and the answer is yes.
+    /// </summary>
+    public Func<string, Task<bool>>? Ask { get; set; }
 
     /// <summary>Size of the file shown, the way it stands (EXIF orientation applied); 0 when it can't be read.</summary>
     public int ImageWidth { get; private set; }
@@ -142,6 +150,18 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// </summary>
     protected virtual bool CanSave => true;
 
+    /// <summary>
+    /// True for a tool whose files each have an edit of their own (annotate): each file keeps its own undo steps, and
+    /// <see cref="Snapshot"/> and <see cref="Restore"/> are the state of the file shown. False: one history for all.
+    /// </summary>
+    protected virtual bool UndoPerFile => false;
+
+    /// <summary>
+    /// Whether Cancel (and Esc) may close the window now; a tool with work to lose asks through <see cref="Ask"/>.
+    /// True by default: nothing is asked.
+    /// </summary>
+    protected virtual Task<bool> ConfirmCloseAsync() => Task.FromResult(true);
+
     /// <summary>A key the window doesn't use (1 to 7 for a ratio, say); true when the tool took it. Not called while typing.</summary>
     public virtual bool HandleKey(Key key, KeyModifiers modifiers) => false;
 
@@ -151,8 +171,21 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <summary>Call before a change by the user: the state until now becomes one undo step.</summary>
     protected void RecordStep()
     {
-        _undo.Push(Snapshot());
-        _redo.Clear();
+        var (undo, redo) = History;
+        undo.Push(Snapshot());
+        redo.Clear();
+    }
+
+    /// <summary>The undo and redo steps of the file shown (of every file, unless <see cref="UndoPerFile"/>).</summary>
+    private (Stack<object> Undo, Stack<object> Redo) History
+    {
+        get
+        {
+            var key = UndoPerFile ? Index : 0;
+            if (!_history.TryGetValue(key, out var history))
+                _history[key] = history = (new Stack<object>(), new Stack<object>());
+            return history;
+        }
     }
 
     [RelayCommand(CanExecute = nameof(CanGoNext))]
@@ -171,9 +204,10 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Undo()
     {
-        if (_undo.TryPop(out var step))
+        var (undo, redo) = History;
+        if (undo.TryPop(out var step))
         {
-            _redo.Push(Snapshot());
+            redo.Push(Snapshot());
             Restore(step);
         }
     }
@@ -181,9 +215,10 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Redo()
     {
-        if (_redo.TryPop(out var step))
+        var (undo, redo) = History;
+        if (redo.TryPop(out var step))
         {
-            _undo.Push(Snapshot());
+            undo.Push(Snapshot());
             Restore(step);
         }
     }
@@ -208,9 +243,23 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
         Finished?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>Closes with nothing to run, once the tool agrees (<see cref="ConfirmCloseAsync"/>).</summary>
     [RelayCommand]
-    private void Cancel()
+    private async Task Cancel()
     {
+        // Esc pressed again while the question is up asks nothing more.
+        if (_asking)
+            return;
+        _asking = true;
+        try
+        {
+            if (!await ConfirmCloseAsync())
+                return;
+        }
+        finally
+        {
+            _asking = false;
+        }
         Result = null;
         Finished?.Invoke(this, EventArgs.Empty);
     }

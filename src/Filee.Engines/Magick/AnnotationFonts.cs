@@ -13,6 +13,9 @@ internal static class AnnotationFonts
     // missing-glyph boxes. Add a run split like CadFonts.Layout if annotating Chinese or Hindi text matters.
     private static readonly Lazy<SKTypeface> Face = new(Find);
 
+    /// <summary>The typeface's family, for a text box that shows a text being typed as it will be drawn.</summary>
+    public static string FamilyName => Face.Value.FamilyName;
+
     /// <summary>A font of <paramref name="size"/> pixels, set up so a small preview lays text out like the saved picture (no hinting).</summary>
     public static SKFont Create(float size) => new(Face.Value, size)
     {

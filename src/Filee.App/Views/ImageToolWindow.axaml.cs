@@ -55,6 +55,7 @@ public partial class ImageToolWindow : Window
             CropToolViewModel => (new CropPanel(), CropCanvas()),
             BackgroundToolViewModel => (new BackgroundPanel(), BackdropCanvas()),
             RedactToolViewModel => (new RedactPanel(), BoxesCanvas()),
+            AnnotateToolViewModel => (new AnnotatePanel(), DrawingCanvas()),
             _ => ((Control?, PictureView?))(null, null),
         };
         PictureHost.Child = _picture;
@@ -87,6 +88,18 @@ public partial class ImageToolWindow : Window
         [!PictureView.FullShortSideProperty] = CompiledBinding.Create<ImageToolViewModel, int>(vm => vm.FullShortSide),
         [!RedactCanvas.RedactProperty] = CompiledBinding.Create<RedactToolViewModel, RedactEdit>(vm => vm.Redact),
         [!RedactCanvas.SelectedIndexProperty] = CompiledBinding.Create<RedactToolViewModel, int>(vm => vm.SelectedIndex),
+    };
+
+    /// <summary>The preview picture with the file's drawings, which are drawn, picked, moved, retyped and deleted on it.</summary>
+    private AnnotateCanvas DrawingCanvas() => new()
+    {
+        [!PictureView.PictureProperty] = CompiledBinding.Create<ImageToolViewModel, SKImage?>(vm => vm.PreviewImage),
+        [!PictureView.FullShortSideProperty] = CompiledBinding.Create<ImageToolViewModel, int>(vm => vm.FullShortSide),
+        [!AnnotateCanvas.AnnotationsProperty] = CompiledBinding.Create<AnnotateToolViewModel, IReadOnlyList<Annotation>>(vm => vm.Annotations),
+        [!AnnotateCanvas.SelectedIndexProperty] = CompiledBinding.Create<AnnotateToolViewModel, int>(vm => vm.SelectedIndex),
+        [!AnnotateCanvas.ToolProperty] = CompiledBinding.Create<AnnotateToolViewModel, AnnotationKind?>(vm => vm.DrawingTool),
+        [!AnnotateCanvas.ColorProperty] = CompiledBinding.Create<AnnotateToolViewModel, string>(vm => vm.Color),
+        [!AnnotateCanvas.StrokeWidthProperty] = CompiledBinding.Create<AnnotateToolViewModel, StrokeLevel>(vm => vm.StrokeWidth),
     };
 
     private void OnFinished(object? sender, EventArgs e) => Close();

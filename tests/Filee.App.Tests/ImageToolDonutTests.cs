@@ -299,33 +299,6 @@ public class ImageToolDonutTests
         conversions.Jobs[0].DismissCommand.Execute(null);
     }
 
-    /// <summary>The real tool windows, noting what opening one handed back.</summary>
-    private sealed class RecordingToolWindows()
-        : WindowService(AppHost.Get<ILocalizer>(), AppHost.Get<IServiceProvider>(), AppHost.Get<MemoryTrimmer>())
-    {
-        public Task<ToolResult?>? Opening { get; private set; }
-
-        public override Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor) =>
-            Opening = base.EditImageAsync(tool, files, cursor);
-    }
-
-    [AvaloniaFact]
-    public void Annotate_opens_no_window_and_runs_nothing_before_its_window_is_built()
-    {
-        TestServices.EnsureInitialized("ko");
-        var conversions = AppHost.Get<ConversionService>();
-        var jobs = conversions.Jobs.Count;
-        var windows = new RecordingToolWindows();
-        ClickTool(TestImages.Png(1), windows, slice: 3); // crop, add background, redact, annotate
-        RunUntil(() => windows.Opening is not null);
-        Dispatcher.UIThread.RunJobs();
-
-        // Done at once with nothing: a window would have kept it waiting until it was closed.
-        Assert.True(windows.Opening!.IsCompletedSuccessfully);
-        Assert.Null(windows.Opening.Result);
-        Assert.Equal(jobs, conversions.Jobs.Count);
-    }
-
     [AvaloniaFact]
     public void Crop_looks_at_every_file_once_picked_and_leaves_out_what_is_not_a_still_picture()
     {

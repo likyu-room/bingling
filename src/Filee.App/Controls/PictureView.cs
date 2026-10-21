@@ -82,7 +82,10 @@ public class PictureView : Control
     protected virtual ImageEdit? EditToDraw => Edit;
 
     /// <summary>Where the picture is drawn on the control now, at this zoom and pan.</summary>
-    protected Rect PictureRect => ImageRect(Bounds.Size, ContentSize, _zoom, _pan);
+    protected Rect PictureRect => PictureRectIn(Bounds.Size);
+
+    /// <summary>Where the picture is drawn on a control of <paramref name="size"/> (while it is arranged, before its bounds are).</summary>
+    protected Rect PictureRectIn(Size size) => ImageRect(size, ContentSize, _zoom, _pan);
 
     /// <summary>The point Ctrl+1 centres (on the picture drawn at <paramref name="picture"/>); null: the picture's centre.</summary>
     protected virtual Point? ActualSizeCentre(Rect picture) => null;
@@ -97,7 +100,7 @@ public class PictureView : Control
     public void Fit()
     {
         (_zoom, _pan) = (1, default);
-        InvalidateVisual();
+        ViewChanged();
     }
 
     /// <summary>
@@ -114,7 +117,14 @@ public class PictureView : Control
         _zoom = Math.Clamp(ActualSizeWidth(pixelWidth) / scaling / fitted.Width, MinZoom, MaxZoom);
         var image = ImageRect(Bounds.Size, content, _zoom, default);
         _pan = ActualSizeCentre(image) is { } centre ? new Rect(Bounds.Size).Center - centre : default;
+        ViewChanged();
+    }
+
+    /// <summary>The zoom or the pan changed: the picture is drawn anew, and what a canvas lays over it (a text box) is arranged anew.</summary>
+    private void ViewChanged()
+    {
         InvalidateVisual();
+        InvalidateArrange();
     }
 
     // ───────── Geometry ─────────
@@ -165,7 +175,7 @@ public class PictureView : Control
         if (_panning is not { } panning)
             return;
         _pan = panning.Pan + (e.GetPosition(this) - panning.Start);
-        InvalidateVisual();
+        ViewChanged();
         e.Handled = true;
     }
 
@@ -194,7 +204,7 @@ public class PictureView : Control
         var zoom = Math.Clamp(_zoom * Math.Pow(1.2, e.Delta.Y), MinZoom, MaxZoom);
         _pan = ZoomAt(Bounds.Size, content, _zoom, _pan, e.GetPosition(this), zoom);
         _zoom = zoom;
-        InvalidateVisual();
+        ViewChanged();
         e.Handled = true;
     }
 

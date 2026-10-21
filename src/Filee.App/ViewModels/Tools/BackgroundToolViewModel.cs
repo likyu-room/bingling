@@ -354,7 +354,7 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
     }
 
     /// <summary><paramref name="text"/> as <c>#RRGGBB</c> in capitals when it is six hex digits (the <c>#</c> optional); otherwise null.</summary>
-    private static string? HexColor(string text) =>
+    internal static string? HexColor(string text) =>
         HexPattern().Match(text.Trim()) is { Success: true } m ? "#" + m.Groups[1].Value.ToUpperInvariant() : null;
 
     [GeneratedRegex("^#?([0-9A-Fa-f]{6})$")]
