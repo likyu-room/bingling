@@ -34,6 +34,16 @@ public static class ImageEditRenderer
     /// <summary>The last backdrop picture read, kept because the preview draws it again on every frame.</summary>
     private static (string Path, DateTime Stamp, SKImage? Image)? _backdrop;
 
+    /// <summary>The path of the backdrop picture kept for the preview, if any (for tests).</summary>
+    internal static string? CachedBackdropPath
+    {
+        get
+        {
+            lock (BackdropLock)
+                return _backdrop?.Path;
+        }
+    }
+
     /// <summary>Output size and where the picture sits in it (pixels), for a w×h picture and an optional background.</summary>
     public static (SKSizeI Output, SKRect Picture) Layout(int width, int height, BackgroundEdit? background)
     {
@@ -56,7 +66,13 @@ public static class ImageEditRenderer
     /// <param name="picture">The picture after its orientation and crop, at any size (the preview's is smaller).</param>
     /// <param name="fullShortSide">The short side of the full-size picture in pixels, which sizes the mosaic cells and the
     /// layout the same at every scale; 0 for <paramref name="picture"/>'s own.</param>
-    public static void Draw(SKCanvas canvas, SKImage picture, SKRect output, ImageEdit edit, int fullShortSide)
+    /// <remarks>The backdrop picture is kept between calls, as the preview draws it on every frame (the window hands it a
+    /// smaller copy of a large one). <see cref="Render"/> reads its own and lets it go.</remarks>
+    public static void Draw(SKCanvas canvas, SKImage picture, SKRect output, ImageEdit edit, int fullShortSide) =>
+        Draw(canvas, picture, output, edit, fullShortSide, IsImage(edit) ? CachedBackdrop(edit.Background!.ImagePath) : null);
+
+    /// <summary>Draws the whole result; <paramref name="backdrop"/> is the backdrop picture, or null when there is none or it can't be read.</summary>
+    private static void Draw(SKCanvas canvas, SKImage picture, SKRect output, ImageEdit edit, int fullShortSide, SKImage? backdrop)
     {
         var shortSide = Math.Min(picture.Width, picture.Height);
         var full = fullShortSide > 0 ? fullShortSide : shortSide;
@@ -72,7 +88,7 @@ public static class ImageEditRenderer
         canvas.ClipRect(output);
         if (edit.Background is { } background)
         {
-            DrawBackdrop(canvas, output, background);
+            DrawBackdrop(canvas, output, background, backdrop);
             var shorter = Math.Min(dest.Width, dest.Height);
             using var card = new SKRoundRect(dest, (float)(Math.Clamp(background.Corner, 0, 0.25) * shorter));
             DrawShadow(canvas, card, Math.Clamp(background.Shadow, 0, 100), shorter);
@@ -122,11 +138,16 @@ public static class ImageEditRenderer
         var result = new SKBitmap(new SKImageInfo(size.Width, size.Height, SKColorType.Rgba8888, SKAlphaType.Unpremul));
         using var pixels = picture.PeekPixels();
         using var image = SKImage.FromPixels(pixels); // the picture's own pixels, not a copy of them
+        // Read for this picture alone and let go after it: kept, a full-size backdrop would stay in memory while the app
+        // waits in the tray. The preview's cache is not used either, so the two never push each other's picture out.
+        using var backdrop = IsImage(edit) ? ReadBackdrop(edit.Background!.ImagePath) : null;
         using var canvas = new SKCanvas(result);
         canvas.Clear(SKColors.Transparent);
-        Draw(canvas, image, SKRect.Create(size.Width, size.Height), edit, Math.Min(picture.Width, picture.Height));
+        Draw(canvas, image, SKRect.Create(size.Width, size.Height), edit, Math.Min(picture.Width, picture.Height), backdrop);
         return result;
     }
+
+    private static bool IsImage(ImageEdit edit) => edit.Background?.Kind == BackgroundKind.Image;
 
     /// <summary>
     /// Line width, text size and number sticker diameter as fractions of the short side. A level from a newer Filee is
@@ -279,7 +300,8 @@ public static class ImageEditRenderer
         aspect?.Split(':') is [var a, var b] && int.TryParse(a, out var x) && int.TryParse(b, out var y) && x > 0 && y > 0
             ? (x, y) : null;
 
-    private static void DrawBackdrop(SKCanvas canvas, SKRect output, BackgroundEdit background)
+    /// <param name="image">The picture of a <see cref="BackgroundKind.Image"/> backdrop, or null when it can't be read.</param>
+    private static void DrawBackdrop(SKCanvas canvas, SKRect output, BackgroundEdit background, SKImage? image)
     {
         using var paint = new SKPaint();
         switch (background.Kind)
@@ -292,7 +314,7 @@ public static class ImageEditRenderer
                 // White under a picture with see-through parts, and in place of one that can't be read.
                 paint.Color = SKColors.White;
                 canvas.DrawRect(output, paint);
-                if (Backdrop(background.ImagePath) is { } image)
+                if (image is not null)
                 {
                     // Fills the canvas: scaled to cover it, the overflow cut off evenly on both sides.
                     var fit = Math.Max(output.Width / image.Width, output.Height / image.Height);
@@ -433,8 +455,8 @@ public static class ImageEditRenderer
             (byte)((a + count / 2) / count));
     }
 
-    /// <summary>The user's backdrop picture, upright, or null when it can't be read (missing, locked, not a picture).</summary>
-    private static SKImage? Backdrop(string? path)
+    /// <summary>The preview's backdrop picture: <see cref="ReadBackdrop"/>, kept until another is asked for.</summary>
+    private static SKImage? CachedBackdrop(string? path)
     {
         if (string.IsNullOrEmpty(path))
             return null;
@@ -445,14 +467,11 @@ public static class ImageEditRenderer
                 var stamp = File.GetLastWriteTimeUtc(path); // a missing file has a fixed stamp, a replaced one a new one
                 if (_backdrop is { } kept && kept.Path == path && kept.Stamp == stamp)
                     return kept.Image;
-                _backdrop = (path, stamp, null); // one that can't be read is not tried again on every frame
-                using var frames = ImageReader.Read(path, FormatRegistry.Detect(path)?.Id ?? "", new Preset(), firstFrameOnly: true);
-                frames[0].AutoOrient();
-                using var bitmap = EditBridge.ToBitmap(frames[0]);
-                bitmap.SetImmutable(); // the image shares the bitmap's pixels instead of copying them
-                var image = SKImage.FromBitmap(bitmap);
-                // ponytail: one picture kept, at full size, until another is asked for; the one it replaces is left to the
-                // finalizer, as a save on another thread may still be drawing it. Downscale or evict if memory matters.
+                // One that can't be read is kept as null, so it is not tried again on every frame.
+                // ponytail: one picture kept until another is asked for; the one it replaces is left to the finalizer, as a
+                // frame on the render thread may still be drawing it. Saves read their own, so this is the window's
+                // smaller copy of a large picture.
+                var image = ReadBackdrop(path);
                 _backdrop = (path, stamp, image);
                 return image;
             }
@@ -460,6 +479,25 @@ public static class ImageEditRenderer
             {
                 return null; // drawn white instead
             }
+        }
+    }
+
+    /// <summary>The user's backdrop picture, upright, or null when it can't be read (missing, locked, not a picture).</summary>
+    private static SKImage? ReadBackdrop(string? path)
+    {
+        if (string.IsNullOrEmpty(path))
+            return null;
+        try
+        {
+            using var frames = ImageReader.Read(path, FormatRegistry.Detect(path)?.Id ?? "", new Preset(), firstFrameOnly: true);
+            frames[0].AutoOrient();
+            using var bitmap = EditBridge.ToBitmap(frames[0]);
+            bitmap.SetImmutable(); // the image shares the bitmap's pixels instead of copying them
+            return SKImage.FromBitmap(bitmap);
+        }
+        catch (Exception)
+        {
+            return null; // drawn white instead
         }
     }
 }

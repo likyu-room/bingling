@@ -303,6 +303,27 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
     }
 
     [Fact]
+    public void A_save_lets_its_backdrop_picture_go_and_the_preview_keeps_its_own()
+    {
+        // A save reads the user's picture at full size (up to hundreds of MB): kept, it would stay until another is picked.
+        using var picture = Filled(20, 20, SKColors.Red);
+        var path = fx.Write(new MagickImage(MagickColors.Lime, 30, 10), "wall.png");
+        var edit = Backdrop(new BackgroundEdit { Kind = BackgroundKind.Image, ImagePath = path, Shadow = 0 });
+
+        using (var saved = ImageEditRenderer.Render(picture, edit))
+            Assert.Equal(SKColors.Lime, saved.GetPixel(0, 0));
+        Assert.NotEqual(path, ImageEditRenderer.CachedBackdropPath);
+
+        // The preview draws on every frame, from a small copy: that one is kept.
+        using var image = SKImage.FromBitmap(picture);
+        using var preview = new SKBitmap(Info(30, 30));
+        using (var canvas = new SKCanvas(preview))
+            ImageEditRenderer.Draw(canvas, image, SKRect.Create(30, 30), edit, 0);
+        Assert.Equal(SKColors.Lime, preview.GetPixel(0, 0));
+        Assert.Equal(path, ImageEditRenderer.CachedBackdropPath);
+    }
+
+    [Fact]
     public void Preview_scale_matches_full_size()
     {
         // The editor window draws a small copy of the picture; saving draws the original. Both must look the same.
