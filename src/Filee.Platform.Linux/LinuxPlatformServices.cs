@@ -47,12 +47,12 @@ public sealed class LinuxPlatformServices : IPlatformServices
     public bool PressCarriesPosition => !WaylandGestures;
     public bool SupportsSelectionShortcut => false;
     public string SelectionShortcutUnavailableReason =>
-        "Linux file managers do not expose a shared selected-file API. Use the Filee context action or its Thunar shortcut.";
+        $"Linux file managers do not expose a shared selected-file API. Use the {Filee.Core.AppIdentity.Name} context action or its Thunar shortcut.";
     public string? GlobalPointerGesturesUnavailableReason => SupportsGlobalPointerGestures ? null : IsWaylandSession
         ? "The cursor-following gesture requires an X11 desktop session. File actions and the drop zone remain available on Wayland."
         : "The cursor-following gesture requires an X11 display.";
     public string ThunarShortcutRestartRequired =>
-        "Close Thunar before changing its shortcut, then reopen it to load the Filee action and shortcut.";
+        $"Close Thunar before changing its shortcut, then reopen it to load the {Filee.Core.AppIdentity.Name} action and shortcut.";
 
     // Wayland can't say which window is under the cursor, so any Ctrl+drag may open the (invisible) donut window;
     // it only shows when files are dragged in, and excluded apps can't be told apart there either.

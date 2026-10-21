@@ -55,16 +55,16 @@ public static class EngineDownloads
             {
                 "ffmpeg" => "Install FFmpeg with Homebrew (brew install ffmpeg), then check again or select its bin folder.",
                 "ghostscript" => "Install Ghostscript with Homebrew (brew install ghostscript), then check again or select its bin folder.",
-                _ => $"No Filee download is available for {RuntimeIdentifier}. Install {package.Id} for this Mac and select its program or .app folder.",
+                _ => $"No {Filee.Core.AppIdentity.Name} download is available for {RuntimeIdentifier}. Install {package.Id} for this Mac and select its program or .app folder.",
             };
         if (OperatingSystem.IsLinux())
             return package.Id switch
             {
                 "libreoffice" => "Install LibreOffice using your distribution's package manager (Ubuntu/Debian: sudo apt install libreoffice), then check again. HWP import through LibreOffice also needs Java and the H2Orestart extension.",
                 "ghostscript" => "Install Ghostscript using your distribution's package manager (Ubuntu/Debian: sudo apt install ghostscript), then check again.",
-                _ => $"No Filee download is available for {RuntimeIdentifier}. Install {package.Id} using your distribution's package manager and select its program folder.",
+                _ => $"No {Filee.Core.AppIdentity.Name} download is available for {RuntimeIdentifier}. Install {package.Id} using your distribution's package manager and select its program folder.",
             };
-        return $"No Filee download is available for {RuntimeIdentifier}. Select a compatible installed copy.";
+        return $"No {Filee.Core.AppIdentity.Name} download is available for {RuntimeIdentifier}. Select a compatible installed copy.";
     }
 
     /// <summary>Packages whose download is smaller than this (bytes) are suggested, see <see cref="IsSuggested"/>.</summary>

@@ -360,6 +360,7 @@
   "general.import": "가져오기…",
   "general.reset_library": "기본값으로 초기화",
   "general.reset_confirm": "모든 프리셋과 툴바 프로필을 기본값으로 바꿀까요?",
+  "general.presets_file": "빙글링 프리셋",
   "general.imported": "{0}개 항목을 가져왔어요",
 
   "triggers.title": "단축키",

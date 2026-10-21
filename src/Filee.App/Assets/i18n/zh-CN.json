@@ -360,6 +360,7 @@
   "general.import": "导入…",
   "general.reset_library": "恢复默认",
   "general.reset_confirm": "要将所有预设和工具栏配置恢复为默认吗？",
+  "general.presets_file": "Bingling 预设",
   "general.imported": "已导入 {0} 项",
 
   "triggers.title": "快捷操作",

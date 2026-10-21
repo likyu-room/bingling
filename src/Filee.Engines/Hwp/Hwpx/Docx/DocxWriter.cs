@@ -159,7 +159,7 @@ internal sealed partial class DocxWriter
         parts.Add(new Part("docProps/core.xml", "application/vnd.openxmlformats-package.core-properties+xml") { Xml = CoreProperties(document.Title) });
         parts.Add(new Part("docProps/app.xml", "application/vnd.openxmlformats-officedocument.extended-properties+xml")
         {
-            Xml = "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\"><Application>Filee</Application></Properties>",
+            Xml = $"<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\"><Application>{Filee.Core.AppIdentity.Name}</Application></Properties>",
         });
 
         var temp = outputPath + ".tmp";

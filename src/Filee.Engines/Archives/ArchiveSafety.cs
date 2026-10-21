@@ -43,7 +43,7 @@ internal static class ArchiveSafety
     public static void CheckListing(IReadOnlyList<SevenZipEntry> entries, string archiveName, string targetDirectory)
     {
         if (entries.Count > MaxEntries)
-            throw new InvalidDataException($"{archiveName} has more than {MaxEntries:N0} entries; Filee does not unpack it.");
+            throw new InvalidDataException($"{archiveName} has more than {MaxEntries:N0} entries; {Filee.Core.AppIdentity.Name} does not unpack it.");
         foreach (var entry in entries)
         {
             if (entry.IsEncrypted)
@@ -118,7 +118,7 @@ internal static class ArchiveSafety
     }
 
     public static Exception Encrypted(string archiveName) =>
-        new InvalidDataException($"{archiveName} is password-protected. Filee cannot unpack encrypted archives.");
+        new InvalidDataException($"{archiveName} is password-protected. {Filee.Core.AppIdentity.Name} cannot unpack encrypted archives.");
 
     public static Exception Unsafe(string archiveName, string entry) =>
         new InvalidDataException($"{archiveName} was not unpacked: the entry \"{entry}\" points outside the target folder.");

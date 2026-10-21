@@ -43,7 +43,7 @@ internal static class FrameSequenceWriter
 
         // Same folder as the output (same drive, so the move is instant); the frames go into a visible folder inside
         // it, which becomes the output.
-        var staging = Path.Combine(Path.GetDirectoryName(output)!, $".{Path.GetFileName(output)}.filee-{Guid.NewGuid().ToString("N")[..8]}");
+        var staging = Path.Combine(Path.GetDirectoryName(output)!, $".{Path.GetFileName(output)}.bingling-{Guid.NewGuid().ToString("N")[..8]}");
         Directory.CreateDirectory(staging).Attributes |= FileAttributes.Hidden;
         try
         {

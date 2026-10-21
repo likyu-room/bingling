@@ -417,7 +417,7 @@ internal static class PlyFormat
             part.ComputeNormals();
 
         var header = new StringBuilder();
-        header.Append("ply\nformat binary_little_endian 1.0\ncomment Written by Filee\n");
+        header.Append($"ply\nformat binary_little_endian 1.0\ncomment Written by {Filee.Core.AppIdentity.Name}\n");
         header.Append(CultureInfo.InvariantCulture, $"element vertex {model.VertexCount}\n");
         header.Append("property float x\nproperty float y\nproperty float z\n");
         if (hasNormals)

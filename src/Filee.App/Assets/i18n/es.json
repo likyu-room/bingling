@@ -349,6 +349,7 @@
   "general.import": "Importar…",
   "general.reset_library": "Restablecer los valores predeterminados",
   "general.reset_confirm": "¿Reemplazar todos los ajustes preestablecidos y los perfiles de menú circular por los valores predeterminados?",
+  "general.presets_file": "Ajustes preestablecidos de Bingling",
   "general.imported": "Se importaron {0} elementos",
   "triggers.title": "Atajos",
   "triggers.description": "Elige cómo se abre el menú circular. Puedes añadir tantos gestos como quieras.",

@@ -349,6 +349,7 @@
   "general.import": "इम्पोर्ट करें…",
   "general.reset_library": "डिफ़ॉल्ट पर रीसेट करें",
   "general.reset_confirm": "सभी प्रीसेट और टूलबार प्रोफ़ाइल को डिफ़ॉल्ट से बदल दें?",
+  "general.presets_file": "Bingling प्रीसेट",
   "general.imported": "{0} आइटम इम्पोर्ट किए गए",
   "triggers.title": "शॉर्टकट",
   "triggers.description": "चुनें कि डोनट टूलबार कैसे खुले। आप जितने चाहें उतने जेस्चर जोड़ सकते हैं।",

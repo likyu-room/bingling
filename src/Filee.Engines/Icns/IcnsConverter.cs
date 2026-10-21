@@ -75,7 +75,7 @@ public sealed class IcnsConverter : IConverter, IImageTransformer
         var entries = IcnsFile.Parse(File.ReadAllBytes(step.InputPath));
         var candidates = IcnsFile.Candidates(entries);
         if (candidates.Count == 0)
-            throw new InvalidDataException("The ICNS file contains no image Filee can read (only 1-bit or 8-bit palette icons).");
+            throw new InvalidDataException($"The ICNS file contains no image {Filee.Core.AppIdentity.Name} can read (only 1-bit or 8-bit palette icons).");
         progress?.Report(0.2);
 
         using var image = DecodeLargest(candidates, ct);

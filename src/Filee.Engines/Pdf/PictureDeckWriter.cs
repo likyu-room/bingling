@@ -223,7 +223,7 @@ internal sealed class PictureDeckWriter : IDisposable
             $"<dcterms:modified xsi:type=\"dcterms:W3CDTF\">{now}</dcterms:modified></cp:coreProperties>");
         Write("docProps/app.xml",
             "<Properties xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties\">" +
-            $"<Application>Filee</Application><Slides>{N(slides)}</Slides><Notes>{N(_slideHasNotes.Count(n => n))}</Notes></Properties>");
+            $"<Application>{Filee.Core.AppIdentity.Name}</Application><Slides>{N(slides)}</Slides><Notes>{N(_slideHasNotes.Count(n => n))}</Notes></Properties>");
 
         Write("_rels/.rels", Rels(
             ("rId1", "officeDocument", "ppt/presentation.xml"),

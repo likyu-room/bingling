@@ -127,19 +127,19 @@ public sealed partial class EmlConverter : IConverter
         }
         else
         {
-            body = $"<pre class=\"filee-mail-text\">{WebUtility.HtmlEncode(message.TextBody ?? "")}</pre>";
+            body = $"<pre class=\"bingling-mail-text\">{WebUtility.HtmlEncode(message.TextBody ?? "")}</pre>";
         }
 
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n");
         sb.Append("<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; img-src data:; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'\">\n");
         sb.Append($"<title>{WebUtility.HtmlEncode(message.Subject ?? "")}</title>\n");
-        sb.Append("<style>\n.filee-mail-headers { border-collapse: collapse; margin: 0 0 12px 0; font-family: sans-serif; font-size: 14px; }\n")
-          .Append(".filee-mail-headers th { text-align: left; vertical-align: top; padding: 2px 16px 2px 0; color: #555; font-weight: 600; }\n")
-          .Append(".filee-mail-headers td { padding: 2px 0; }\n")
-          .Append(".filee-mail-text { white-space: pre-wrap; font-family: inherit; }\n</style>\n");
+        sb.Append("<style>\n.bingling-mail-headers { border-collapse: collapse; margin: 0 0 12px 0; font-family: sans-serif; font-size: 14px; }\n")
+          .Append(".bingling-mail-headers th { text-align: left; vertical-align: top; padding: 2px 16px 2px 0; color: #555; font-weight: 600; }\n")
+          .Append(".bingling-mail-headers td { padding: 2px 0; }\n")
+          .Append(".bingling-mail-text { white-space: pre-wrap; font-family: inherit; }\n</style>\n");
         sb.Append(styles);
-        sb.Append("</head>\n<body>\n<table class=\"filee-mail-headers\">\n");
+        sb.Append("</head>\n<body>\n<table class=\"bingling-mail-headers\">\n");
         foreach (var (name, value) in Headers(message))
             sb.Append($"<tr><th>{name}</th><td>{WebUtility.HtmlEncode(value)}</td></tr>\n");
         sb.Append("</table>\n<hr>\n");

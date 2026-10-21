@@ -80,7 +80,7 @@ internal static class ArchiveFiles
     {
         var info = new DirectoryInfo(target);
         if (info.Exists && info.Attributes.HasFlag(FileAttributes.ReparsePoint))
-            throw new IOException($"{target} is a link; Filee does not extract into links.");
+            throw new IOException($"{target} is a link; {Filee.Core.AppIdentity.Name} does not extract into links.");
         Directory.CreateDirectory(target);
         foreach (var file in Directory.EnumerateFiles(source))
             File.Move(file, Path.Combine(target, Path.GetFileName(file)), overwrite: true);

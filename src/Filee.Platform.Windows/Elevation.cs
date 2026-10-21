@@ -63,7 +63,7 @@ public static class Elevation
                 failure = $"{ex.GetType().Name}: {ex.Message}";
             }
         })
-        { IsBackground = true, Name = "Filee shell relaunch" };
+        { IsBackground = true, Name = "Bingling shell relaunch" };
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         if (!thread.Join(TimeSpan.FromSeconds(15)))

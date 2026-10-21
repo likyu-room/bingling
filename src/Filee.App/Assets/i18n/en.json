@@ -360,6 +360,7 @@
   "general.import": "Import…",
   "general.reset_library": "Reset to defaults",
   "general.reset_confirm": "Replace all presets and toolbar profiles with the defaults?",
+  "general.presets_file": "Bingling presets",
   "general.imported": "Imported {0} items",
 
   "triggers.title": "Shortcuts",

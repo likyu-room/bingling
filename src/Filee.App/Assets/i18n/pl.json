@@ -360,6 +360,7 @@
   "general.import": "Importuj…",
   "general.reset_library": "Przywróć domyślne",
   "general.reset_confirm": "Zastąpić wszystkie ustawienia wstępne i profile pasków domyślnymi?",
+  "general.presets_file": "Ustawienia wstępne Bingling",
   "general.imported": "Zaimportowano elementów: {0}",
 
   "triggers.title": "Skróty",

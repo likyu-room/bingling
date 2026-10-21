@@ -96,7 +96,7 @@ internal sealed class LinuxDesktopIntegration(string configHome, string dataHome
             File.Delete(path);
             return;
         }
-        Write(path, $"[Desktop Entry]\nType=Application\nName=Filee\nExec={DesktopArgument(executablePath)} --background\nTerminal=false\nX-GNOME-Autostart-enabled=true\n");
+        Write(path, $"[Desktop Entry]\nType=Application\nName={Filee.Core.AppIdentity.Name}\nExec={DesktopArgument(executablePath)} --background\nTerminal=false\nX-GNOME-Autostart-enabled=true\n");
     }
 
     public void SetContextMenu(bool enabled, string executablePath, string label)
@@ -105,7 +105,7 @@ internal sealed class LinuxDesktopIntegration(string configHome, string dataHome
         var menuPaths = new[]
         {
             Path.Combine(dataHome, "Thunar", "sendto", "filee.desktop"),
-            Path.Combine(dataHome, "nautilus", "scripts", "Filee"),
+            Path.Combine(dataHome, "nautilus", "scripts", Filee.Core.AppIdentity.Name),
             Path.Combine(dataHome, "nemo", "actions", "filee.nemo_action"),
             Path.Combine(dataHome, "kio", "servicemenus", "filee.desktop"),
         };

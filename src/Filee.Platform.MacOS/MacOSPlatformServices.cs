@@ -48,7 +48,7 @@ public sealed class MacOSPlatformServices : IPlatformServices
         {
             LastSelectionError = ex.Message;
             Trace.TraceWarning($"Reading Finder selection failed: {ex.Message}");
-            throw new InvalidOperationException($"Could not read Finder selection. Allow Filee to control Finder in System Settings > Privacy & Security > Automation. {ex.Message}", ex);
+            throw new InvalidOperationException($"Could not read Finder selection. Allow {Filee.Core.AppIdentity.Name} to control Finder in System Settings > Privacy & Security > Automation. {ex.Message}", ex);
         }
     }
 
@@ -72,22 +72,15 @@ public sealed class MacOSPlatformServices : IPlatformServices
     }
 
     /// <summary>
-    /// Shows or hides Filee's own service in Finder's right-click menu (the same switch as System Settings >
-    /// Keyboard > Keyboard Shortcuts > Services), and removes the Automator Quick Action earlier builds installed.
+    /// Shows or hides Bingling's own service in Finder's right-click menu (the same switch as System Settings >
+    /// Keyboard > Keyboard Shortcuts > Services). The Automator Quick Action of early upstream builds
+    /// (~/Library/Services/Filee.workflow) belongs to the original Filee and is left alone.
     /// </summary>
     public void SetContextMenu(bool enabled, string executablePath, string label)
     {
-        RemoveLegacyWorkflow();
         Run("/usr/bin/defaults", ["write", "pbs", "NSServicesStatus", "-dict-add",
             MacOSIntegrationFiles.ServiceStatusKey, MacOSIntegrationFiles.ServiceStatus(enabled)], 10_000);
         Run("/System/Library/CoreServices/pbs", ["-update"], 10_000);
-    }
-
-    private static void RemoveLegacyWorkflow()
-    {
-        var workflow = Path.Combine(UserLibrary, "Services", "Filee.workflow");
-        if (Directory.Exists(workflow))
-            Directory.Delete(workflow, recursive: true);
     }
 
     public ModernContextMenuState GetModernContextMenuState(string executablePath) => ModernContextMenuState.Unsupported;
@@ -128,7 +121,7 @@ public sealed class MacOSPlatformServices : IPlatformServices
     private static void RequireExecutable(string path)
     {
         if (!Path.IsPathFullyQualified(path) || !File.Exists(path))
-            throw new FileNotFoundException("Filee's executable must have an existing absolute path.", path);
+            throw new FileNotFoundException($"{Filee.Core.AppIdentity.Name}'s executable must have an existing absolute path.", path);
     }
 
     private static string Run(string executable, IReadOnlyList<string> arguments, int timeoutMs)

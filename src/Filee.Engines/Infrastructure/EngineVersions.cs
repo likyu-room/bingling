@@ -12,7 +12,7 @@ public static class EngineVersions
     public static string Library(string name, Type type) => $"{name} {Of(type.Assembly)}";
 
     /// <summary>"Filee 1.1.0" — for engines written as part of Filee.</summary>
-    public static string BuiltIn { get; } = $"Filee {Of(typeof(EngineVersions).Assembly)}";
+    public static string BuiltIn { get; } = $"{Filee.Core.AppIdentity.Name} {Of(typeof(EngineVersions).Assembly)}";
 
     /// <summary>The version engines.json pins for a bundled or downloaded component ("0.8.6"), or null.</summary>
     public static string? Component(string componentId) =>

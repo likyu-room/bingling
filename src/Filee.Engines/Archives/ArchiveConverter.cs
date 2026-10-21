@@ -88,7 +88,7 @@ public sealed class ArchiveConverter : IConverter, IFileCombiner
         if (output is null)
             return [];
 
-        var staging = Path.Combine(Path.GetDirectoryName(output)!, $".{Path.GetFileName(output)}.filee-{Guid.NewGuid().ToString("N")[..8]}");
+        var staging = Path.Combine(Path.GetDirectoryName(output)!, $".{Path.GetFileName(output)}.bingling-{Guid.NewGuid().ToString("N")[..8]}");
         Directory.CreateDirectory(staging).Attributes |= FileAttributes.Hidden;
         try
         {

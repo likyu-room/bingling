@@ -68,7 +68,7 @@ public sealed class CadConverter(ILogger? logger = null) : IConverter, IImageTra
             Report(step.InputPath, scene);
             if (scene.Items.Count == 0)
                 throw new InvalidDataException(scene.Skipped.Count > 0
-                    ? $"The drawing only contains objects Filee cannot draw ({string.Join(", ", scene.Skipped.Keys)})."
+                    ? $"The drawing only contains objects {Filee.Core.AppIdentity.Name} cannot draw ({string.Join(", ", scene.Skipped.Keys)})."
                     : "The drawing has nothing visible to draw: model space and the layout are empty, or every entity is on a layer that is off, frozen or not plotted.");
             cancellationToken.ThrowIfCancellationRequested();
             progress?.Report(0.7);

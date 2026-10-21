@@ -69,7 +69,7 @@ internal static class EbookFiles
 {
     /// <summary>Message for books with DRM: Filee never removes copy protection.</summary>
     public const string DrmMessage =
-        "This book is protected with DRM (copy protection), so it cannot be converted. Filee does not remove DRM; " +
+        $"This book is protected with DRM (copy protection), so it cannot be converted. {Filee.Core.AppIdentity.Name} does not remove DRM; " +
         "open it in the reading app it was bought for.";
 
     /// <summary>

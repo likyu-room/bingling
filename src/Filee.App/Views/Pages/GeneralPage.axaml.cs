@@ -9,7 +9,8 @@ namespace Filee.App.Views.Pages;
 
 public partial class GeneralPage : UserControl
 {
-    private static readonly FilePickerFileType JsonType = new("Filee presets") { Patterns = ["*.json"] };
+    // The file type name in the export and import dialogs, in the UI language.
+    private static FilePickerFileType JsonType => new(AppHost.Get<ILocalizer>()["general.presets_file"]) { Patterns = ["*.json"] };
 
     public GeneralPage() => InitializeComponent();
 

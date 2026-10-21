@@ -46,14 +46,14 @@ internal static class ImageReader
         {
             images.Dispose();
             throw new InvalidOperationException(
-                "This DICOM image is compressed in a way Filee can't read (more than 8 bits per sample, or an unusual " +
+                $"This DICOM image is compressed in a way {Filee.Core.AppIdentity.Name} can't read (more than 8 bits per sample, or an unusual " +
                 "compression). Export it uncompressed from the viewing software and try again. (" + ex.Message + ")", ex);
         }
         catch (MagickException ex) when (formatId == "xcf")
         {
             images.Dispose();
             throw new InvalidOperationException(
-                "This GIMP file can't be read. Filee reads 8-bit XCF files saved without \"better but slower compression\"; " +
+                $"This GIMP file can't be read. {Filee.Core.AppIdentity.Name} reads 8-bit XCF files saved without \"better but slower compression\"; " +
                 "in GIMP, export the picture as PNG or PSD instead. (" + ex.Message + ")", ex);
         }
         catch

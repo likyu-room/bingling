@@ -28,7 +28,7 @@ internal static class FontFile
             return SfntFont.Read(data);
         if (Eot.IsEot(data))
             return Eot.Decode(data);
-        throw new InvalidDataException("This file is not a font Filee can read (TTF, OTF, WOFF, WOFF2 or EOT).");
+        throw new InvalidDataException($"This file is not a font {Filee.Core.AppIdentity.Name} can read (TTF, OTF, WOFF, WOFF2 or EOT).");
     }
 
     /// <summary>

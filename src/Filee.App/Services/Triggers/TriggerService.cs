@@ -144,7 +144,7 @@ public sealed class TriggerService : IDisposable
                     NotifyStatus();
                 }
             })
-            { IsBackground = true, Name = "Filee global input" };
+            { IsBackground = true, Name = "Bingling global input" };
             _hookThread.Start();
         }
         catch (Exception ex)

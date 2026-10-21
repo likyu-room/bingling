@@ -208,7 +208,7 @@ public sealed class PdfSharpConverter : IConverter, IPdfMerger, IImageTransforme
         var level = preset.Pdf.Compression;
         var candidates = new List<string>();
         Exception? failure = null;
-        var builtIn = Path.Combine(scratch, Guid.NewGuid().ToString("N")[..8] + "-filee.pdf");
+        var builtIn = Path.Combine(scratch, Guid.NewGuid().ToString("N")[..8] + "-bingling.pdf");
         try
         {
             using var document = OpenForChanges(plain);

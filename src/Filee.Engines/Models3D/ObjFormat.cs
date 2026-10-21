@@ -284,7 +284,7 @@ internal static class ObjFormat
         using (var writer = new StreamWriter(objPath, false, new UTF8Encoding(false), 1 << 16))
         {
             writer.NewLine = "\n";
-            writer.WriteLine("# Written by Filee");
+            writer.WriteLine($"# Written by {Filee.Core.AppIdentity.Name}");
             if (mtlPath is not null)
                 writer.WriteLine($"mtllib {RelativeReference(objPath, mtlPath)}");
 
@@ -521,7 +521,7 @@ internal static class MtlFormat
     {
         using var writer = new StreamWriter(path, false, new UTF8Encoding(false));
         writer.NewLine = "\n";
-        writer.WriteLine("# Written by Filee");
+        writer.WriteLine($"# Written by {Filee.Core.AppIdentity.Name}");
         WriteMaterial(writer, ObjFormat.DefaultMaterial, new Material3D());
         for (var m = 0; m < model.Materials.Count; m++)
             WriteMaterial(writer, names[m], model.Materials[m]);

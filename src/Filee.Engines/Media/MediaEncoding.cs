@@ -320,13 +320,13 @@ internal static class MediaEncoding
             case VideoCodec.Hevc when Has("libx265"):
                 return "libx265";
             case VideoCodec.Hevc:
-                throw new InvalidOperationException("This FFmpeg has no HEVC encoder (libx265). Filee's FFmpeg download has one.");
+                throw new InvalidOperationException($"This FFmpeg has no HEVC encoder (libx265). {Filee.Core.AppIdentity.Name}'s FFmpeg download has one.");
             case VideoCodec.Av1 when Has("libsvtav1"):
                 return "libsvtav1";
             case VideoCodec.Av1 when Has("libaom-av1"):
                 return "libaom-av1";
             case VideoCodec.Av1:
-                throw new InvalidOperationException("This FFmpeg has no AV1 encoder (libsvtav1 or libaom-av1). Filee's FFmpeg download has one.");
+                throw new InvalidOperationException($"This FFmpeg has no AV1 encoder (libsvtav1 or libaom-av1). {Filee.Core.AppIdentity.Name}'s FFmpeg download has one.");
             default:
                 return defaultEncoder;
         }

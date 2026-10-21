@@ -85,7 +85,7 @@ internal static class Eot
         var flags = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(12));
         if ((flags & CompressedFlag) != 0)
             throw new NotSupportedException(
-                "This EOT file is compressed with MicroType Express, which Filee can't unpack. Only uncompressed EOT files can be converted.");
+                $"This EOT file is compressed with MicroType Express, which {Filee.Core.AppIdentity.Name} can't unpack. Only uncompressed EOT files can be converted.");
         if (eotSize > data.Length || eotSize < 82 || fontSize > eotSize - 82)
             throw new InvalidDataException("The EOT file is truncated or damaged.");
 

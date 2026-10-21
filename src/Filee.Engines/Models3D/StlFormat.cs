@@ -163,7 +163,7 @@ internal static class StlFormat
     {
         using var stream = new BufferedStream(output, 1 << 20);
         var header = new byte[HeaderSize];
-        Encoding.ASCII.GetBytes("Binary STL written by Filee").CopyTo(header, 0);
+        Encoding.ASCII.GetBytes($"Binary STL written by {Filee.Core.AppIdentity.Name}").CopyTo(header, 0);
         BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(80), (uint)model.TriangleCount);
         stream.Write(header);
 
