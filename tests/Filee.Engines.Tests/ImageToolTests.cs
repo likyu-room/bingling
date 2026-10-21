@@ -6,6 +6,7 @@ using Filee.Core.Presets;
 using Filee.Engines.Magick;
 using ImageMagick;
 using ImageMagick.Drawing;
+using static Filee.Engines.Tests.ImageSamples;
 
 namespace Filee.Engines.Tests;
 
@@ -39,64 +40,10 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
         Assert.True(red.R > 200 && red.G < 60, $"{presetId}: ({x},{y}) is {red}");
     }
 
-    private static Preset Tool(string id) => BuiltInData.CreatePresets().Single(p => p.Id == id);
-
-    /// <summary>A 40 × 20 white image with a red 10 × 10 square in the top left corner.</summary>
-    private static MagickImage Marked()
-    {
-        var image = new MagickImage(MagickColors.White, 40, 20);
-        new Drawables().FillColor(MagickColors.Red).Rectangle(0, 0, 9, 9).Draw(image);
-        return image;
-    }
-
-    private static bool IsRed(IMagickImage<byte> image, int x, int y) =>
-        image.GetPixels().GetPixel(x, y).ToColor() is { } c && c.R > 200 && c.G < 80 && c.B < 80;
-
-    /// <summary>
-    /// Writes <paramref name="image"/> (and disposes it) as <paramref name="name"/>, whose extension names the format, in
-    /// a fresh folder. <paramref name="compressionLevel"/> sets the zlib level of a PNG.
-    /// </summary>
-    private string Write(MagickImage image, string name, int? compressionLevel = null)
-    {
-        var path = Path.Combine(fx.NewFolder(), name);
-        using (image)
-        {
-            if (compressionLevel is { } level)
-                image.Settings.SetDefine(MagickFormat.Png, "compression-level", level);
-            image.Write(path);
-        }
-        return path;
-    }
-
-    /// <summary>
-    /// A JPEG as phones save it: stored 40 × 20, shown turned right (EXIF orientation 6), so on screen 20 × 40 with the
-    /// red square at the top right.
-    /// </summary>
-    private string WritePhone(uint quality = 90)
-    {
-        var image = Marked();
-        var exif = new ExifProfile();
-        exif.SetValue(ExifTag.Orientation, (ushort)OrientationType.RightTop);
-        image.SetProfile(exif);
-        image.Orientation = OrientationType.RightTop; // ImageMagick writes this into the profile
-        image.Quality = quality;
-        return Write(image, "phone.jpg");
-    }
-
-    /// <summary>Random pixels from a few levels per channel: a picture that zlib packs better the harder it tries.</summary>
-    private static MagickImage Noise(uint width, uint height)
-    {
-        var random = new Random(1);
-        var pixels = new byte[width * height * 3];
-        for (var i = 0; i < pixels.Length; i++)
-            pixels[i] = (byte)(random.Next(8) * 32);
-        return new MagickImage(pixels, new PixelReadSettings(width, height, StorageType.Char, PixelMapping.RGB));
-    }
-
     [Fact]
     public async Task A_phone_photo_turns_the_way_it_looks_and_says_so_in_its_orientation()
     {
-        var source = WritePhone();
+        var source = fx.WritePhone();
         using (var written = new MagickImage(source))
             Assert.Equal(OrientationType.RightTop, written.Orientation); // the test photo is what it says
 
@@ -108,32 +55,6 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
         Assert.Equal((40u, 20u), (result.Width, result.Height));
         Assert.True(IsRed(result, 3, 3));
         Assert.True(result.Orientation is OrientationType.TopLeft or OrientationType.Undefined, $"{result.Orientation}");
-    }
-
-    /// <summary>
-    /// EXIF data with orientation <paramref name="orientation"/> and a small JPEG preview, as cameras and phones write
-    /// it: a TIFF header, IFD0 with the orientation, IFD1 pointing at the preview.
-    /// </summary>
-    private static ExifProfile ExifWithThumbnail(ushort orientation)
-    {
-        byte[] thumbnail;
-        using (var small = new MagickImage(MagickColors.Blue, 8, 4))
-            thumbnail = small.ToByteArray(MagickFormat.Jpeg);
-        var data = new List<byte>();
-        void U16(int v) => data.AddRange(BitConverter.GetBytes((ushort)v));
-        void U32(int v) => data.AddRange(BitConverter.GetBytes((uint)v));
-        data.AddRange("II"u8.ToArray());
-        U16(42);
-        U32(8);
-        U16(1); // IFD0 at 8: one entry
-        U16(0x0112); U16(3); U32(1); U16(orientation); U16(0);
-        U32(26); // IFD1 at 8 + 2 + 12 + 4
-        U16(2); // IFD1: the preview's offset and length
-        U16(0x0201); U16(4); U32(1); U32(26 + 2 + 24 + 4);
-        U16(0x0202); U16(4); U32(1); U32(thumbnail.Length);
-        U32(0);
-        data.AddRange(thumbnail);
-        return new ExifProfile([.. "Exif\0\0"u8.ToArray(), .. data]);
     }
 
     [Fact]
@@ -338,7 +259,7 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     public async Task Crop_keeps_the_box_and_the_format()
     {
         // 40×20 PNG, red 10×10 top-left. Box = left quarter, full height → 10×20, red at (0,0).
-        var job = await fx.ConvertAsync([Write(Marked(), "a.png")], Crop(0, 0, .25, 1));
+        var job = await fx.ConvertAsync([fx.Write(Marked(), "a.png")], Crop(0, 0, .25, 1));
         Assert.Equal(JobState.Completed, job.State);
         Assert.Equal("a Cropped.png", Path.GetFileName(job.Outputs.Single()));
         using var r = new MagickImage(job.Outputs.Single());
@@ -351,7 +272,7 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     public async Task Crop_of_a_turned_phone_photo_cuts_what_the_user_sees()
     {
         // Stored 40×20 with orientation 6 (shown 20×40, red top-right). Box = top half as seen → 20×20 with red at the top right.
-        var job = await fx.ConvertAsync([WritePhone()], Crop(0, 0, 1, .5));
+        var job = await fx.ConvertAsync([fx.WritePhone()], Crop(0, 0, 1, .5));
         using var r = new MagickImage(job.Outputs.Single());
         Assert.Equal((20u, 20u), (r.Width, r.Height));
         Assert.True(IsRed(r, 18, 1));
@@ -361,7 +282,7 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     [Fact]
     public async Task Compress_never_raises_jpeg_quality_and_keeps_the_photo_upright()
     {
-        var source = WritePhone(quality: 70);              // orientation 6, quality 70, EXIF present
+        var source = fx.WritePhone(quality: 70);              // orientation 6, quality 70, EXIF present
         var job = await fx.ConvertAsync([source], Tool("compress-image"));
         var output = job.Outputs.Single();
         Assert.Equal("phone Compressed.jpg", Path.GetFileName(output));
@@ -374,7 +295,7 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     [Fact]
     public async Task Strip_metadata_removes_exif_and_keeps_orientation_visually()
     {
-        var job = await fx.ConvertAsync([WritePhone()], Tool("strip-metadata"));
+        var job = await fx.ConvertAsync([fx.WritePhone()], Tool("strip-metadata"));
         using var r = new MagickImage(job.Outputs.Single());
         Assert.Null(r.GetExifProfile());
         Assert.Equal((20u, 40u), (r.Width, r.Height));
@@ -384,7 +305,7 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     [Fact]
     public async Task Compressing_a_png_stays_lossless_and_not_larger()
     {
-        var source = Write(Noise(256, 256), "n.png", compressionLevel: 1); // little compression on purpose
+        var source = fx.Write(Noise(256, 256), "n.png", compressionLevel: 1); // little compression on purpose
         var job = await fx.ConvertAsync([source], Tool("compress-image"));
         var output = job.Outputs.Single();
         Assert.True(new FileInfo(output).Length <= new FileInfo(source).Length);
