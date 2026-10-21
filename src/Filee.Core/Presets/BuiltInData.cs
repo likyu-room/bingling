@@ -259,7 +259,8 @@ public static class BuiltInData
     /// <summary>
     /// Rotate and flip presets, and the two groups that fan them out on the donut (added in settings schema 17). On no
     /// default donut: users add "Rotate" / "Flip" (or single presets) in Settings → Toolbar. The "Tools" group (crop,
-    /// compress, strip metadata) is the exception: it has its own slice on the images donut.
+    /// add background, redact, annotate, compress, strip metadata) is the exception: it has its own slice on the images
+    /// donut. A tool added after a release reaches existing libraries through <c>SettingsMigrations.AddMissingToolPresets</c>.
     /// </summary>
     public static List<Preset> ImageToolPresets() =>
     [
@@ -278,12 +279,29 @@ public static class BuiltInData
             Id = "flip", NameKey = "preset.group_flip", TargetFormat = Preset.GroupTarget, Kind = PresetKind.Group,
             SubPresetIds = ["flip-horizontal", "flip-vertical"],
         },
-        // Crop opens the crop window and runs with the box it returns (PresetKind.Tool); the other two are plain
-        // same-format conversions. Compress trades a little quality for size, strip metadata keeps what the picture looks like.
+        // Crop, add background, redact and annotate open a window of their own and run with the edit it returns
+        // (PresetKind.Tool); the other two are plain same-format conversions. Compress trades a little quality for size,
+        // strip metadata keeps what the picture looks like. Redact drops the metadata too: it can hold what was hidden
+        // (a thumbnail of the picture, a place, a name). A backdrop makes a picture with edges of its own, so it is a PNG.
         new()
         {
             Id = "crop", NameKey = "preset.crop", TargetFormat = SameAsSource, Kind = PresetKind.Tool, Tool = ImageToolKind.Crop,
             Image = { Quality = 95 }, Output = { FileNamePattern = "{name} Cropped" },
+        },
+        new()
+        {
+            Id = "add-background", NameKey = "preset.add_background", TargetFormat = "png", Kind = PresetKind.Tool,
+            Tool = ImageToolKind.AddBackground, Image = { Quality = 95 }, Output = { FileNamePattern = "{name} with background" },
+        },
+        new()
+        {
+            Id = "redact", NameKey = "preset.redact", TargetFormat = SameAsSource, Kind = PresetKind.Tool, Tool = ImageToolKind.Redact,
+            Image = { Quality = 95, KeepMetadata = false }, Output = { FileNamePattern = "{name} Redacted" },
+        },
+        new()
+        {
+            Id = "annotate", NameKey = "preset.annotate", TargetFormat = SameAsSource, Kind = PresetKind.Tool, Tool = ImageToolKind.Annotate,
+            Image = { Quality = 95 }, Output = { FileNamePattern = "{name} Annotated" },
         },
         Tool("compress-image", "preset.compress_image", "{name} Compressed", i =>
         {
@@ -301,7 +319,7 @@ public static class BuiltInData
         new()
         {
             Id = "tools", NameKey = "preset.group_tools", TargetFormat = Preset.GroupTarget, Kind = PresetKind.Group,
-            SubPresetIds = ["crop", "compress-image", "strip-metadata"],
+            SubPresetIds = ["crop", "add-background", "redact", "annotate", "compress-image", "strip-metadata"],
         },
     ];
 

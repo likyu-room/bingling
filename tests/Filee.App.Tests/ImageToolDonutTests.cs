@@ -87,13 +87,13 @@ public class ImageToolDonutTests
         vm.Items.Single(i => i.Id == "tools").Children!.Single(c => c.Id == id);
 
     [AvaloniaFact]
-    public void Image_donut_shows_the_tools_slice_as_an_accent_group_with_three_tools()
+    public void Image_donut_shows_the_tools_slice_as_an_accent_group_with_six_tools()
     {
         var vm = Load(TestImages.Png(2));
         var tools = vm.Items.Single(i => i.Id == "tools");
         Assert.True(tools.IsAccent && tools.IsEnabled);
-        Assert.Equal(3, tools.Children!.Count);
-        Assert.All(tools.Children, c => Assert.True(c.IsAccent && c.IsEnabled));
+        Assert.Equal(["crop", "add-background", "redact", "annotate", "compress-image", "strip-metadata"], tools.Children!.Select(c => c.Id));
+        Assert.All(tools.Children!, c => Assert.True(c.IsAccent && c.IsEnabled));
         Assert.DoesNotContain(vm.Items.Where(i => i.Id != "tools"), i => i.IsAccent);
         Assert.Matches(@"^PNG 2개 · \d+\u00A0B$", vm.CenterTitle);
     }
@@ -142,9 +142,9 @@ public class ImageToolDonutTests
     [InlineData("s.xbm", MagickFormat.Xbm)]
     public void No_tool_is_offered_for_icons_and_xbm(string name, MagickFormat format)
     {
-        // ICO pads the result to a square and XBM breaks on the space in the tools' file names: all three tools are off.
+        // ICO pads the result to a square and XBM breaks on the space in the tools' file names: every tool is off.
         var vm = Load(TestImages.Write(name, format));
-        foreach (var id in new[] { "crop", "compress-image", "strip-metadata" })
+        foreach (var id in new[] { "crop", "add-background", "redact", "annotate", "compress-image", "strip-metadata" })
         {
             Assert.False(Tool(vm, id).IsEnabled);
             Assert.False(string.IsNullOrEmpty(Tool(vm, id).DisabledReason));

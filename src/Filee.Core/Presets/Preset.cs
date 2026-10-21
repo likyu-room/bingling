@@ -233,14 +233,17 @@ public sealed class ImageOptions
     public ImageFlip Flip { get; set; }
 
     /// <summary>
-    /// What image tools changed in the picture (the crop), applied after the turn and before resizing. Null when no
-    /// tool was used: the conversion then keeps the whole picture.
+    /// What image tools changed in the picture (the crop, boxes hidden, drawings, a backdrop), applied after the turn and
+    /// before resizing. Null when no tool was used: the conversion then keeps the whole picture.
     /// </summary>
     public ImageEdit? Edit { get; set; }
 
-    /// <summary>Turns, mirrors or crops the image: only engines that do (<see cref="Conversion.IImageTransformer"/>) can run it.</summary>
+    /// <summary>
+    /// Turns, mirrors, crops or draws on the image: only engines that do (<see cref="Conversion.IImageTransformer"/>) can run it.
+    /// </summary>
     [JsonIgnore]
-    public bool TurnsOrMirrors => Rotation != ImageRotation.None || Flip != ImageFlip.None || Edit?.Crop is not null;
+    public bool TurnsOrMirrors =>
+        Rotation != ImageRotation.None || Flip != ImageFlip.None || Edit?.Crop is not null || Edit?.Draws == true;
 
     /// <summary>Scale in percent when <see cref="Resize"/> is <see cref="ResizeMode.Percent"/>.</summary>
     public int ResizePercent { get; set; } = 50;

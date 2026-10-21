@@ -829,6 +829,83 @@ public class UserDataStoreTests
         Assert.Single(presets, p => p.Id == "rotate-left"); // repaired, not added twice
     }
 
+    private static readonly string[] NewTools = ["add-background", "redact", "annotate"];
+
+    /// <summary>Writes the library 1.0.0 left (the three tools of that version, none of the new ones) and loads it.</summary>
+    private static UserDataStore LibraryFrom1_0_0(string directory, params string[] toolsGroup)
+    {
+        var seed = new UserDataStore(directory);
+        seed.Load();
+        seed.Presets.RemoveAll(p => NewTools.Contains(p.Id));
+        seed.Presets.Single(p => p.Id == "tools").SubPresetIds = [.. toolsGroup];
+        seed.SaveLibrary(); // saving adds nothing: only loading does
+        Assert.All(NewTools, id => Assert.Null(seed.FindPreset(id)));
+
+        var store = new UserDataStore(directory);
+        store.Load();
+        return store;
+    }
+
+    [Fact]
+    public void A_library_from_1_0_0_gains_the_new_tools_once()
+    {
+        using var dir = new TempDir();
+
+        var store = LibraryFrom1_0_0(dir.Path, "crop", "compress-image", "strip-metadata");
+
+        Assert.Equal(["crop", "add-background", "redact", "annotate", "compress-image", "strip-metadata"], store.FindPreset("tools")!.SubPresetIds);
+        foreach (var id in NewTools)
+        {
+            Assert.Single(store.Presets, p => p.Id == id);
+            Assert.Equal(PresetKind.Tool, store.FindPreset(id)!.Kind);
+        }
+        // Where a new library has them in the preset list, and saved right away so the next start finds them there.
+        Assert.Equal(["crop", "add-background", "redact", "annotate", "compress-image"],
+            store.Presets.Select(p => p.Id).SkipWhile(id => id != "crop").Take(5));
+        Assert.Contains("\"id\": \"redact\"", File.ReadAllText(Path.Combine(dir.Path, "presets.json")));
+
+        // The user takes "Redact" off the ring: the preset stays, so it is not offered again.
+        store.FindPreset("tools")!.SubPresetIds.Remove("redact");
+        store.SaveLibrary();
+        var again = new UserDataStore(dir.Path);
+        again.Load();
+        Assert.Equal(["crop", "add-background", "annotate", "compress-image", "strip-metadata"], again.FindPreset("tools")!.SubPresetIds);
+        Assert.Single(again.Presets, p => p.Id == "redact");
+    }
+
+    [Fact]
+    public void The_new_tools_go_where_the_spec_puts_them_in_a_group_the_user_arranged_and_not_into_a_full_one()
+    {
+        using var dir = new TempDir();
+        var arranged = LibraryFrom1_0_0(dir.Path, "strip-metadata", "crop");
+        // After the tool that comes before each in the spec, whatever else the user moved around it.
+        Assert.Equal(["strip-metadata", "crop", "add-background", "redact", "annotate"], arranged.FindPreset("tools")!.SubPresetIds);
+
+        using var other = new TempDir();
+        string[] full = ["strip-metadata", "crop", "compress-image", "rotate-left", "rotate-right", "flip-horizontal"];
+        var crowded = LibraryFrom1_0_0(other.Path, full);
+        Assert.Equal(full, crowded.FindPreset("tools")!.SubPresetIds); // no room: nothing is pushed out
+        Assert.All(NewTools, id => Assert.NotNull(crowded.FindPreset(id))); // still there to add in Settings → Toolbar
+    }
+
+    [Fact]
+    public void Missing_tool_presets_are_added_only_when_the_id_is_absent_and_the_group_is_not_brought_back()
+    {
+        Assert.False(SettingsMigrations.AddMissingToolPresets(BuiltInData.CreatePresets())); // a complete library is left alone
+
+        var presets = BuiltInData.CreatePresets();
+        presets.RemoveAll(p => p.Id == "tools" || NewTools.Contains(p.Id));
+        var mine = presets.Single(p => p.Id == "crop");
+        mine.Name = "My crop";
+
+        Assert.True(SettingsMigrations.AddMissingToolPresets(presets));
+
+        Assert.Equal(NewTools, presets.Where(p => NewTools.Contains(p.Id)).Select(p => p.Id));
+        Assert.DoesNotContain(presets, p => p.Id == "tools"); // the user deleted the group
+        Assert.Equal("My crop", mine.Name); // an id that is there is not touched
+        Assert.False(SettingsMigrations.AddMissingToolPresets(presets));
+    }
+
     [Fact]
     public void Version_17_libraries_get_compress_pdf_after_split_pdf_on_no_donut()
     {

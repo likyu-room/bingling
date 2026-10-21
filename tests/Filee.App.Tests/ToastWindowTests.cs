@@ -414,7 +414,7 @@ public class ToastWindowTests
     /// <summary>Converts <paramref name="source"/> with a real job and waits until its card has the size.</summary>
     private static async Task<JobViewModel> RunToTheEnd(string source, string presetId, bool showInToast = false)
     {
-        var vm = AppHost.Get<ConversionService>().Start([source], AppHost.Get<UserDataStore>().FindPreset(presetId)!, showInToast)!;
+        var vm = AppHost.Get<ConversionService>().Start([source], AppHost.Get<UserDataStore>().FindPreset(presetId)!, showInToast: showInToast)!;
         var deadline = DateTime.UtcNow.AddSeconds(30);
         while ((vm.SizeChange is null || vm.Thumbnail is null) && DateTime.UtcNow < deadline)
         {

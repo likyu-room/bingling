@@ -19,6 +19,9 @@ public static class DonutIcons
     public static Geometry? For(Preset preset) => Find(preset.Id switch
     {
         "crop" => "Crop",
+        "add-background" => "AddBackground",
+        "redact" => "Redact",
+        "annotate" => "Annotate",
         "compress-image" => "Compress",
         "strip-metadata" => "StripMetadata",
         "tools" => "Tools",

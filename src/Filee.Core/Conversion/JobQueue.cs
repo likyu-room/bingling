@@ -53,9 +53,11 @@ public sealed class JobQueue : IAsyncDisposable
     public bool IsBusy => Volatile.Read(ref _busy) > 0;
 
     /// <summary>Adds a job to the queue and returns it immediately.</summary>
-    public ConversionJob Enqueue(IReadOnlyList<string> sources, Preset preset, string presetDisplayName)
+    /// <param name="editsByFile">The edit of each file, for a tool that makes one per picture (<see cref="ConversionJob.EditsByFile"/>).</param>
+    public ConversionJob Enqueue(IReadOnlyList<string> sources, Preset preset, string presetDisplayName,
+        IReadOnlyDictionary<string, ImageEdit>? editsByFile = null)
     {
-        var job = new ConversionJob(sources, preset, presetDisplayName);
+        var job = new ConversionJob(sources, preset, presetDisplayName, editsByFile);
         Interlocked.Increment(ref _busy); // until the worker is done with it
         _channel.Writer.TryWrite(job);
         JobUpdated?.Invoke(this, job);
@@ -383,10 +385,12 @@ public sealed class JobQueue : IAsyncDisposable
 
         // Rotate / flip: only an engine that turns images does it. Without one the file would come out unturned
         // (a PDF or a video re-encoded "as rotated"); with two in the route (EPS → PNG → JPG) it would turn twice.
-        var turnAt = job.Preset.Image.TurnsOrMirrors ? route.FirstTransformStep() : -1;
-        if (job.Preset.Image.TurnsOrMirrors && turnAt < 0)
+        // A job with an edit per file runs each file with its own (the preset itself carries none).
+        var filePreset = job.EditsByFile is { } edits && edits.TryGetValue(file.SourcePath, out var edit) ? WithEdit(job.Preset, edit) : job.Preset;
+        var turnAt = filePreset.Image.TurnsOrMirrors ? route.FirstTransformStep() : -1;
+        if (filePreset.Image.TurnsOrMirrors && turnAt < 0)
             return Fail(file, "error.cannot_turn", $"{source.Id} → {target}");
-        var unturned = turnAt < 0 ? job.Preset : Unturned(job.Preset);
+        var unturned = turnAt < 0 ? filePreset : Unturned(filePreset);
 
         file.State = FileState.Running;
         Notify(job);
@@ -426,7 +430,7 @@ public sealed class JobQueue : IAsyncDisposable
                     {
                         // Turned once, in step turnAt: every other step gets the preset without rotation and flip,
                         // also one before it whose engine applies image options but doesn't say it turns.
-                        var preset = s == turnAt ? job.Preset : unturned;
+                        var preset = s == turnAt ? filePreset : unturned;
                         // Playback speed changes once, in the step that writes the output: an animation passed from one
                         // engine to another would otherwise change speed in both.
                         if (preset.Image.ChangesSpeed && !(isLast && finalOutput))
@@ -481,12 +485,20 @@ public sealed class JobQueue : IAsyncDisposable
             return Fail(file, "error.conversion_failed", ex.Message);
         }
 
+        static Preset WithEdit(Preset preset, ImageEdit edit)
+        {
+            var copy = preset.Clone();
+            copy.Image.Edit = edit; // the job's own copy: engines only read it
+            return copy;
+        }
+
         static Preset Unturned(Preset preset)
         {
             var copy = preset.Clone();
             copy.Image.Rotation = ImageRotation.None;
             copy.Image.Flip = ImageFlip.None;
-            // The crop too: cut once, in the step that transforms, not again by an engine before or after it.
+            // The edit too (crop, hidden boxes, drawings, backdrop): applied once, in the step that transforms, not again
+            // by an engine before or after it.
             copy.Image.Edit = null;
             return copy;
         }

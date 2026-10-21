@@ -57,16 +57,26 @@ public sealed class ConversionService
     /// <summary>Starts converting files with a preset.</summary>
     /// <param name="files">Source files.</param>
     /// <param name="preset">Preset to apply.</param>
+    /// <param name="perFile">
+    /// For a tool that makes one edit per picture (annotate): the edit of each file, by its full path. The job holds only
+    /// the files that have one, so a picture nothing was done to is left out of it, and has one card for all of them.
+    /// </param>
     /// <param name="showInToast">False when another view (the donut's progress ring) displays the job first.</param>
     /// <returns>The job's view model, or null when there was nothing to convert.</returns>
-    public JobViewModel? Start(IReadOnlyList<string> files, Preset preset, bool showInToast = true)
+    public JobViewModel? Start(IReadOnlyList<string> files, Preset preset, IReadOnlyDictionary<string, ImageEdit>? perFile = null,
+        bool showInToast = true)
     {
-        // A tool preset runs with the edit its tool made (the crop box); without one it would only copy the files.
-        if (files.Count == 0 || preset.IsGroup || (preset.Kind == PresetKind.Tool && preset.Image.Edit is null))
+        if (perFile is not null)
+        {
+            var edited = new HashSet<string>(perFile.Keys, StringComparer.OrdinalIgnoreCase);
+            files = files.Where(edited.Contains).ToList();
+        }
+        // A tool preset runs with the edit its tool made (the crop box, or one per file); without one it would only copy the files.
+        if (files.Count == 0 || preset.IsGroup || (preset.Kind == PresetKind.Tool && preset.Image.Edit is null && perFile is null))
             return null;
         // A preset on "Default" saves where Settings > General says (read now, so a changed default applies at once).
         preset = _store.Settings.WithDefaultOutput(preset);
-        var job = _queue.Enqueue(files, preset, _loc.DisplayName(preset));
+        var job = _queue.Enqueue(files, preset, _loc.DisplayName(preset), perFile);
         var vm = new JobViewModel(job, _loc, _platform, Remove, RetryFailed);
         _byId[job.Id] = vm;
         Jobs.Insert(0, vm);

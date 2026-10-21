@@ -62,18 +62,38 @@ public sealed class ConversionJob
 {
     private readonly CancellationTokenSource _cts = new();
 
-    public ConversionJob(IReadOnlyList<string> sources, Preset preset, string presetDisplayName)
+    /// <param name="editsByFile">
+    /// For a tool that makes one edit per picture (annotate): the edit of each source file, by its full path, any case.
+    /// Files without one are not in <paramref name="sources"/>; <c>ConversionService.Start</c> leaves them out.
+    /// </param>
+    public ConversionJob(IReadOnlyList<string> sources, Preset preset, string presetDisplayName,
+        IReadOnlyDictionary<string, ImageEdit>? editsByFile = null)
     {
         Sources = sources;
         Preset = preset.Clone(); // later edits of the preset must not affect a running job
         PresetDisplayName = presetDisplayName;
         Files = sources.Select(s => new FileResult { SourcePath = s }).ToList();
+        if (editsByFile is not null)
+        {
+            // Copies, for the same reason as the preset's.
+            var edits = new Dictionary<string, ImageEdit>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (path, edit) in editsByFile)
+                edits[path] = edit.Clone();
+            EditsByFile = edits;
+        }
     }
 
     public string Id { get; } = Guid.NewGuid().ToString("N")[..10];
     public DateTime CreatedAt { get; } = DateTime.Now;
     public IReadOnlyList<string> Sources { get; }
     public Preset Preset { get; }
+
+    /// <summary>
+    /// The edit each source file runs with, by its full path (any case), or null when every file runs with the
+    /// <see cref="Preset"/>'s own <see cref="ImageOptions.Edit"/>. Each file takes its edit in place of that one.
+    /// </summary>
+    public IReadOnlyDictionary<string, ImageEdit>? EditsByFile { get; }
+
     public string PresetDisplayName { get; }
     public IReadOnlyList<FileResult> Files { get; }
     public JobState State { get; internal set; } = JobState.Queued;

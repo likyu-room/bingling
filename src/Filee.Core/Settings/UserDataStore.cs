@@ -79,6 +79,8 @@ public sealed class UserDataStore
         var schema = Settings.SchemaVersion;
         SettingsMigrations.Apply(Settings);
         var libraryChanged = File.Exists(ProfilesPath) && SettingsMigrations.ApplyToLibrary(schema, Presets, Profiles);
+        // Whatever the schema: a tool added after the library was made comes in on every load (and only while its id is missing).
+        libraryChanged |= SettingsMigrations.AddMissingToolPresets(Presets);
         EnsureConsistency();
 
         // Persist upgrades right away so they run once, even if the user never changes a setting.
@@ -565,6 +567,37 @@ internal static class SettingsMigrations
         //      takes it. Other extensions the user removed from a built-in donut stay removed.
         if (from < 22)
             changed |= LearnExtensions(profiles, out _, ["fbx"]);
+        return changed;
+    }
+
+    /// <summary>
+    /// Adds the built-in image tools (crop, add background, ...) a library doesn't have, on every load and whatever its
+    /// settings schema: a tool that came with a later version reaches libraries made before it without a schema bump.
+    /// A tool is added only when its id is missing; one the user took off the "Tools" ring is still a preset, so it
+    /// stays off. A new tool takes its place in that ring (after the tool before it in the built-in ring) when the ring
+    /// has room. The group itself is not brought back when the user deleted it.
+    /// </summary>
+    /// <returns>True when a preset was added.</returns>
+    public static bool AddMissingToolPresets(List<Preset> presets)
+    {
+        var builtIn = BuiltInData.ImageToolPresets();
+        var ring = builtIn.Single(p => p.Id == "tools").SubPresetIds;
+        var changed = false;
+        for (var i = 0; i < builtIn.Count; i++)
+        {
+            var tool = builtIn[i];
+            if (tool.Kind != PresetKind.Tool || presets.Any(p => p.Id == tool.Id))
+                continue;
+
+            // Where a new library lists it: right after the nearest built-in before it that this library has.
+            var before = builtIn.Take(i).Reverse().Select(b => presets.FindIndex(p => p.Id == b.Id)).FirstOrDefault(at => at >= 0, -1);
+            presets.Insert(before < 0 ? presets.Count : before + 1, tool);
+            changed = true;
+
+            var rank = ring.IndexOf(tool.Id);
+            if (rank >= 0 && presets.FirstOrDefault(p => p.Id == "tools") is { IsGroup: true } group && group.SubPresetIds.Count < Preset.MaxSubPresets)
+                group.SubPresetIds.Insert(group.SubPresetIds.FindLastIndex(id => ring.IndexOf(id) is var r && r >= 0 && r < rank) + 1, tool.Id);
+        }
         return changed;
     }
 

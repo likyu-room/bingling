@@ -46,6 +46,9 @@ public class DonutIconTests
 
     [AvaloniaTheory]
     [InlineData("crop", "Icon.Donut.Crop")]
+    [InlineData("add-background", "Icon.Donut.AddBackground")]
+    [InlineData("redact", "Icon.Donut.Redact")]
+    [InlineData("annotate", "Icon.Donut.Annotate")]
     [InlineData("compress-image", "Icon.Donut.Compress")]
     [InlineData("strip-metadata", "Icon.Donut.StripMetadata")]
     [InlineData("tools", "Icon.Donut.Tools")]
@@ -114,8 +117,11 @@ public class DonutIconTests
         Assert.NotEmpty(vm.Items);
         Assert.All(vm.Items, item => Assert.NotNull(item.Icon));
         var tools = vm.Items.Single(i => i.Id == "tools");
-        Assert.Equal(3, tools.Children!.Count);
+        Assert.Equal(6, tools.Children!.Count);
         Assert.All(tools.Children, child => Assert.NotNull(child.Icon));
         Assert.Same(Icon("Icon.Donut.Crop"), tools.Children[0].Icon);
+        Assert.Same(Icon("Icon.Donut.AddBackground"), tools.Children[1].Icon);
+        Assert.Same(Icon("Icon.Donut.Redact"), tools.Children[2].Icon);
+        Assert.Same(Icon("Icon.Donut.Annotate"), tools.Children[3].Icon);
     }
 }

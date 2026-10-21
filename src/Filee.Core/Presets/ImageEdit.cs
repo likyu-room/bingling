@@ -1,4 +1,6 @@
-// What the image tools change in a picture (the crop so far) and the geometry of that crop.
+// What the image tools change in a picture (the crop, and what DrawingEdits.cs describes) and the geometry of that crop.
+
+using System.Text.Json.Serialization;
 
 namespace Filee.Core.Presets;
 
@@ -45,7 +47,29 @@ public sealed class ImageEdit
     /// <summary>The box to keep, or null to keep the whole picture.</summary>
     public CropRect? Crop { get; set; }
 
-    public ImageEdit Clone() => new() { Crop = Crop?.Clone() };
+    /// <summary>The boxes to hide (after the crop), or null.</summary>
+    public RedactEdit? Redact { get; set; }
+
+    /// <summary>What is drawn on the picture (after the crop and the boxes), in drawing order, or null.</summary>
+    public List<Annotation>? Annotations { get; set; }
+
+    /// <summary>The backdrop the finished picture is set on, or null for none.</summary>
+    public BackgroundEdit? Background { get; set; }
+
+    /// <summary>
+    /// True when the edit puts something on the picture (boxes, drawings or a backdrop), not only cuts it: a redaction
+    /// with no box, or an empty list of drawings, changes nothing. A backdrop always counts.
+    /// </summary>
+    [JsonIgnore]
+    public bool Draws => Redact is { Boxes.Count: > 0 } || Annotations is { Count: > 0 } || Background is not null;
+
+    public ImageEdit Clone() => new()
+    {
+        Crop = Crop?.Clone(),
+        Redact = Redact?.Clone(),
+        Annotations = Annotations is null ? null : [.. Annotations.Select(a => a.Clone())],
+        Background = Background?.Clone(),
+    };
 }
 
 /// <summary>Geometry of the crop tool: ratios, the first box, a box on another picture, and pixels.</summary>

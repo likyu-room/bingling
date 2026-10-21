@@ -242,6 +242,54 @@ public class JobQueueTests
     }
 
     [Fact]
+    public async Task Job_with_per_file_edits_gives_each_file_its_own_edit()
+    {
+        using var dir = new TempDir();
+        var a = dir.File("a.png");
+        var b = dir.File("b.png");
+        var turner = new FakeTurner("magick", new ConversionEdge("png", "png"));
+        await using var queue = new JobQueue(new ConverterCatalog([turner]));
+        var preset = new Preset { Kind = PresetKind.Tool, Tool = ImageToolKind.Annotate, TargetFormat = BuiltInData.SameAsSource };
+        var arrow = new ImageEdit { Annotations = [new Annotation { Kind = AnnotationKind.Arrow }] };
+        var black = new ImageEdit { Redact = new RedactEdit { Boxes = [new EditRect { X = .25, Width = .5, Height = .5 }] } };
+        // Keys are the full paths of the sources, in any case.
+        var edits = new Dictionary<string, ImageEdit> { [a.ToUpperInvariant()] = arrow, [b] = black };
+
+        var job = new ConversionJob([a, b], preset, "Test", edits);
+        await queue.RunAsync(job);
+
+        Assert.Equal(JobState.Completed, job.State);
+        var seen = turner.EditsSeen.ToDictionary(s => s.Input, s => s.Edit, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(AnnotationKind.Arrow, seen[a]!.Annotations!.Single().Kind);
+        Assert.Null(seen[a]!.Redact);
+        Assert.Equal(.25, seen[b]!.Redact!.Boxes.Single().X);
+        Assert.Null(seen[b]!.Annotations);
+        Assert.Null(job.Preset.Image.Edit); // the preset is the same for every file: only the file's own copy has the edit
+        Assert.Null(preset.Image.Edit);
+
+        // The job keeps its own copy: an editor that goes on changing its edit does not change a job that was started.
+        arrow.Annotations![0].Kind = AnnotationKind.Line;
+        Assert.Equal(AnnotationKind.Arrow, job.EditsByFile![a].Annotations!.Single().Kind);
+    }
+
+    [Fact]
+    public async Task A_per_file_drawing_needs_an_engine_that_transforms_images()
+    {
+        using var dir = new TempDir();
+        var a = dir.File("a.png");
+        await using var queue = new JobQueue(new ConverterCatalog([new FakeConverter("copier", new ConversionEdge("png", "png"))]));
+        var preset = new Preset { Kind = PresetKind.Tool, Tool = ImageToolKind.Redact, TargetFormat = BuiltInData.SameAsSource };
+        var edit = new ImageEdit { Redact = new RedactEdit { Boxes = [new EditRect { Width = .5, Height = .5 }] } };
+
+        var job = new ConversionJob([a], preset, "Test", new Dictionary<string, ImageEdit> { [a] = edit });
+        await queue.RunAsync(job);
+
+        // Copied unredacted would look like success: it must fail instead.
+        Assert.Equal(JobState.Failed, job.State);
+        Assert.Equal("error.cannot_turn", job.Files.Single().ErrorKey);
+    }
+
+    [Fact]
     public async Task A_step_before_the_turning_one_gets_the_preset_without_rotation()
     {
         // STL → PNG (an engine that renders with the image options but doesn't say it turns) → HEIC (one that turns):
