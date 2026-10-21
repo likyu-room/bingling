@@ -158,7 +158,7 @@ public sealed class FolderWatcher : IAsyncDisposable
             if (job is not null)
             {
                 if (Rule.Originals == AfterConversion.MoveToOriginals)
-                    foreach (var file in job.Files.Where(f => f.State == FileState.Done))
+                    foreach (var file in job.Files.Where(f => f.IsHandled))
                         MoveToOriginals(Rule, file.SourcePath, _log);
                 Converted?.Invoke(this, job);
             }

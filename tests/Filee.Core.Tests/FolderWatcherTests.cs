@@ -23,14 +23,19 @@ public class FolderWatcherTests
     }
 
     /// <summary>A watcher whose conversions run on a JobQueue with a fake jpg → png converter into the rule's output folder.</summary>
-    private static (FolderWatcher Watcher, FakeTime Time, List<ConversionJob> Jobs, JobQueue Queue) Create(WatchRule rule)
+    private static (FolderWatcher Watcher, FakeTime Time, List<ConversionJob> Jobs, JobQueue Queue) Create(WatchRule rule, bool onlyIfSmaller = false)
     {
         var queue = new JobQueue(new ConverterCatalog([new FakeConverter("magick", new ConversionEdge("jpg", "png"))]));
         var jobs = new List<ConversionJob>();
         var time = new FakeTime();
         var watcher = new FolderWatcher(rule, async (files, _) =>
         {
-            var preset = new Preset { TargetFormat = "png", Output = { Location = OutputLocation.CustomFolder, CustomFolder = rule.ResolvedOutputFolder } };
+            var preset = new Preset
+            {
+                TargetFormat = "png",
+                Output = { Location = OutputLocation.CustomFolder, CustomFolder = rule.ResolvedOutputFolder },
+                Image = { OnlyIfSmaller = onlyIfSmaller },
+            };
             var job = new ConversionJob(files, preset, "Test");
             await queue.RunAsync(job);
             jobs.Add(job);
@@ -149,6 +154,38 @@ public class FolderWatcherTests
         Assert.False(File.Exists(photo));
         Assert.True(File.Exists(Path.Combine(dir.Path, "originals", "photo.jpg")));
         Assert.True(File.Exists(Path.Combine(dir.Path, "converted", "photo.png")));
+    }
+
+    [Fact]
+    public async Task Watch_folder_moves_the_original_when_compress_skips_it()
+    {
+        // The output was not smaller, so none was kept: the original is as done as a converted one. Left in the folder it
+        // would be picked up again at every start.
+        using var dir = new TempDir();
+        var photo = dir.File("photo.jpg", "x"); // the fake engine writes more than one byte
+        var rule = new WatchRule { Folder = dir.Path, Originals = AfterConversion.MoveToOriginals };
+        var (watcher, time, jobs, queue) = Create(rule, onlyIfSmaller: true);
+        await using var __ = queue;
+        await using var ___ = watcher;
+
+        Assert.True(watcher.Start());
+        time.Advance(3);
+        Assert.Equal(1, await watcher.ProcessPendingAsync());
+
+        var skipped = Assert.Single(Assert.Single(jobs).Files);
+        Assert.Equal((FileState.Skipped, "toast.skipped_not_smaller"), (skipped.State, skipped.NoticeKey));
+        Assert.False(File.Exists(photo));
+        Assert.True(File.Exists(Path.Combine(dir.Path, "originals", "photo.jpg")));
+        Assert.False(File.Exists(Path.Combine(dir.Path, "converted", "photo.png")));
+
+        // The next start finds nothing waiting.
+        var (again, againTime, againJobs, againQueue) = Create(rule, onlyIfSmaller: true);
+        await using var ____ = againQueue;
+        await using var _____ = again;
+        Assert.True(again.Start());
+        againTime.Advance(3);
+        Assert.Equal(0, await again.ProcessPendingAsync());
+        Assert.Empty(againJobs);
     }
 
     [Fact]

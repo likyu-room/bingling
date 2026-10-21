@@ -93,7 +93,7 @@ public sealed class WatchFolderService(UserDataStore store, ConversionService co
         var job = await conversions.RunAsync(files, preset, ruleId);
         if (job is null || store.Settings.WatchFolders.FirstOrDefault(r => r.Id == ruleId) is not { Originals: AfterConversion.MoveToOriginals } rule)
             return;
-        foreach (var file in job.Files.Where(f => f.State == Core.Conversion.FileState.Done))
+        foreach (var file in job.Files.Where(f => f.IsHandled))
             FolderWatcher.MoveToOriginals(rule, file.SourcePath, log);
     }
 
