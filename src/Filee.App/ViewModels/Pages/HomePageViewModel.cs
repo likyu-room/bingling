@@ -9,6 +9,7 @@ using Filee.Core.Conversion;
 using Filee.Core.History;
 using Filee.Core.Localization;
 using Filee.Core.Platform;
+using Filee.Core.Presets;
 using Filee.Core.Settings;
 
 namespace Filee.App.ViewModels.Pages;
@@ -33,8 +34,10 @@ public sealed partial class HistoryItemViewModel : ObservableObject
         HasErrors = Failures.Count > 0 || entry.State == JobState.Failed;
         FailureSummary = loc.Format("home.failed_files", Failures.Count);
         HasOutputs = entry.Outputs.Any(ConversionService.Exists);
-        // Only entries that remember their preset (Filee 1.8 and later) and still have a failed file to convert.
-        CanRetry = conversions is not null && entry.Preset is not null && entry.Failures.Any(f => ConversionService.Exists(f.Source));
+        // Only entries that remember their preset (Filee 1.8 and later) and still have a failed file to convert. A tool runs
+        // only with its edit: one whose files each had their own (annotate) kept them on the job, not here.
+        CanRetry = conversions is not null && entry.Preset is { } preset && (preset.Kind != PresetKind.Tool || preset.Image.Edit is not null)
+            && entry.Failures.Any(f => ConversionService.Exists(f.Source));
     }
 
     public string Title { get; }

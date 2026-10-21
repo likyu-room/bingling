@@ -17,10 +17,15 @@ namespace Filee.App.Controls;
 /// <summary>Shows a picture (and an edit on it) that can be zoomed and panned.</summary>
 public class PictureView : Control
 {
+    /// <summary>Defines <see cref="Picture"/>.</summary>
     public static readonly StyledProperty<SKImage?> PictureProperty =
         AvaloniaProperty.Register<PictureView, SKImage?>(nameof(Picture));
+
+    /// <summary>Defines <see cref="Edit"/>.</summary>
     public static readonly StyledProperty<ImageEdit?> EditProperty =
         AvaloniaProperty.Register<PictureView, ImageEdit?>(nameof(Edit));
+
+    /// <summary>Defines <see cref="FullShortSide"/>.</summary>
     public static readonly StyledProperty<int> FullShortSideProperty =
         AvaloniaProperty.Register<PictureView, int>(nameof(FullShortSide));
 

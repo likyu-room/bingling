@@ -117,6 +117,55 @@ public class ToolPresetTests
         }
     }
 
+    [AvaloniaFact]
+    public void History_retries_a_tool_job_only_when_its_preset_kept_the_edit()
+    {
+        var store = Store();
+        var conversions = AppHost.Get<ConversionService>();
+        var folder = Directory.CreateTempSubdirectory("filee-history-tools-").FullName;
+        try
+        {
+            // Not pictures: both jobs fail, and the history keeps the preset each ran with.
+            var cut = Path.Combine(folder, "cut.png");
+            var drawn = Path.Combine(folder, "drawn.png");
+            File.WriteAllBytes(cut, [0x89, 0x50, 0x4E, 0x47]);
+            File.WriteAllBytes(drawn, [0x89, 0x50, 0x4E, 0x47]);
+            var crop = store.FindPreset("crop")!.Clone();
+            crop.Image.Edit = new ImageEdit { Crop = new CropRect { Width = .5, Height = .5 } };
+            var cropJob = conversions.Start([cut], crop)!;
+            var annotateJob = conversions.Start([drawn], store.FindPreset("annotate")!,
+                new Dictionary<string, ImageEdit> { [drawn] = new() { Annotations = [new Annotation { Kind = AnnotationKind.Arrow }] } })!;
+            WaitUntilDone(cropJob);
+            WaitUntilDone(annotateJob);
+            // Recorded as each job ends, on its worker thread (read from a copy: the list grows there).
+            Assert.True(SpinWait.SpinUntil(() => new[] { cropJob, annotateJob }
+                .All(j => store.History.ToArray().Any(h => h.JobId == j.Job.Id)), 10_000));
+
+            // Read back from disk, as the Home page shows it after a restart.
+            var saved = new UserDataStore(store.Directory);
+            saved.Load();
+            HistoryItemViewModel Item(JobViewModel job) => new(saved.History.Single(h => h.JobId == job.Job.Id),
+                AppHost.Get<ILocalizer>(), AppHost.Get<Filee.Core.Platform.IPlatformServices>(), conversions);
+
+            // Each file's own drawing stays with its job, not in the history: no button that would run nothing.
+            Assert.False(Item(annotateJob).CanRetry);
+
+            // A crop's box is the preset's own, so it is kept and runs again.
+            var cropItem = Item(cropJob);
+            Assert.True(cropItem.CanRetry);
+            cropItem.RetryCommand.Execute(null);
+            var retried = Assert.Single(conversions.Jobs, j => j != cropJob && j.Job.Sources.Contains(cut));
+            Assert.Equal(.5, retried.Job.Preset.Image.Edit!.Crop!.Width);
+            WaitUntilDone(retried);
+            foreach (var job in new[] { cropJob, annotateJob, retried })
+                job.DismissCommand.Execute(null);
+        }
+        finally
+        {
+            try { Directory.Delete(folder, true); } catch (IOException) { }
+        }
+    }
+
     /// <summary>Runs the UI thread until <paramref name="job"/> has finished and its card shows it.</summary>
     private static void WaitUntilDone(JobViewModel job)
     {

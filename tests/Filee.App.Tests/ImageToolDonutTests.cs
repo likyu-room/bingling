@@ -281,18 +281,18 @@ public class ImageToolDonutTests
         var files = TestImages.Png(3);
         var conversions = AppHost.Get<ConversionService>();
         var jobs = conversions.Jobs.Count;
-        // Drawn on the first and the last file; nothing on the middle one.
+        // Drawn on the last and the first file (in that order); nothing on the middle one.
         var windows = new FakeToolWindows(new ToolResult(null, new Dictionary<string, ImageEdit>
         {
-            [files[0]] = new() { Annotations = [new Annotation { Kind = AnnotationKind.Arrow }] },
             [files[2]] = new() { Annotations = [new Annotation { Kind = AnnotationKind.Number, Number = 1 }] },
+            [files[0]] = new() { Annotations = [new Annotation { Kind = AnnotationKind.Arrow }] },
         }));
         ClickTool(files, windows, slice: 0);
         RunUntil(() => conversions.Jobs.Count > jobs);
 
         Assert.Equal(jobs + 1, conversions.Jobs.Count); // one job, one card
         var job = conversions.Jobs[0].Job;
-        Assert.Equal([files[0], files[2]], job.Sources);
+        Assert.Equal([files[0], files[2]], job.Sources); // in the order they were dropped
         Assert.Equal(AnnotationKind.Arrow, Assert.Single(job.EditsByFile![files[0]].Annotations!).Kind);
         Assert.Equal(AnnotationKind.Number, Assert.Single(job.EditsByFile[files[2]].Annotations!).Kind);
         Assert.Null(job.Preset.Image.Edit); // each file runs with its own

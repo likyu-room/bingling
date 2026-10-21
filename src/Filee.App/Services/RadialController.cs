@@ -382,8 +382,8 @@ public sealed class RadialController(
                     return;
                 if (result.PerFile is { } perFile)
                 {
-                    // Each file its own edit (annotate): one job of the files that have one.
-                    conversions.Start(perFile.Keys.ToList(), preset, perFile);
+                    // Each file its own edit (annotate): one job of the files that have one, in the order they were dropped.
+                    conversions.Start(picked, preset, perFile);
                     return;
                 }
                 var run = preset.Clone();
