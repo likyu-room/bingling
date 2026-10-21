@@ -7,6 +7,7 @@
 
 <p align="center">
   <a href="../../releases/latest"><b>Download</b></a> ·
+  <a href="docs/manual/en.md">User guide</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#install">Install</a> ·
   <a href="#command-line">Command line</a> ·

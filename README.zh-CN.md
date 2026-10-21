@@ -7,6 +7,7 @@
 
 <p align="center">
   <a href="../../releases/latest"><b>下载</b></a> ·
+  <a href="docs/manual/en.md">使用说明</a> ·
   <a href="#使用方法">使用方法</a> ·
   <a href="#安装">安装</a> ·
   <a href="#命令行">命令行</a> ·

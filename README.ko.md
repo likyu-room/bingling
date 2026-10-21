@@ -7,6 +7,7 @@
 
 <p align="center">
   <a href="../../releases/latest"><b>다운로드</b></a> ·
+  <a href="docs/manual/ko.md">사용 설명서</a> ·
   <a href="#쓰는-법">쓰는 법</a> ·
   <a href="#설치">설치</a> ·
   <a href="#명령줄">명령줄</a> ·
