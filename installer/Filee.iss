@@ -1,4 +1,4 @@
-﻿; Filee Plus installer (Inno Setup 7). Build it with build/build-installer.ps1, which publishes the app, generates
+﻿; Bingling installer (Inno Setup 7). Build it with build/build-installer.ps1, which publishes the app, generates
 ; obj\engines.iss (build/tools/make-installer-engines.cs) and runs
 ;   ISCC.exe /DAppVersion=1.2.0 /DPublishDir=<published app> /O<output folder> installer\Filee.iss
 ;
@@ -22,9 +22,9 @@
   #error PublishDir is not defined: build with build/build-installer.ps1
 #endif
 
-#define AppName "Filee Plus"
+#define AppName "Bingling"
 #define AppExe "Filee.exe"
-; Never change: Windows finds the installed Filee Plus by this id (uninstall key "{<id>}_is1"). It differs from the original Filee's id, so both install.
+; Never change: Windows finds the installed Bingling by this id (uninstall key "{<id>}_is1"). It differs from the original Filee's id, so both install.
 #define AppGuid "A10409B5-6A21-4C67-9A0C-84B49B4629AF"
 
 [Setup]
@@ -51,7 +51,7 @@ WizardStyle=modern dynamic
 WizardImageFile=wizard-light.png
 WizardImageFileDynamicDark=wizard-dark.png
 WizardSmallImageFile=..\src\Filee.App\Assets\Icons\filee.png
-OutputBaseFilename=FileePlus-{#AppVersion}-win-Setup
+OutputBaseFilename=Bingling-{#AppVersion}-win-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
 ; Filee is closed by PrepareToInstall; Restart Manager is only the fallback, and only for Filee.exe: with DLLs in the
@@ -72,30 +72,34 @@ Name: "zhcn"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 ; Texts shared with the app (engine names, the two options of the General page) are generated into obj\engines.iss.
 [CustomMessages]
+; Start menu and desktop shortcut: 빙글링 when Setup runs in Korean, Bingling otherwise.
+en.ShortcutName=Bingling
+ko.ShortcutName=빙글링
+zhcn.ShortcutName=Bingling
 en.GroupOptions=Options:
 ko.GroupOptions=옵션:
 zhcn.GroupOptions=选项：
 en.TaskModernMenu=Also show it at the top of the Windows 11 menu, not only under “Show more options”
 ko.TaskModernMenu=Windows 11 기본 메뉴에도 표시 (“추가 옵션 표시”를 누르지 않아도 보여요)
 zhcn.TaskModernMenu=也显示在 Windows 11 主菜单中，而不仅是“显示更多选项”里
-en.StatusExplorerMenu=Adding Filee Plus to the File Explorer menu...
-ko.StatusExplorerMenu=탐색기 메뉴에 Filee Plus를 추가하는 중...
-zhcn.StatusExplorerMenu=正在将 Filee Plus 添加到资源管理器菜单...
-en.ExplorerMenuFailed=Windows did not add Filee Plus to the top of the File Explorer menu:%n%n%1%n%nFilee Plus still appears under “Show more options”. You can try again in Filee Plus under Settings → General.
-ko.ExplorerMenuFailed=Windows가 탐색기 기본 메뉴에 Filee Plus를 추가하지 못했어요:%n%n%1%n%nFilee Plus는 “추가 옵션 표시” 안에는 계속 나타나요. Filee Plus의 설정 → 일반에서 다시 시도할 수 있어요.
-zhcn.ExplorerMenuFailed=Windows 未能将 Filee Plus 添加到资源管理器主菜单：%n%n%1%n%nFilee Plus 仍会出现在“显示更多选项”中。你可以在 Filee Plus 的 设置 → 常规 中重试。
-en.ReadyEngines=Conversion engines (Filee Plus downloads them when it starts):
-ko.ReadyEngines=변환 엔진 (Filee Plus가 시작하면서 내려받아요):
-zhcn.ReadyEngines=转换引擎（Filee Plus 启动后下载）：
-en.FinishedRunning=Filee Plus is installed and running in the notification area of the taskbar.%n%nTo convert files, drag them while holding the trigger key, or right-click them in File Explorer.
-ko.FinishedRunning=Filee Plus가 설치되어 작업 표시줄 알림 영역에서 실행 중이에요.%n%n파일을 변환하려면 지정한 키를 누른 채 파일을 끌거나, 탐색기에서 파일을 우클릭하세요.
-zhcn.FinishedRunning=Filee Plus 已安装，正在任务栏通知区域运行。%n%n要转换文件，请按住触发键拖动文件，或在资源管理器中右键单击文件。
+en.StatusExplorerMenu=Adding Bingling to the File Explorer menu...
+ko.StatusExplorerMenu=탐색기 메뉴에 빙글링을 추가하는 중...
+zhcn.StatusExplorerMenu=正在将 Bingling 添加到资源管理器菜单...
+en.ExplorerMenuFailed=Windows did not add Bingling to the top of the File Explorer menu:%n%n%1%n%nBingling still appears under “Show more options”. You can try again in Bingling under Settings → General.
+ko.ExplorerMenuFailed=Windows가 탐색기 기본 메뉴에 빙글링을 추가하지 못했어요:%n%n%1%n%n빙글링은 “추가 옵션 표시” 안에는 계속 나타나요. 빙글링의 설정 → 일반에서 다시 시도할 수 있어요.
+zhcn.ExplorerMenuFailed=Windows 未能将 Bingling 添加到资源管理器主菜单：%n%n%1%n%nBingling 仍会出现在“显示更多选项”中。你可以在 Bingling 的 设置 → 常规 中重试。
+en.ReadyEngines=Conversion engines (Bingling downloads them when it starts):
+ko.ReadyEngines=변환 엔진 (빙글링이 시작하면서 내려받아요):
+zhcn.ReadyEngines=转换引擎（Bingling 启动后下载）：
+en.FinishedRunning=Bingling is installed and running in the notification area of the taskbar.%n%nTo convert files, drag them while holding the trigger key, or right-click them in File Explorer.
+ko.FinishedRunning=빙글링이 설치되어 작업 표시줄 알림 영역에서 실행 중이에요.%n%n파일을 변환하려면 지정한 키를 누른 채 파일을 끌거나, 탐색기에서 파일을 우클릭하세요.
+zhcn.FinishedRunning=Bingling 已安装，正在任务栏通知区域运行。%n%n要转换文件，请按住触发键拖动文件，或在资源管理器中右键单击文件。
 en.TaskCli=Add the "filee" command to PATH (convert from the command line)
 ko.TaskCli="filee" 명령어를 PATH에 추가 (명령줄에서 변환)
 zhcn.TaskCli=将 "filee" 命令添加到 PATH（在命令行中转换）
-en.FinishedEngines=The conversion engines you picked are downloading in the Filee Plus window.
-ko.FinishedEngines=선택한 변환 엔진은 Filee Plus 창에서 내려받고 있어요.
-zhcn.FinishedEngines=你选择的转换引擎正在 Filee Plus 窗口中下载。
+en.FinishedEngines=The conversion engines you picked are downloading in the Bingling window.
+ko.FinishedEngines=선택한 변환 엔진은 빙글링 창에서 내려받고 있어요.
+zhcn.FinishedEngines=你选择的转换引擎正在 Bingling 窗口中下载。
 
 [Tasks]
 Name: "contextmenu"; Description: "{cm:TaskContextMenu}"; GroupDescription: "{cm:GroupOptions}"; Check: IsFreshInstall
@@ -107,9 +111,14 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+; 1.1.0 named its shortcuts "Filee Plus". The ones below replace them, so an update leaves no second entry.
+Type: files; Name: "{autoprograms}\Filee Plus.lnk"
+Type: files; Name: "{autodesktop}\Filee Plus.lnk"
+
 [Icons]
-Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
-Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
+Name: "{autoprograms}\{cm:ShortcutName}"; Filename: "{app}\{#AppExe}"
+Name: "{autodesktop}\{cm:ShortcutName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [UninstallRun]
 ; Quits Filee, then removes the Explorer menu entries, the startup entry and downloaded engines. Settings stay.

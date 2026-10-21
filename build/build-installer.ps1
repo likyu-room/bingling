@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Builds the Windows installer FileePlus-<version>-win-Setup.exe (installer/Filee.iss) and, with -Portable, the portable
+  Builds the Windows installer Bingling-<version>-win-Setup.exe (installer/Filee.iss) and, with -Portable, the portable
   zip, into -OutputDir.
 
 .DESCRIPTION
@@ -129,7 +129,7 @@ Write-Host "compile installer $Version"
 $options = @('/Q', "/DAppVersion=$Version", "/DPublishDir=$PublishDir", "/O$OutputDir")
 if ($CheckOnly) { $options += '--no-compression' }
 Invoke-Checked 'ISCC' { & $iscc @options (Join-Path $root 'installer\Filee.iss') }
-$setupExe = Join-Path $OutputDir "FileePlus-$Version-win-Setup.exe"
+$setupExe = Join-Path $OutputDir "Bingling-$Version-win-Setup.exe"
 if (-not (Test-Path $setupExe)) { throw "ISCC did not write $setupExe" }
 if ($CheckOnly) {
     Write-Host "installer/Filee.iss compiles"
@@ -138,7 +138,7 @@ if ($CheckOnly) {
 
 $files = @($setupExe)
 if ($Portable) {
-    $zip = Join-Path $OutputDir "FileePlus-$Version-win-Portable.zip"
+    $zip = Join-Path $OutputDir "Bingling-$Version-win-Portable.zip"
     Remove-Item $zip -ErrorAction SilentlyContinue
     Write-Host "zip  $zip"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -147,7 +147,7 @@ if ($Portable) {
 }
 
 # Checksums for people who verify their download.
-$sums = Join-Path $OutputDir "FileePlus-$Version-SHA256SUMS.txt"
+$sums = Join-Path $OutputDir "Bingling-$Version-SHA256SUMS.txt"
 $files | ForEach-Object { "$((Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant())  $(Split-Path $_ -Leaf)" } |
     Set-Content $sums -Encoding ascii
 Get-Item ($files + $sums) | Format-Table Name, Length

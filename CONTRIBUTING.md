@@ -36,7 +36,7 @@ pwsh build/build-portable.ps1 -Runtime linux-x64
 
 Use the matching runtime on a Mac or ARM64 Linux machine. Packaging runs on Linux/macOS so archives retain
 executable permissions. Each archive contains the app, CLI, rhwp, 7-Zip, installation instructions and per-user
-install/uninstall scripts. `FileePlus-<version>-<rid>-SHA256SUMS.txt` verifies the archive. macOS bundles use
+install/uninstall scripts. `Bingling-<version>-<rid>-SHA256SUMS.txt` verifies the archive. macOS bundles use
 `com.filee.app` and a development ad-hoc signature by default; public distribution still needs Developer ID signing
 and notarization. `-SigningIdentity` can supply a signing identity, but does not perform notarization.
 
@@ -110,7 +110,7 @@ Read [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) first. In short:
 Bump `<Version>` in `Directory.Build.props`, merge, then push a tag `vX.Y.Z`. `.github/workflows/release.yml` runs the
 tests and `build/build-installer.ps1 -Portable`: it publishes the app (`-p:FileeRelease=true`, which lets it register
 Explorer and startup entries), adds the Explorer menu extension and the bundled rhwp and 7-Zip, compiles
-`installer/Filee.iss` with a pinned, portable Inno Setup, and uploads `FileePlus-X.Y.Z-win-Setup.exe`, the portable zip and
+`installer/Filee.iss` with a pinned, portable Inno Setup, and uploads `Bingling-X.Y.Z-win-Setup.exe`, the portable zip and
 their SHA-256 sums with release notes generated from the merged pull requests.
 
 To try the installer locally run `pwsh build/build-installer.ps1` (output in `Releases/`). Setup needs administrator

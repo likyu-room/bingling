@@ -6,7 +6,7 @@
     <OutputType>WinExe</OutputType>
     <AssemblyName>Filee</AssemblyName>
     <!-- The file description Task Manager and the start-up list show: tells this app from the original Filee. -->
-    <AssemblyTitle>Filee Plus</AssemblyTitle>
+    <AssemblyTitle>Bingling</AssemblyTitle>
     <RootNamespace>Filee.App</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\Icons\filee.ico</ApplicationIcon>

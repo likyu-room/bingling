@@ -1,6 +1,6 @@
 # Third-party notices
 
-Filee is MIT-licensed. It uses and redistributes the following third-party software.
+Bingling (based on Filee) is MIT-licensed. It uses and redistributes the following third-party software.
 Each component remains under its own license.
 
 ## Libraries (NuGet)
@@ -92,7 +92,7 @@ Windows headers, without a C runtime. Pieces of these projects that can end up i
 
 ## Installer
 
-`Filee-<version>-win-Setup.exe` is built with Inno Setup (a build tool, not part of the app); the setup and uninstall
+`Bingling-<version>-win-Setup.exe` is built with Inno Setup (a build tool, not part of the app); the setup and uninstall
 programs inside it are Inno Setup's.
 
 | Component | License | Project |

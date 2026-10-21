@@ -100,12 +100,47 @@ public class InstallerTests
         var script = Script;
         Assert.Contains($"#define AppName \"{AppIdentity.Name}\"", script);
         Assert.Contains("#define AppGuid \"A10409B5-6A21-4C67-9A0C-84B49B4629AF\"", script);
-        Assert.Contains($"OutputBaseFilename={AppIdentity.Folder}-{{#AppVersion}}-win-Setup", script);
+        Assert.Contains($"OutputBaseFilename={AppIdentity.FilePrefix}-{{#AppVersion}}-win-Setup", script);
         // The original Filee's installer id, upstream address and per-user folders must not appear anywhere.
         Assert.DoesNotContain("C8686E06-8327-40A2-B0F7-3DEDD61D9248", script);
         Assert.DoesNotContain("KnifeLemon", script);
         Assert.DoesNotContain(@"{localappdata}\Filee\", script);
         Assert.DoesNotContain(@"{localappdata}\Filee'", script);
+    }
+
+    [Fact]
+    public void Setup_shows_the_name_in_the_install_language_and_clears_the_1_1_0_shortcuts()
+    {
+        var script = Script;
+        Assert.Contains("en.ShortcutName=Bingling", script);
+        Assert.Contains("ko.ShortcutName=빙글링", script);
+        Assert.Contains("zhcn.ShortcutName=Bingling", script);
+        Assert.Contains(@"Name: ""{autoprograms}\{cm:ShortcutName}""", script);
+        Assert.Contains(@"Name: ""{autodesktop}\{cm:ShortcutName}""", script);
+        // An update over 1.1.0 removes the shortcuts that carried its old name.
+        Assert.Contains($@"Type: files; Name: ""{{autoprograms}}\{AppIdentity.LegacyName}.lnk""", script);
+        Assert.Contains($@"Type: files; Name: ""{{autodesktop}}\{AppIdentity.LegacyName}.lnk""", script);
+        // The old name appears only in those two lines and the comment above them, never in a message or a title.
+        Assert.Equal(3, Regex.Matches(script, Regex.Escape(AppIdentity.LegacyName)).Count);
+    }
+
+    [Fact]
+    public void Korean_setup_texts_use_particles_that_fit_the_name()
+    {
+        var script = Script;
+        Assert.DoesNotMatch(LocalizationTests.WrongParticle(), script);
+        Assert.Contains("탐색기 메뉴에 빙글링을 추가하는 중...", script);
+        Assert.DoesNotContain("Filee Plus를", script);
+    }
+
+    [Fact]
+    public void Update_over_1_1_0_keeps_the_settings_folder_and_the_install_id()
+    {
+        // Same id: Setup updates the installed copy in place. Same folder name: settings, engines and the lock carry over.
+        Assert.Equal("FileePlus", AppIdentity.Folder);
+        Assert.Contains("#define AppGuid \"A10409B5-6A21-4C67-9A0C-84B49B4629AF\"", Script);
+        Assert.Equal("Bingling", AppIdentity.Name);
+        Assert.Equal("Bingling", AppIdentity.FilePrefix);
     }
 
     [Fact]
