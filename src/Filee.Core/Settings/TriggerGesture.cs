@@ -84,10 +84,10 @@ public sealed class TriggerGesture
             new() { Kind = TriggerKind.Drag, Modifiers = dragModifier, Button = TriggerMouseButton.Left },
             new() { Kind = TriggerKind.KeyChord, Modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt, Button = TriggerMouseButton.None, Key = "Space" },
         ];
-        // Shift + drag is the headline gesture on Windows (Ctrl + drag stays as the second way in).
-        // macOS and Linux keep their single drag default.
+        // Windows also lists Shift + drag, last and switched off: one tick in Settings turns it on, and the hint and the
+        // tray tooltip show the first enabled drag, which stays Ctrl. macOS and Linux keep their single drag default.
         if (OperatingSystem.IsWindows())
-            defaults.Insert(0, new() { Kind = TriggerKind.Drag, Modifiers = ModifierKeys.Shift, Button = TriggerMouseButton.Left });
+            defaults.Add(new() { Kind = TriggerKind.Drag, Modifiers = ModifierKeys.Shift, Button = TriggerMouseButton.Left, Enabled = false });
         return defaults;
     }
 }
