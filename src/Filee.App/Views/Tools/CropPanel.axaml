@@ -5,38 +5,6 @@
              xmlns:tools="using:Filee.App.ViewModels.Tools"
              x:Class="Filee.App.Views.Tools.CropPanel"
              x:DataType="tools:CropToolViewModel">
-  <UserControl.Styles>
-    <!-- Chips that don't take the focus: ← / → keep moving between files, and 1 to 7 pick a ratio. -->
-    <Style Selector="ListBox.chips">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="Focusable" Value="False" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem">
-      <Setter Property="Focusable" Value="False" />
-      <Setter Property="CornerRadius" Value="999" />
-      <Setter Property="Padding" Value="11,4" />
-      <Setter Property="Margin" Value="0,0,6,6" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="FontSize" Value="12.5" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AccentFaintBrush}" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
-    </Style>
-  </UserControl.Styles>
-
   <StackPanel Spacing="18">
     <StackPanel>
       <TextBlock Classes="label" Text="{DynamicResource tool.crop.aspect}" />

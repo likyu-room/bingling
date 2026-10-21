@@ -7,36 +7,6 @@
              x:Class="Filee.App.Views.Tools.BackgroundPanel"
              x:DataType="tools:BackgroundToolViewModel">
   <UserControl.Styles>
-    <!-- Chips that don't take the focus: ← / → keep moving between files. -->
-    <Style Selector="ListBox.chips">
-      <Setter Property="Background" Value="Transparent" />
-      <Setter Property="BorderThickness" Value="0" />
-      <Setter Property="Padding" Value="0" />
-      <Setter Property="Focusable" Value="False" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem">
-      <Setter Property="Focusable" Value="False" />
-      <Setter Property="CornerRadius" Value="999" />
-      <Setter Property="Padding" Value="11,4" />
-      <Setter Property="Margin" Value="0,0,6,6" />
-      <Setter Property="MinHeight" Value="0" />
-      <Setter Property="FontSize" Value="12.5" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AccentFaintBrush}" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-      <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
-    </Style>
-    <Style Selector="ListBox.chips ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-      <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
-    </Style>
-
     <!-- Backdrop chips: a small painted pill in a ring that is the accent colour when it is the one chosen. -->
     <Style Selector="ListBox.swatches">
       <Setter Property="Background" Value="Transparent" />

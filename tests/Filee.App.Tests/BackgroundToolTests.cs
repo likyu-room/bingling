@@ -9,6 +9,7 @@ using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
@@ -400,6 +401,90 @@ public class BackgroundToolTests
         Assert.Equal("16:9", vm.Aspect.Value);
         vm.UndoCommand.Execute(null);
         Assert.Equal("auto", vm.Aspect.Value);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void After_a_slider_is_used_with_the_mouse_the_arrow_keys_switch_files_again()
+    {
+        var (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(200, 400));
+        Point Centre(Control c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), window)!.Value;
+        var sliders = window.GetVisualDescendants().OfType<Slider>().ToList();
+
+        // A drag on the thumb of the padding slider. The slider must not keep the keys: they are for the files (spec §3).
+        var start = Centre(sliders[0].GetVisualDescendants().OfType<Thumb>().Single());
+        window.MouseDown(start, MouseButton.Left);
+        window.MouseMove(start + new Point(30, 0));
+        window.MouseUp(start + new Point(30, 0), MouseButton.Left);
+        var padding = vm.Padding;
+        Assert.True(padding > 8);
+        window.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+        Assert.Equal(1, vm.Index);
+        Assert.Equal(padding, vm.Padding); // not nudged
+
+        // A click on the track of another slider, away from its thumb, and then a drag from where it went.
+        var track = sliders[1].Bounds;
+        var onTrack = sliders[1].TranslatePoint(new Point(track.Width * .7, track.Height / 2), window)!.Value;
+        window.MouseDown(onTrack, MouseButton.Left);
+        window.MouseUp(onTrack, MouseButton.Left);
+        var corner = vm.Corner;
+        Assert.True(corner > 3);
+        window.KeyPressQwerty(PhysicalKey.ArrowLeft, RawInputModifiers.None);
+        Assert.Equal(0, vm.Index);
+        Assert.Equal(corner, vm.Corner);
+
+        // Someone who tabs to a slider does want the arrows there.
+        Assert.True(sliders[2].Focus());
+        var shadow = vm.Shadow;
+        window.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+        Assert.Equal(0, vm.Index);
+        Assert.NotEqual(shadow, vm.Shadow);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Pressing_on_the_track_and_dragging_is_one_undo_step()
+    {
+        var (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.Png(400, 200));
+        var slider = window.GetVisualDescendants().OfType<Slider>().First();
+        var width = slider.Bounds.Width;
+        Point At(double x) => slider.TranslatePoint(new Point(x, slider.Bounds.Height / 2), window)!.Value;
+
+        window.MouseDown(At(width * .5), MouseButton.Left); // away from the thumb: the value jumps there
+        for (var i = 1; i <= 5; i++)
+            window.MouseMove(At(width * .5 + i * 8));
+        window.MouseUp(At(width * .5 + 40), MouseButton.Left);
+        Assert.True(vm.Padding > 20, $"the padding went to {vm.Padding}");
+
+        vm.UndoCommand.Execute(null);
+        Assert.Equal(8.0, vm.Padding); // the jump and the drag after it together
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_lost_pointer_capture_ends_a_slider_drag()
+    {
+        var (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.Png(400, 200));
+        IPointer? pointer = null;
+        window.AddHandler(InputElement.PointerPressedEvent, (_, e) => pointer = e.Pointer, RoutingStrategies.Tunnel, handledEventsToo: true);
+        var thumb = window.GetVisualDescendants().OfType<Slider>().First().GetVisualDescendants().OfType<Thumb>().Single();
+        var start = thumb.TranslatePoint(new Point(thumb.Bounds.Width / 2, thumb.Bounds.Height / 2), window)!.Value;
+
+        window.MouseDown(start, MouseButton.Left);
+        window.MouseMove(start + new Point(20, 0));
+        var dragged = vm.Padding;
+        Assert.True(dragged > 8);
+        pointer!.Capture(null); // taken away without a release: an Alt+Tab, a system dialog, a cancelled touch
+
+        // The next change is a step of its own, as it is when no drag was ever begun.
+        vm.Corner = 9;
+        vm.UndoCommand.Execute(null);
+        Assert.Equal(3.0, vm.Corner);
+        Assert.Equal(dragged, vm.Padding); // only the corner went back: the drag's own step was not what this undid
+        window.MouseUp(start + new Point(20, 0), MouseButton.Left);
         window.Close();
         vm.Dispose();
     }

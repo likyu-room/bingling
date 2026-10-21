@@ -1,0 +1,36 @@
+<!--
+  Look of a list box of chips (Classes="chips"): rounded pills in a wrapping row, the accent colour on the chosen one. Used by
+  the image tool panels (the crop ratios, the add background shape). The chips don't take the focus, so ← / → keep moving
+  between files and the tools' number keys keep working; a pointer click still picks one.
+-->
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Style Selector="ListBox.chips">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Focusable" Value="False" />
+  </Style>
+  <Style Selector="ListBox.chips ListBoxItem">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="CornerRadius" Value="999" />
+    <Setter Property="Padding" Value="11,4" />
+    <Setter Property="Margin" Value="0,0,6,6" />
+    <Setter Property="MinHeight" Value="0" />
+    <Setter Property="FontSize" Value="12.5" />
+  </Style>
+  <Style Selector="ListBox.chips ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+  </Style>
+  <Style Selector="ListBox.chips ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentFaintBrush}" />
+  </Style>
+  <Style Selector="ListBox.chips ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+    <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+  </Style>
+  <Style Selector="ListBox.chips ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
+  </Style>
+</Styles>
