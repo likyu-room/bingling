@@ -95,6 +95,11 @@
     <Style Selector="ToggleButton.extchip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
       <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
     </Style>
+    <!-- Peach Glass writes dark brown (#3B2416) on its orange, so the darker AccentStrong would leave only 3.3:1 under the
+         pointer. A lighter orange (#FF8E3C, the accent #FF7A1A lightened by 15%) keeps 6.3:1, light and dark alike. -->
+    <Style Selector="Window.peach ToggleButton.extchip:checked:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#FF8E3C" />
+    </Style>
   </UserControl.Styles>
 
   <Grid x:Name="Root" RowDefinitions="Auto,*">
