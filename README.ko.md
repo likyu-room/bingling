@@ -170,7 +170,7 @@ Filee는 앞으로도 무료예요. 개발을 응원하고 싶다면 편한 방�
 
 ## 라이선스
 
-MIT, © 2026 Myeonggu Kim (KnifeLemon), Filee 기여자. 포함된 서드파티 구성요소는 각자의 라이선스를 따르고, [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)에 정리되어 있어요.
+MIT, © 2026 Beomsuk Kim (LikeU). Filee 기반, © 2026 Myeonggu Kim (KnifeLemon), Filee 기여자. 포함된 서드파티 구성요소는 각자의 라이선스를 따르고, [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)에 정리되어 있어요.
 
 <p align="center">
   <a href="https://star-history.com/#KnifeLemon/Filee&Date"><img src="https://api.star-history.com/svg?repos=KnifeLemon/Filee&type=Date" alt="Star history" width="600"></a>

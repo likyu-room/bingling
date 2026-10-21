@@ -16,8 +16,8 @@
 
     <Version>1.0.0</Version>
     <Product>Filee Plus</Product>
-    <Authors>Filee contributors</Authors>
-    <Copyright>Copyright (c) Filee contributors</Copyright>
+    <Authors>Beomsuk Kim (LikeU)</Authors>
+    <Copyright>Copyright (c) 2026 Beomsuk Kim (LikeU); based on Filee, (c) Myeonggu Kim (KnifeLemon) and Filee contributors</Copyright>
 
     <!-- Single source of truth for the GitHub repository, the public Filee Plus fork (used by the updater and the About
          page). It must stay public: GitHub shows releases to signed-out apps only then. With no repository the app does

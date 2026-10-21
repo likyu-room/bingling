@@ -92,7 +92,7 @@ public static class ExplorerMenuPackage
                 new XAttribute("ProcessorArchitecture", Architecture)),
             new XElement(Foundation + "Properties",
                 new XElement(Foundation + "DisplayName", AppIdentity.Name),
-                new XElement(Foundation + "PublisherDisplayName", "Filee contributors"),
+                new XElement(Foundation + "PublisherDisplayName", "Beomsuk Kim (LikeU)"),
                 new XElement(Foundation + "Logo", LogoPath),
                 new XElement(Uap10 + "AllowExternalContent", "true")),
             new XElement(Foundation + "Resources",
