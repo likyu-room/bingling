@@ -42,8 +42,11 @@ public class ImageToolShellTests
         Assert.Equal(files, crop.Files);
 
         // A tool whose window is not built yet gets none, rather than the crop window under its name.
-        foreach (var tool in new[] { ImageToolKind.AddBackground, ImageToolKind.Redact, ImageToolKind.Annotate })
+        foreach (var tool in new[] { ImageToolKind.Redact, ImageToolKind.Annotate })
             Assert.Null(ImageToolViewModel.Create(tool, files, TestStore(), Loc()));
+
+        using var background = ImageToolViewModel.Create(ImageToolKind.AddBackground, files, TestStore(), Loc());
+        Assert.IsType<BackgroundToolViewModel>(background);
     }
 
     [AvaloniaFact]

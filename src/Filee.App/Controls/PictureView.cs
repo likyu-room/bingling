@@ -81,6 +81,12 @@ public class PictureView : Control
     /// <summary>The point Ctrl+1 centres (on the picture drawn at <paramref name="picture"/>); null: the picture's centre.</summary>
     protected virtual Point? ActualSizeCentre(Rect picture) => null;
 
+    /// <summary>
+    /// How many pixels of the file <see cref="ContentSize"/>'s width stands for (<paramref name="fileWidth"/>: the file's
+    /// own). A canvas that draws the picture on a backdrop shows more than the picture, so Ctrl+1 needs the result's width.
+    /// </summary>
+    protected virtual double ActualSizeWidth(int fileWidth) => fileWidth;
+
     /// <summary>Shows the whole picture again (Ctrl+0).</summary>
     public void Fit()
     {
@@ -99,7 +105,7 @@ public class PictureView : Control
             return;
         var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
         var fitted = ImageRect(Bounds.Size, content, 1, default);
-        _zoom = Math.Clamp(pixelWidth / scaling / fitted.Width, MinZoom, MaxZoom);
+        _zoom = Math.Clamp(ActualSizeWidth(pixelWidth) / scaling / fitted.Width, MinZoom, MaxZoom);
         var image = ImageRect(Bounds.Size, content, _zoom, default);
         _pan = ActualSizeCentre(image) is { } centre ? new Rect(Bounds.Size).Center - centre : default;
         InvalidateVisual();

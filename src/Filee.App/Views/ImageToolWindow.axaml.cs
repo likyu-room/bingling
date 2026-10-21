@@ -11,6 +11,7 @@ using Filee.App.ViewModels;
 using Filee.App.ViewModels.Tools;
 using Filee.App.Views.Tools;
 using Filee.Core.Presets;
+using SkiaSharp;
 
 namespace Filee.App.Views;
 
@@ -52,6 +53,7 @@ public partial class ImageToolWindow : Window
         (ToolPanel.Content, _picture) = _model switch
         {
             CropToolViewModel => (new CropPanel(), CropCanvas()),
+            BackgroundToolViewModel => (new BackgroundPanel(), BackdropCanvas()),
             _ => ((Control?, PictureView?))(null, null),
         };
         PictureHost.Child = _picture;
@@ -68,6 +70,14 @@ public partial class ImageToolWindow : Window
         canvas.BoxDoubleClicked += (_, _) => _model?.SaveCommand.Execute(null);
         return canvas;
     }
+
+    /// <summary>The result (the picture on its backdrop) over the preview picture; nothing is dragged on it.</summary>
+    private BackgroundCanvas BackdropCanvas() => new()
+    {
+        [!PictureView.PictureProperty] = CompiledBinding.Create<ImageToolViewModel, SKImage?>(vm => vm.PreviewImage),
+        [!PictureView.FullShortSideProperty] = CompiledBinding.Create<ImageToolViewModel, int>(vm => vm.FullShortSide),
+        [!PictureView.EditProperty] = CompiledBinding.Create<BackgroundToolViewModel, ImageEdit?>(vm => vm.PreviewEdit),
+    };
 
     private void OnFinished(object? sender, EventArgs e) => Close();
 

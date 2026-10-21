@@ -1,0 +1,164 @@
+<!-- The add background tool's side of the image tool window: the backdrop chips (gradients, colours, a typed colour, a
+     picture of the user's), the padding / corner / shadow sliders with their pixels on the file shown, and the shape. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Filee.App.ViewModels"
+             xmlns:tools="using:Filee.App.ViewModels.Tools"
+             x:Class="Filee.App.Views.Tools.BackgroundPanel"
+             x:DataType="tools:BackgroundToolViewModel">
+  <UserControl.Styles>
+    <!-- Chips that don't take the focus: ← / → keep moving between files. -->
+    <Style Selector="ListBox.chips">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Focusable" Value="False" />
+    </Style>
+    <Style Selector="ListBox.chips ListBoxItem">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="11,4" />
+      <Setter Property="Margin" Value="0,0,6,6" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="FontSize" Value="12.5" />
+    </Style>
+    <Style Selector="ListBox.chips ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource SurfaceAltBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+    </Style>
+    <Style Selector="ListBox.chips ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentFaintBrush}" />
+    </Style>
+    <Style Selector="ListBox.chips ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource OnAccentBrush}" />
+    </Style>
+    <Style Selector="ListBox.chips ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource AccentStrongBrush}" />
+    </Style>
+
+    <!-- Backdrop chips: a small painted pill in a ring that is the accent colour when it is the one chosen. -->
+    <Style Selector="ListBox.swatches">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Focusable" Value="False" />
+    </Style>
+    <Style Selector="ListBox.swatches ListBoxItem">
+      <Setter Property="Focusable" Value="False" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="2" />
+      <Setter Property="Margin" Value="0,0,4,2" />
+      <Setter Property="MinHeight" Value="0" />
+    </Style>
+    <Style Selector="ListBox.swatches ListBoxItem /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.swatches ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentFaintBrush}" />
+    </Style>
+    <Style Selector="ListBox.swatches ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+    <Style Selector="ListBox.swatches ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentStrongBrush}" />
+    </Style>
+    <!-- The typed colour's chip and the button for a picture: the same ring when one of them is the backdrop. -->
+    <Style Selector="Border.ring">
+      <Setter Property="BorderThickness" Value="2" />
+      <Setter Property="BorderBrush" Value="Transparent" />
+      <Setter Property="CornerRadius" Value="999" />
+      <Setter Property="Padding" Value="2" />
+    </Style>
+    <Style Selector="Border.ring.selected">
+      <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+    </Style>
+  </UserControl.Styles>
+
+  <StackPanel Spacing="14">
+    <StackPanel>
+      <TextBlock Classes="label" Text="{DynamicResource tool.background.fill}" />
+      <ListBox Classes="swatches" ItemsSource="{Binding Swatches}" SelectedItem="{Binding SelectedSwatch}">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="tools:BackgroundSwatch">
+            <Border Width="40" Height="22" CornerRadius="11" Background="{Binding Brush}" BorderThickness="1"
+                    BorderBrush="{DynamicResource SubtleBorderBrush}" ToolTip.Tip="{Binding Label}"
+                    AutomationProperties.Name="{Binding Label}" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <TextBlock Classes="caption" Text="{DynamicResource tool.background.custom_color}" Margin="0,6,0,4" />
+      <StackPanel Orientation="Horizontal" Spacing="6">
+        <Border Classes="ring" Classes.selected="{Binding IsCustomColor}">
+          <Border Width="40" Height="22" CornerRadius="11" Background="{Binding CustomColorBrush}" BorderThickness="1"
+                  BorderBrush="{DynamicResource SubtleBorderBrush}" />
+        </Border>
+        <TextBox Text="{Binding CustomColorHex}" Width="120" PlaceholderText="#RRGGBB" VerticalAlignment="Center"
+                 AutomationProperties.Name="{DynamicResource tool.background.custom_color}" />
+      </StackPanel>
+
+      <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+        <Border Classes="ring" Classes.selected="{Binding IsCustomImage}" CornerRadius="8">
+          <Button Content="{DynamicResource tool.background.custom_image}" Click="OnPickImage" Focusable="False" />
+        </Border>
+        <TextBlock Classes="caption" Text="{Binding CustomImageName}" IsVisible="{Binding IsCustomImage}"
+                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" MaxWidth="90" />
+      </StackPanel>
+    </StackPanel>
+
+    <StackPanel>
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding PaddingText}" />
+        <TextBlock Classes="label" Text="{DynamicResource tool.background.padding}" />
+      </DockPanel>
+      <!-- A drag is one undo step: the view model is told when the pointer goes down and up (BackgroundPanel.axaml.cs). -->
+      <Slider x:Name="PaddingSlider" Minimum="0" Maximum="40" Value="{Binding Padding}" TickFrequency="1" IsSnapToTickEnabled="True"
+              AutomationProperties.Name="{DynamicResource tool.background.padding}" />
+    </StackPanel>
+
+    <StackPanel>
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding CornerText}" />
+        <TextBlock Classes="label" Text="{DynamicResource tool.background.corner}" />
+      </DockPanel>
+      <Slider x:Name="CornerSlider" Minimum="0" Maximum="25" Value="{Binding Corner}" TickFrequency="1" IsSnapToTickEnabled="True"
+              AutomationProperties.Name="{DynamicResource tool.background.corner}" />
+    </StackPanel>
+
+    <StackPanel>
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding ShadowText}" />
+        <TextBlock Classes="label" Text="{DynamicResource tool.background.shadow}" />
+      </DockPanel>
+      <Slider x:Name="ShadowSlider" Minimum="0" Maximum="100" Value="{Binding Shadow}" TickFrequency="1" IsSnapToTickEnabled="True"
+              AutomationProperties.Name="{DynamicResource tool.background.shadow}" />
+    </StackPanel>
+
+    <StackPanel>
+      <TextBlock Classes="label" Text="{DynamicResource tool.background.ratio}" />
+      <ListBox Classes="chips" ItemsSource="{Binding Aspects}" SelectedItem="{Binding Aspect}">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:IChoice">
+            <TextBlock Text="{Binding Label}" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </StackPanel>
+  </StackPanel>
+</UserControl>

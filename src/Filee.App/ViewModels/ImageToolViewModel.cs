@@ -29,7 +29,7 @@ public sealed record ToolResult(ImageEdit? Shared, IReadOnlyDictionary<string, I
 public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
 {
     /// <summary>Longest side of the preview: enough for a window on a 4K screen, far less than a camera's photo.</summary>
-    private const int PreviewEdge = 2048;
+    internal const int PreviewEdge = 2048;
 
     private readonly Stack<object> _undo = new();
     private readonly Stack<object> _redo = new();
@@ -58,6 +58,7 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
         ILogger? log = null) => tool switch
         {
             ImageToolKind.Crop => new CropToolViewModel(files, store, loc, log),
+            ImageToolKind.AddBackground => new BackgroundToolViewModel(files, store, loc, log),
             _ => null,
         };
 
@@ -291,7 +292,8 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
         return (bitmap, SKImage.FromBitmap(pixels));
     }
 
-    public void Dispose()
+    /// <summary>Lets go of the preview; a tool with files of its own to clear away overrides this and calls it.</summary>
+    public virtual void Dispose()
     {
         _disposed = true;
         SetPreview(null);
