@@ -40,6 +40,32 @@ public class LegacyDataMigrationTests
     }
 
     [Fact]
+    public void A_move_that_failed_is_tried_again_for_what_Bingling_still_lacks()
+    {
+        // The first start could not rename the folders (a file in use), and Bingling started without them: its log
+        // folder and its own engines folder exist now.
+        using var roaming = new TempDir();
+        using var local = new TempDir();
+        Write(roaming.Path, "FileePlus", "settings.json", "old settings");
+        Write(roaming.Path, "FileePlus", "presets.json", "old presets");
+        Write(roaming.Path, "FileePlus", Path.Combine("logs", "filee-20261021.log"), "old log");
+        Write(roaming.Path, "Bingling", Path.Combine("logs", "bingling-20261022.log"), "new log");
+        Write(local.Path, "FileePlus", Path.Combine("engines", "pandoc", ".filee-component"), "abc");
+        Directory.CreateDirectory(Path.Combine(local.Path, "Bingling"));
+
+        var report = LegacyDataMigration.Run(roaming.Path, local.Path);
+
+        Assert.Equal(3, report.Count);
+        Assert.Equal("old settings", File.ReadAllText(Path.Combine(roaming.Path, "Bingling", "settings.json")));
+        Assert.Equal("old presets", File.ReadAllText(Path.Combine(roaming.Path, "Bingling", "presets.json")));
+        Assert.Equal("abc", File.ReadAllText(Path.Combine(local.Path, "Bingling", "engines", "pandoc", ".filee-component")));
+        // Bingling's own folder of the same name stays; the old one stays where it was. Emptied folders go.
+        Assert.Equal(["bingling-20261022.log"], Directory.GetFiles(Path.Combine(roaming.Path, "Bingling", "logs")).Select(Path.GetFileName));
+        Assert.True(File.Exists(Path.Combine(roaming.Path, "FileePlus", "logs", "filee-20261021.log")));
+        Assert.False(Directory.Exists(Path.Combine(local.Path, "FileePlus")));
+    }
+
+    [Fact]
     public void The_original_Filee_keeps_its_folder()
     {
         using var roaming = new TempDir();
