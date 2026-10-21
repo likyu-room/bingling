@@ -164,8 +164,8 @@ public class InstallerTests
         // stopped half way left behind is cleaned up after it, and its command folder leaves PATH once it is gone.
         var end = remove.IndexOf("EndFileePlus(Folder);", StringComparison.Ordinal);
         var keep = remove.IndexOf("KeepFileePlusEngines;", StringComparison.Ordinal);
-        var uninstall = remove.IndexOf("RunFileePlusUninstaller(Uninstaller);", StringComparison.Ordinal);
-        var cleanUp = remove.IndexOf("CleanUpFileePlus(Folder);", StringComparison.Ordinal);
+        var uninstall = remove.IndexOf("Uninstalled := Installed and RunFileePlusUninstaller(Uninstaller);", StringComparison.Ordinal);
+        var cleanUp = remove.IndexOf("CleanUpFileePlus(Folder, Uninstalled or not FileExists(Folder + FileePlusExe));", StringComparison.Ordinal);
         var path = remove.IndexOf("RemoveFromPath(Folder + 'cli');", StringComparison.Ordinal);
         Assert.True(end > 0 && keep > end && uninstall > keep && cleanUp > uninstall && path > cleanUp, remove);
         Assert.Contains("if not FileExists(Folder + 'cli\\filee.cmd') then", remove);
@@ -173,7 +173,7 @@ public class InstallerTests
         var ending = Body(script, "procedure EndFileePlus(const Folder: String);");
         Assert.True(ending.IndexOf("'--quit'", StringComparison.Ordinal) < ending.IndexOf("KillProcessAt(Folder + FileePlusExe);", StringComparison.Ordinal));
         Assert.Contains("KillProcessAt(Folder + FileePlusCliExe);", ending);
-        Assert.Contains("'/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'", Body(script, "procedure RunFileePlusUninstaller(const Uninstaller: String);"));
+        Assert.Contains("'/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'", Body(script, "function RunFileePlusUninstaller(const Uninstaller: String): Boolean;"));
         // Its uninstall entry, by its own id only; per machine first, then per user.
         var find = Body(script, "function FindFileePlus(var Uninstaller: String): Boolean;");
         Assert.Contains("RegQueryStringValue(HKLM, FileePlusUninstallKey, 'UninstallString', Uninstaller)", find);
@@ -200,29 +200,48 @@ public class InstallerTests
         var script = Script;
         // Without an uninstall entry, its default folder, startup entry or menu package still show it is there.
         var remove = Body(script, "procedure RemoveFileePlus;");
-        Assert.Contains(@"Folder := AddBackslash(ExpandConstant('{autopf}\') + FileePlusName);", remove);
+        Assert.Contains(@"Result := AddBackslash(ExpandConstant('{autopf}\') + FileePlusName);",
+            Body(script, "function FileePlusDir(var Uninstaller: String): String;"));
+        Assert.Contains("Folder := FileePlusDir(Uninstaller);", remove);
         Assert.Contains("if not Installed and not HasFileePlusLeftovers(Folder) then", remove);
         var traces = Body(script, "function HasFileePlusLeftovers(const Folder: String): Boolean;");
         Assert.Contains("DirExists(RemoveBackslash(Folder))", traces);
         Assert.Contains("RegValueExists(HKCU, RunKey, FileePlusName)", traces);
         Assert.Contains("IsPackageRegistered(FileePlusMenuFamily)", traces);
         // Removed the way its uninstaller would, by the names of Filee Plus only.
-        var cleanUp = Body(script, "procedure CleanUpFileePlus(const Folder: String);");
+        var cleanUp = Body(script, "procedure CleanUpFileePlus(const Folder: String; FilesGone: Boolean);");
         Assert.Contains("RunPowerShell('Get-AppxPackage -Name ' + PsQuote(FileePlusMenuName) + ' | Remove-AppxPackage', Error);", cleanUp);
         Assert.Contains("RegDeleteValue(HKCU, RunKey, FileePlusName);", cleanUp);
         Assert.Contains(@"RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\' + FileePlusFolder);", cleanUp);
-        Assert.Contains("if DeleteFileePlusFolder(RemoveBackslash(Folder)) then", cleanUp);
         Assert.Contains("RegDeleteKeyIncludingSubkeys(HKLM, FileePlusUninstallKey);", cleanUp);
         Assert.Contains($"FileePlusName = '{AppIdentity.LegacyName}';", script);
         Assert.Contains("FileePlusMenuName = 'FileePlus.ExplorerMenu';", script);
         Assert.Contains("FileePlusMenuFamily = 'FileePlus.ExplorerMenu_c73vxh346rtay';", script);
         Assert.Contains(@"RunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';", script);
-        // Only a folder named Filee Plus is deleted; files still in use go at the next restart. Its uninstall entry goes
-        // with the folder, never while a folder of another name keeps the files.
-        var folder = Body(script, "function DeleteFileePlusFolder(const Folder: String): Boolean;");
-        Assert.Contains("CompareText(ExtractFileName(Folder), FileePlusName) <> 0", folder);
-        Assert.Contains("DelTree(Folder, True, True, True)", folder);
-        Assert.Contains("RestartReplace(Folder + '\\' + Find.Name, '');", folder);
+        // A failed uninstaller in a folder of another name: Filee Plus stays whole, nothing of it is removed.
+        var keepWhole = cleanUp.IndexOf("CompareText(ExtractFileName(RemoveBackslash(Folder)), FileePlusName) <> 0", StringComparison.Ordinal);
+        Assert.True(keepWhole >= 0 && keepWhole < cleanUp.IndexOf("Remove-AppxPackage", StringComparison.Ordinal), cleanUp);
+        Assert.Contains("if not FilesGone and DirExists(RemoveBackslash(Folder))", cleanUp);
+        // After its uninstaller ran, or once Filee.exe is gone, what is left in its folder is not its own: only an empty
+        // folder goes (also when Setup runs again later). Otherwise
+        // only the files and folders it installed go, the uninstall entry with the folder.
+        Assert.Contains("if FilesGone then\r\n    Gone := RemoveDir(RemoveBackslash(Folder)) or not DirExists(RemoveBackslash(Folder))", cleanUp.Replace("\r\n", "\n").Replace("\n", "\r\n"));
+        Assert.Contains("Gone := DeleteFileePlusFiles(RemoveBackslash(Folder));", cleanUp);
+        Assert.True(cleanUp.IndexOf("if Gone then", StringComparison.Ordinal) < cleanUp.IndexOf("RegDeleteKeyIncludingSubkeys(HKLM, FileePlusUninstallKey);", StringComparison.Ordinal));
+        Assert.DoesNotContain("DelTree(Folder, True, True, True)", script);
+        var own = Body(script, "function IsFileePlusFile(const Name: String): Boolean;");
+        Assert.Contains("';.exe;.dll;.json;.pdb;.xml;.msix;'", own);
+        Assert.Contains("Pos('unins', Lowercase(Name)) = 1", own);
+        var files = Body(script, "function DeleteFileePlusFilesIn(const Folder: String; var Pending: Integer): Boolean;");
+        Assert.Contains("else if not IsFileePlusFile(Find.Name) then\r\n        Result := False", files.Replace("\r\n", "\n").Replace("\n", "\r\n"));
+        Assert.Contains("RestartReplace(Path, '');", files);
+        var folder = Body(script, "function DeleteFileePlusFiles(const Folder: String): Boolean;");
+        Assert.Contains("DelTree(Sub, True, True, True)", folder);
+        Assert.Contains("CompareText(Find.Name, 'engines') = 0", folder);
+        Assert.Contains(@"DeleteFile(Sub + '\filee.cmd');", folder);
+        Assert.Contains("Log('Kept ' + Folder + ': it holds files Filee Plus did not install');", folder);
+        // The folder goes at the next restart only when nothing but its own files in use is left there.
+        Assert.Contains("else if Pending = 0 then", folder);
         // The original Filee's package, startup entry, right-click key and folder are never named.
         Assert.DoesNotContain("'Filee.ExplorerMenu", script);
         Assert.DoesNotContain("Filee.ExplorerMenu_", script);
@@ -230,6 +249,27 @@ public class InstallerTests
         Assert.DoesNotContain(@"{autopf}\Filee'", script);
         Assert.DoesNotContain(@"{autopf}\Filee\", script);
         Assert.DoesNotContain("RunKey, 'Filee'", script);
+    }
+
+    [Fact]
+    public void Bingling_is_never_installed_into_the_folder_of_Filee_Plus_that_Setup_removes()
+    {
+        var script = Script;
+        // The folder page refuses that folder and any folder inside it, and says why.
+        var next = Body(script, "function NextButtonClick(CurPageID: Integer): Boolean;");
+        Assert.Contains("if CurPageID <> wpSelectDir then", next);
+        Assert.Contains("if IsSameOrInside(WizardDirValue, Folder) then", next);
+        Assert.Contains("MsgBox(FmtMessage(CustomMessage('DirFormerVersion'), [RemoveBackslash(Folder)]), mbError, MB_OK);", next);
+        Assert.Contains("Result := False;", next);
+        Assert.Contains("Folder := FileePlusDir(Uninstaller);", next);
+        foreach (var language in new[] { "en", "ko", "zhcn" })
+            Assert.Matches($@"(?m)^{language}\.DirFormerVersion=.*%1", script);
+        Assert.Contains("Pos(Uppercase(AddBackslash(Folder)), Uppercase(AddBackslash(Path))) = 1",
+            Body(script, "function IsSameOrInside(const Path, Folder: String): Boolean;"));
+        // A folder given on the command line (/DIR=) is caught before anything of Filee Plus is touched.
+        var remove = Body(script, "procedure RemoveFileePlus;");
+        var guard = remove.IndexOf("if IsSameOrInside(ExpandConstant('{app}'), Folder) then", StringComparison.Ordinal);
+        Assert.True(guard > 0 && guard < remove.IndexOf("EndFileePlus(Folder);", StringComparison.Ordinal), remove);
     }
 
     [Fact]

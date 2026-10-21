@@ -92,6 +92,9 @@ zhcn.StatusExplorerMenu=正在将 Bingling 添加到资源管理器菜单...
 en.StatusFormerVersion=Removing the former version of Bingling...
 ko.StatusFormerVersion=빙글링의 이전 버전을 지우는 중...
 zhcn.StatusFormerVersion=正在卸载 Bingling 的旧版本...
+en.DirFormerVersion=Bingling can't be installed in the folder of its former version, which Setup removes:%n%n%1%n%nPlease choose another folder.
+ko.DirFormerVersion=빙글링의 이전 버전이 있던 폴더에는 설치할 수 없어요. 설치 프로그램이 이 폴더를 지워요:%n%n%1%n%n다른 폴더를 고르세요.
+zhcn.DirFormerVersion=不能安装到 Bingling 旧版本所在的文件夹，安装程序会删除该文件夹：%n%n%1%n%n请选择其他文件夹。
 en.ExplorerMenuFailed=Windows did not add Bingling to the top of the File Explorer menu:%n%n%1%n%nBingling still appears under “Show more options”. You can try again in Bingling under Settings → General.
 ko.ExplorerMenuFailed=Windows가 탐색기 기본 메뉴에 빙글링을 추가하지 못했어요:%n%n%1%n%n빙글링은 “추가 옵션 표시” 안에는 계속 나타나요. 빙글링의 설정 → 일반에서 다시 시도할 수 있어요.
 zhcn.ExplorerMenuFailed=Windows 未能将 Bingling 添加到资源管理器主菜单：%n%n%1%n%nBingling 仍会出现在“显示更多选项”中。你可以在 Bingling 的 设置 → 常规 中重试。
@@ -516,6 +519,25 @@ begin
     Uninstaller := RemoveQuotes(Uninstaller);
 end;
 
+// The install folder of Filee Plus, with a backslash: where its uninstaller is (next to Filee.exe), else its default
+// folder. Uninstaller is empty when it has no uninstall entry.
+function FileePlusDir(var Uninstaller: String): String;
+begin
+  if FindFileePlus(Uninstaller) then
+    Result := ExtractFilePath(Uninstaller)
+  else
+  begin
+    Uninstaller := '';
+    Result := AddBackslash(ExpandConstant('{autopf}\') + FileePlusName);
+  end;
+end;
+
+// True when Path is Folder or a folder inside it.
+function IsSameOrInside(const Path, Folder: String): Boolean;
+begin
+  Result := Pos(Uppercase(AddBackslash(Folder)), Uppercase(AddBackslash(Path))) = 1;
+end;
+
 // Something of Filee Plus is still there: its install folder, its startup entry or its Windows 11 menu package.
 function HasFileePlusLeftovers(const Folder: String): Boolean;
 begin
@@ -562,10 +584,12 @@ begin
   end;
 end;
 
-procedure RunFileePlusUninstaller(const Uninstaller: String);
+// True when the uninstaller ran and reported success.
+function RunFileePlusUninstaller(const Uninstaller: String): Boolean;
 var
   ResultCode: Integer;
 begin
+  Result := False;
   if not FileExists(Uninstaller) then
     Log('The Filee Plus uninstaller is missing')
   else if not Exec(Uninstaller, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
@@ -573,48 +597,121 @@ begin
   else if ResultCode <> 0 then
     Log(Format('The Filee Plus uninstaller ended with exit code %d', [ResultCode]))
   else
+  begin
     Log('Filee Plus was removed');
+    Result := True;
+  end;
 end;
 
-// Deletes the install folder of Filee Plus, and only a folder of that name (a custom install folder may hold other
-// files). A file still in use (Explorer keeps the menu DLL loaded) is deleted at the next restart, the folder after it.
-// False when the folder was left alone.
-function DeleteFileePlusFolder(const Folder: String): Boolean;
+// True for a file Filee Plus 1.0 and 1.1 installed into its folder: the published app (programs and libraries with
+// their settings, symbols and documentation, the translations of the libraries), the Explorer menu package, a menu DLL
+// that was moved aside, and the uninstaller.
+function IsFileePlusFile(const Name: String): Boolean;
+var
+  Ext: String;
+begin
+  Ext := Lowercase(ExtractFileExt(Name));
+  Result := (Pos(';' + Ext + ';', ';.exe;.dll;.json;.pdb;.xml;.msix;') > 0)
+    or ((Pos('unins', Lowercase(Name)) = 1) and ((Ext = '.dat') or (Ext = '.msg')))
+    or (Pos('fileeexplorermenu.dll.', Lowercase(Name)) = 1);
+end;
+
+// Deletes the files of Filee Plus directly in Folder; one in use is deleted at the next restart (counted in Pending).
+// False when the folder holds a file of another kind, which stays.
+function DeleteFileePlusFilesIn(const Folder: String; var Pending: Integer): Boolean;
 var
   Find: TFindRec;
+  Path: String;
 begin
   Result := True;
-  if not DirExists(Folder) then
-    Exit;
-  if CompareText(ExtractFileName(Folder), FileePlusName) <> 0 then
-  begin
-    Log('Left ' + Folder + ' alone: it is not named ' + FileePlusName);
-    Result := False;
-    Exit;
-  end;
-  if DelTree(Folder, True, True, True) then
-    Exit;
   if FindFirst(Folder + '\*', Find) then
   try
     repeat
-      if (Find.Attributes and FILE_ATTRIBUTE_DIRECTORY) = 0 then
-        RestartReplace(Folder + '\' + Find.Name, '');
+      Path := Folder + '\' + Find.Name;
+      if (Find.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0 then
+        // Folders are the caller's.
+      else if not IsFileePlusFile(Find.Name) then
+        Result := False
+      else if not DeleteFile(Path) then
+      begin
+        RestartReplace(Path, '');
+        Pending := Pending + 1;
+      end;
     until not FindNext(Find);
   finally
     FindClose(Find);
   end;
-  RestartReplace(Folder, '');
-  Log('Parts of ' + Folder + ' are in use; Windows deletes them at the next restart');
 end;
 
-// What a removal of Filee Plus that stopped half way left behind (no uninstaller, or it failed), removed the way its
-// uninstaller would (its [UninstallRun] and UninstallCleanup.cs): the Windows 11 menu package, the startup entry, the
-// right-click and Send To entries, the shortcuts, the install folder and the uninstall entry. Only names of Filee Plus:
-// the original Filee's (Filee, Filee.ExplorerMenu, its own folder and id) are different.
-procedure CleanUpFileePlus(const Folder: String);
+// Deletes what Filee Plus installed into its folder, never the whole folder: its files (IsFileePlusFile), the bundled
+// engines and its command line (its own folders) and the translation folders of its libraries. The folder goes when
+// nothing else is left, at the next restart when only its own files in use are. Anything else stays, and the folder
+// with it. True when the folder is gone or goes at the next restart.
+function DeleteFileePlusFiles(const Folder: String): Boolean;
+var
+  Find: TFindRec;
+  Sub: String;
+  Pending: Integer;
+  Clean: Boolean;
+begin
+  Result := True;
+  if not DirExists(Folder) then
+    Exit;
+  Pending := 0;
+  Clean := DeleteFileePlusFilesIn(Folder, Pending);
+  if FindFirst(Folder + '\*', Find) then
+  try
+    repeat
+      if ((Find.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0) and (Find.Name <> '.') and (Find.Name <> '..') then
+      begin
+        Sub := Folder + '\' + Find.Name;
+        if CompareText(Find.Name, 'engines') = 0 then
+          DelTree(Sub, True, True, True)
+        else if CompareText(Find.Name, 'cli') = 0 then
+        begin
+          DeleteFile(Sub + '\filee.cmd');
+          RemoveDir(Sub);
+        end
+        else if DeleteFileePlusFilesIn(Sub, Pending) then
+          RemoveDir(Sub);
+        if DirExists(Sub) then
+          Clean := False;
+      end;
+    until not FindNext(Find);
+  finally
+    FindClose(Find);
+  end;
+  if not Clean then
+  begin
+    Log('Kept ' + Folder + ': it holds files Filee Plus did not install');
+    Result := False;
+  end
+  else if Pending = 0 then
+    Result := RemoveDir(Folder)
+  else
+  begin
+    RestartReplace(Folder, '');
+    Log('Parts of ' + Folder + ' are in use; Windows deletes them at the next restart');
+  end;
+end;
+
+// What is left of Filee Plus after its uninstaller ran, or of one without an uninstaller or whose uninstaller failed,
+// removed the way its uninstaller would (its [UninstallRun] and UninstallCleanup.cs): the Windows 11 menu package, the
+// startup entry, the right-click and Send To entries, the shortcuts, its files and folder and the uninstall entry. Only
+// names of Filee Plus: the original Filee's (Filee, Filee.ExplorerMenu, its own folder and id) are different.
+procedure CleanUpFileePlus(const Folder: String; FilesGone: Boolean);
 var
   Error: String;
+  Gone: Boolean;
 begin
+  // Its files are still there and its folder can't be told from another program's: Filee Plus stays whole rather
+  // than half removed, and can still be removed in Settings > Apps.
+  if not FilesGone and DirExists(RemoveBackslash(Folder))
+    and (CompareText(ExtractFileName(RemoveBackslash(Folder)), FileePlusName) <> 0) then
+  begin
+    Log('Left Filee Plus in ' + Folder + ' as it is: the folder is not named ' + FileePlusName);
+    Exit;
+  end;
   Log('Removing what is left of Filee Plus (' + Folder + ')');
   if IsPackageRegistered(FileePlusMenuFamily) then
     RunPowerShell('Get-AppxPackage -Name ' + PsQuote(FileePlusMenuName) + ' | Remove-AppxPackage', Error);
@@ -623,8 +720,14 @@ begin
   DeleteFile(ExpandConstant('{usersendto}\') + FileePlusName + '.lnk');
   DeleteFile(ExpandConstant('{autoprograms}\') + FileePlusName + '.lnk');
   DeleteFile(ExpandConstant('{autodesktop}\') + FileePlusName + '.lnk');
-  // The uninstall entry goes with the folder: never while the files are kept.
-  if DeleteFileePlusFolder(RemoveBackslash(Folder)) then
+  // After its uninstaller ran, or once Filee.exe is gone, what is left in its folder is not its own (Inno keeps such
+  // files): an empty folder goes, nothing else. Otherwise its own files go, and the uninstall entry with the folder,
+  // never while files are kept.
+  if FilesGone then
+    Gone := RemoveDir(RemoveBackslash(Folder)) or not DirExists(RemoveBackslash(Folder))
+  else
+    Gone := DeleteFileePlusFiles(RemoveBackslash(Folder));
+  if Gone then
   begin
     RegDeleteKeyIncludingSubkeys(HKLM, FileePlusUninstallKey);
     RegDeleteKeyIncludingSubkeys(HKCU, FileePlusUninstallKey);
@@ -638,26 +741,45 @@ end;
 procedure RemoveFileePlus;
 var
   Uninstaller, Folder: String;
-  Installed: Boolean;
+  Installed, Uninstalled: Boolean;
 begin
-  Installed := FindFileePlus(Uninstaller);
-  // Its uninstaller lives in its install folder, next to Filee.exe.
-  if Installed then
-    Folder := ExtractFilePath(Uninstaller)
-  else
-    Folder := AddBackslash(ExpandConstant('{autopf}\') + FileePlusName);
+  Folder := FileePlusDir(Uninstaller);
+  Installed := Uninstaller <> '';
   if not Installed and not HasFileePlusLeftovers(Folder) then
     Exit;
+  // Bingling went into that folder (the folder page refuses it; this catches /DIR= on the command line): removing
+  // Filee Plus there would remove Bingling too.
+  if IsSameOrInside(ExpandConstant('{app}'), Folder) then
+  begin
+    Log('Left Filee Plus alone: Bingling is installed in its folder ' + Folder);
+    Exit;
+  end;
   Log('Removing Filee Plus (' + Folder + ', uninstaller found: ' + IntToStr(Ord(Installed)) + ')');
   WizardForm.StatusLabel.Caption := CustomMessage('StatusFormerVersion');
   EndFileePlus(Folder);
   KeepFileePlusEngines;
-  if Installed then
-    RunFileePlusUninstaller(Uninstaller);
+  Uninstalled := Installed and RunFileePlusUninstaller(Uninstaller);
+  // Only a folder that still has Filee.exe holds the files of Filee Plus: its uninstaller deletes Filee.exe with them.
   if HasFileePlusLeftovers(Folder) then
-    CleanUpFileePlus(Folder);
+    CleanUpFileePlus(Folder, Uninstalled or not FileExists(Folder + FileePlusExe));
   if not FileExists(Folder + 'cli\filee.cmd') then
     RemoveFromPath(Folder + 'cli');
+end;
+
+// The folder page: Bingling can't go into the folder of Filee Plus (or a folder inside it), which Setup removes.
+function NextButtonClick(CurPageID: Integer): Boolean;
+var
+  Uninstaller, Folder: String;
+begin
+  Result := True;
+  if CurPageID <> wpSelectDir then
+    Exit;
+  Folder := FileePlusDir(Uninstaller);
+  if IsSameOrInside(WizardDirValue, Folder) then
+  begin
+    MsgBox(FmtMessage(CustomMessage('DirFormerVersion'), [RemoveBackslash(Folder)]), mbError, MB_OK);
+    Result := False;
+  end;
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
