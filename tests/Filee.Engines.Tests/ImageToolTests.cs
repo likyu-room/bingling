@@ -222,6 +222,30 @@ public class ImageToolTests(EngineFixture fx) : IClassFixture<EngineFixture>
     }
 
     [Fact]
+    public void A_picture_to_look_at_reads_only_the_first_frame_of_an_animated_png_too()
+    {
+        // The toast's thumbnail of a .apng. Filee's own reader composes every frame; the second one is damaged here, so a
+        // read that decodes it throws, and only a read that stops after the first frame gives the thumbnail.
+        var path = Path.Combine(fx.NewFolder(), "anim.apng");
+        using (var red = new MagickImage(MagickColors.Red, 8, 8) { AnimationDelay = 10 })
+        using (var green = new MagickImage(MagickColors.Lime, 8, 8) { AnimationDelay = 10 })
+        using (var blue = new MagickImage(MagickColors.Blue, 8, 8) { AnimationDelay = 10 })
+            Apng.Write([red, green, blue], path);
+        using (var all = ImageReader.Read(path, "apng", new Preset()))
+            Assert.Equal(3, all.Count);
+        var bytes = File.ReadAllBytes(path);
+        var second = bytes.AsSpan().IndexOf("fdAT"u8);
+        Assert.True(second > 0);
+        bytes.AsSpan(second + 8, 16).Fill(0xFF); // the zlib stream of the second frame, after the chunk type and sequence number
+        File.WriteAllBytes(path, bytes);
+        Assert.ThrowsAny<Exception>(() => ImageReader.Read(path, "apng", new Preset()));
+
+        using var first = ImageReader.Read(path, "apng", new Preset(), firstFrameOnly: true);
+
+        Assert.True(IsRed(Assert.Single(first), 4, 4));
+    }
+
+    [Fact]
     public async Task A_PDF_is_not_copied_as_if_rotated_it_fails_and_says_why()
     {
         var dir = fx.NewFolder();

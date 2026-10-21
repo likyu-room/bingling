@@ -75,9 +75,11 @@ internal static class Apng
     /// <summary>
     /// Reads every frame of an APNG, each composed onto the canvas as a player shows it (dispose and blend operations
     /// applied), with its delay and the loop count. A PNG without animation comes back as its one image; the default
-    /// image of an APNG whose first frame comes after it is not part of the animation and is skipped.
+    /// image of an APNG whose first frame comes after it is not part of the animation and is skipped. With
+    /// <paramref name="firstFrameOnly"/> only the first frame is decoded and composed (a picture to look at); the chunks
+    /// of the others are still read, but cost no decoding.
     /// </summary>
-    public static MagickImageCollection Read(string path)
+    public static MagickImageCollection Read(string path, bool firstFrameOnly = false)
     {
         var chunks = ReadChunks(File.ReadAllBytes(path));
         if (chunks.Count == 0 || chunks[0].Type != "IHDR" || chunks[0].Data.Length != 13)
@@ -131,7 +133,7 @@ internal static class Apng
         {
             using var canvas = new MagickImage(MagickColors.Transparent, canvasWidth, canvasHeight);
             canvas.ColorSpace = ColorSpace.sRGB;
-            for (var i = 0; i < frames.Count; i++)
+            for (var i = 0; i < (firstFrameOnly ? 1 : frames.Count); i++)
             {
                 var frame = frames[i];
                 using var picture = new MagickImage(FramePng(header, shared, frame), new MagickReadSettings { Format = MagickFormat.Png });

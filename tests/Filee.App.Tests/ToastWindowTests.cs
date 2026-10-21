@@ -137,6 +137,20 @@ public class ToastWindowTests
         Assert.Equal((84, 56), (vm.Thumbnail!.PixelSize.Width, vm.Thumbnail.PixelSize.Height));
     }
 
+    [AvaloniaFact]
+    public async Task Toast_thumbnail_of_an_animated_png_reads_one_frame()
+    {
+        // The card shows the first frame and decodes no other: a later frame that can't be decoded must not cost the picture.
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var vm = Finished(dir.Bytes("sticker.gif", 50_000), dir.AnimatedPngWithDamagedLaterFrames("sticker.apng", frames: 3));
+
+        await vm.LoadFinishDetailsAsync();
+
+        Assert.NotNull(vm.Thumbnail);
+        Assert.Equal((84, 56), (vm.Thumbnail!.PixelSize.Width, vm.Thumbnail.PixelSize.Height));
+    }
+
     [AvaloniaTheory]
     [InlineData(20000, 100, 224, 56)]
     [InlineData(100, 20000, 56, 224)]
@@ -474,6 +488,69 @@ public class ToastWindowTests
             var path = System.IO.Path.Combine(Path, name);
             image.Write(path);
             return path;
+        }
+
+        /// <summary>
+        /// An animated PNG of <paramref name="frames"/> red frames whose later frames hold garbage instead of picture data, so
+        /// only a reader that stops after the first one can show it. Written chunk by chunk: ImageMagick can't write one.
+        /// </summary>
+        public string AnimatedPngWithDamagedLaterFrames(string name, int frames)
+        {
+            using var picture = new MagickImage(MagickColors.Red, 120, 80);
+            var png = picture.ToByteArray(MagickFormat.Png32);
+            byte[]? header = null;
+            var data = new MemoryStream();
+            for (var at = 8; at + 12 <= png.Length;)
+            {
+                var length = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(at));
+                var chunk = png.AsSpan(at + 8, length);
+                switch (System.Text.Encoding.ASCII.GetString(png, at + 4, 4))
+                {
+                    case "IHDR":
+                        header = chunk.ToArray();
+                        break;
+                    case "IDAT":
+                        data.Write(chunk);
+                        break;
+                }
+                at += 12 + length;
+            }
+
+            using var file = new MemoryStream();
+            file.Write(png.AsSpan(0, 8));
+            WriteChunk(file, "IHDR", header!);
+            WriteChunk(file, "acTL", [.. BigEndian((uint)frames), .. BigEndian(0)]);
+            var sequence = 0u;
+            for (var i = 0; i < frames; i++)
+            {
+                // sequence, size 120 x 80 at 0,0, delay 1/10 s, dispose none, blend source
+                WriteChunk(file, "fcTL", [.. BigEndian(sequence++), .. BigEndian(120), .. BigEndian(80), .. BigEndian(0), .. BigEndian(0), 0, 1, 0, 10, 0, 0]);
+                if (i == 0)
+                    WriteChunk(file, "IDAT", data.ToArray());
+                else
+                    WriteChunk(file, "fdAT", [.. BigEndian(sequence++), .. Enumerable.Repeat((byte)0xFF, 32)]);
+            }
+            WriteChunk(file, "IEND", []);
+            var path = System.IO.Path.Combine(Path, name);
+            File.WriteAllBytes(path, file.ToArray());
+            return path;
+
+            static byte[] BigEndian(uint value) => [(byte)(value >> 24), (byte)(value >> 16), (byte)(value >> 8), (byte)value];
+
+            static void WriteChunk(Stream stream, string type, byte[] body)
+            {
+                var typed = System.Text.Encoding.ASCII.GetBytes(type).Concat(body).ToArray();
+                var crc = 0xFFFFFFFFu;
+                foreach (var b in typed)
+                {
+                    crc ^= b;
+                    for (var bit = 0; bit < 8; bit++)
+                        crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320u : crc >> 1;
+                }
+                stream.Write(BigEndian((uint)body.Length));
+                stream.Write(typed);
+                stream.Write(BigEndian(~crc));
+            }
         }
 
         /// <summary>A file of <paramref name="length"/> bytes that is no format at all.</summary>

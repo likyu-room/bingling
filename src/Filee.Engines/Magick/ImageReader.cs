@@ -26,7 +26,7 @@ internal static class ImageReader
     public static MagickImageCollection Read(string path, string formatId, Preset preset, bool firstFrameOnly = false)
     {
         if (formatId == "apng")
-            return Apng.Read(path);
+            return Apng.Read(path, firstFrameOnly);
         if (formatId == "dcm" && Dicom.TryRead(path) is { } scan)
             return scan;
 
