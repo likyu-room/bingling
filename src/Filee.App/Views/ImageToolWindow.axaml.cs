@@ -1,5 +1,5 @@
-// The image tool window: picks the tool's panel, opens near the cursor at the size of the picture, and turns the
-// keys into the view model's commands (Enter, Esc, undo, zoom, files, ratios).
+// The image tool window: puts in the tool's picture view and panel, opens near the cursor at the size of the picture,
+// and turns the keys into the view model's commands (Enter, Esc, undo, zoom, files); the tool's own keys go to it.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -8,6 +8,7 @@ using Avalonia.Input;
 using Filee.App.Controls;
 using Filee.App.Services;
 using Filee.App.ViewModels;
+using Filee.App.ViewModels.Tools;
 using Filee.App.Views.Tools;
 using Filee.Core.Presets;
 
@@ -20,20 +21,22 @@ public partial class ImageToolWindow : Window
     private const double PanelWidth = 260;
 
     /// <summary>What the window needs besides the picture: the panel, the top and bottom bars, the room around it.</summary>
-    internal static readonly Size Chrome = new(PanelWidth + 2 * ImageCanvas.Inset, 110 + 2 * ImageCanvas.Inset);
+    internal static readonly Size Chrome = new(PanelWidth + 2 * PictureView.Inset, 110 + 2 * PictureView.Inset);
 
     /// <summary>The smallest window (as MinWidth / MinHeight in the XAML), unless the screen is smaller (<see cref="Placement"/>).</summary>
     internal static readonly Size Smallest = new(720, 480);
 
     private ImageToolViewModel? _model;
 
+    /// <summary>The tool's picture view: zoom, pan and the keys go to it.</summary>
+    private PictureView? _picture;
+
     public ImageToolWindow()
     {
         InitializeComponent();
         Motion.Track(this);
-        Picture.BoxDoubleClicked += (_, _) => _model?.SaveCommand.Execute(null);
         // Space let go in another window never reaches this one: drags would keep panning.
-        Deactivated += (_, _) => Picture.PanKeyDown = false;
+        Deactivated += (_, _) => _picture?.PanKeyDown = false;
     }
 
     protected override void OnDataContextChanged(EventArgs e)
@@ -45,11 +48,25 @@ public partial class ImageToolWindow : Window
         if (_model is null)
             return;
         _model.Finished += OnFinished;
-        ToolPanel.Content = _model.Tool switch
+        // Each tool its own view and panel (Views/Tools); a tool without them never gets here (ImageToolViewModel.Create).
+        (ToolPanel.Content, _picture) = _model switch
         {
-            ImageToolKind.Crop => new CropPanel(),
-            _ => null,
+            CropToolViewModel => (new CropPanel(), CropCanvas()),
+            _ => ((Control?, PictureView?))(null, null),
         };
+        PictureHost.Child = _picture;
+    }
+
+    /// <summary>The crop box over the preview bitmap; a double click in it saves.</summary>
+    private ImageCanvas CropCanvas()
+    {
+        var canvas = new ImageCanvas
+        {
+            [!ImageCanvas.SourceProperty] = CompiledBinding.Create<ImageToolViewModel, Avalonia.Media.Imaging.Bitmap?>(vm => vm.Preview),
+            [!ImageCanvas.CropProperty] = CompiledBinding.Create<CropToolViewModel, CropRect>(vm => vm.Crop),
+        };
+        canvas.BoxDoubleClicked += (_, _) => _model?.SaveCommand.Execute(null);
+        return canvas;
     }
 
     private void OnFinished(object? sender, EventArgs e) => Close();
@@ -59,7 +76,7 @@ public partial class ImageToolWindow : Window
         base.OnOpened(e);
         // The donut's window never takes the focus, so nothing hands it over: take it, for the keys.
         Activate();
-        Picture.Focus();
+        _picture?.Focus();
     }
 
     /// <summary>Places the window on the screen under <paramref name="cursor"/>, sized to the picture shown.</summary>
@@ -101,7 +118,7 @@ public partial class ImageToolWindow : Window
         base.OnKeyDown(e);
         if (e.Handled || _model is not { } vm)
             return;
-        // A size box keeps the keys for typing: ← / → move the caret there, digits are typed.
+        // A text box keeps the keys for typing: ← / → move the caret there, digits are typed.
         var typing = FocusManager?.GetFocusedElement() as TextBox;
         var ctrl = e.KeyModifiers.HasFlag(KeyModifiers.Control);
         var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
@@ -112,7 +129,7 @@ public partial class ImageToolWindow : Window
             case Key.Enter when typing is not null:
                 // A typed size is taken first; the next Enter saves.
                 BindingOperations.GetBindingExpressionBase(typing, TextBox.TextProperty)?.UpdateSource();
-                Picture.Focus();
+                _picture?.Focus();
                 break;
             case Key.Enter:
                 vm.SaveCommand.Execute(null);
@@ -128,10 +145,10 @@ public partial class ImageToolWindow : Window
                 vm.UndoCommand.Execute(null);
                 break;
             case Key.D0 or Key.NumPad0 when ctrl:
-                Picture.Fit();
+                _picture?.Fit();
                 break;
             case Key.D1 or Key.NumPad1 when ctrl:
-                Picture.ShowActualSize(vm.ImageWidth);
+                _picture?.ShowActualSize(vm.ImageWidth);
                 break;
             case Key.Left when plain:
                 vm.PreviousCommand.Execute(null);
@@ -139,17 +156,12 @@ public partial class ImageToolWindow : Window
             case Key.Right when plain:
                 vm.NextCommand.Execute(null);
                 break;
-            case >= Key.D1 and <= Key.D7 when plain:
-                vm.Aspect = vm.Aspects[e.Key - Key.D1];
-                break;
-            case >= Key.NumPad1 and <= Key.NumPad7 when plain:
-                vm.Aspect = vm.Aspects[e.Key - Key.NumPad1];
-                break;
             case Key.Space when typing is null:
-                Picture.PanKeyDown = true;
+                _picture?.PanKeyDown = true;
                 break;
             default:
-                e.Handled = false;
+                // The tool's own keys (crop: 1 to 7), unless they are being typed.
+                e.Handled = typing is null && vm.HandleKey(e.Key, e.KeyModifiers);
                 break;
         }
     }
@@ -158,7 +170,7 @@ public partial class ImageToolWindow : Window
     {
         base.OnKeyUp(e);
         if (e.Key == Key.Space)
-            Picture.PanKeyDown = false;
+            _picture?.PanKeyDown = false;
     }
 
     protected override void OnClosed(EventArgs e)

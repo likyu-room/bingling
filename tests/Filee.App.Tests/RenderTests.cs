@@ -1438,8 +1438,8 @@ public class RenderTests
     {
         TestServices.EnsureInitialized(language);
         var files = new[] { ImageToolWindowTests.TestImages.Png(1600, 1000, "beach.png"), ImageToolWindowTests.TestImages.Png(800, 1200) };
-        using var vm = new ImageToolViewModel(Filee.Core.Presets.ImageToolKind.Crop, files,
-            new UserDataStore(Path.Combine(TestServices.DataDirectory, "crop-render-" + language)), AppHost.Get<ILocalizer>());
+        using var vm = (Filee.App.ViewModels.Tools.CropToolViewModel)ImageToolViewModel.Create(Filee.Core.Presets.ImageToolKind.Crop, files,
+            new UserDataStore(Path.Combine(TestServices.DataDirectory, "crop-render-" + language)), AppHost.Get<ILocalizer>())!;
         vm.Aspect = vm.Aspects.Single(a => a.Value == "16:9");
         vm.PixelWidth = 1200;
         var window = new ImageToolWindow { DataContext = vm, Width = 1000, Height = 680 };
@@ -1452,7 +1452,7 @@ public class RenderTests
         }
         Pump();
 
-        Assert.Same(vm.Preview, window.FindControl<ImageCanvas>("Picture")!.Source);
+        Assert.Same(vm.Preview, window.GetVisualDescendants().OfType<ImageCanvas>().Single().Source);
         Assert.Equal(language == "ko" ? "2개 중 1" : "1 of 2", vm.PositionText);
         Save(window, $"window-crop-{language}.png");
 
@@ -1602,8 +1602,8 @@ public class RenderTests
             var preset = store.FindPreset("jpg-70")!;
             var group = new GroupEditorViewModel(
                 new Filee.Core.Presets.Preset { Name = "이미지 도구", Kind = Filee.Core.Presets.PresetKind.Group, SubPresetIds = ["half-size", "grayscale"] }, store, loc);
-            using var tool = new ImageToolViewModel(Filee.Core.Presets.ImageToolKind.Crop, [ImageToolWindowTests.TestImages.Png(400, 300)],
-                new UserDataStore(Path.Combine(TestServices.DataDirectory, "peach-tool-" + mode)), loc);
+            using var tool = ImageToolViewModel.Create(Filee.Core.Presets.ImageToolKind.Crop, [ImageToolWindowTests.TestImages.Png(400, 300)],
+                new UserDataStore(Path.Combine(TestServices.DataDirectory, "peach-tool-" + mode)), loc)!;
             Window[] windows =
             [
                 new PresetEditorWindow { DataContext = new PresetEditorViewModel(preset, loc) },

@@ -2,8 +2,9 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Filee.App.ViewModels"
+             xmlns:tools="using:Filee.App.ViewModels.Tools"
              x:Class="Filee.App.Views.Tools.CropPanel"
-             x:DataType="vm:ImageToolViewModel">
+             x:DataType="tools:CropToolViewModel">
   <UserControl.Styles>
     <!-- Chips that don't take the focus: ← / → keep moving between files, and 1 to 7 pick a ratio. -->
     <Style Selector="ListBox.chips">

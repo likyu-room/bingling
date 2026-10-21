@@ -1,9 +1,8 @@
-<!-- The image tool window (crop so far), opened from the donut's tools: the tool and file with "1 of 3" and ‹ › on top,
-     the picture with the box in the middle, the tool's panel on the right, and Reset / Cancel / Save below. -->
+<!-- The image tool window, opened from the donut's tools: the tool and file with "1 of 3" and ‹ › on top,
+     the tool's picture view in the middle, its panel on the right, and Reset / Cancel / Save below. -->
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Filee.App.ViewModels"
-        xmlns:c="using:Filee.App.Controls"
         x:Class="Filee.App.Views.ImageToolWindow"
         x:DataType="vm:ImageToolViewModel"
         Classes="glassy"
@@ -56,6 +55,7 @@
       </ScrollViewer>
     </Border>
 
-    <c:ImageCanvas x:Name="Picture" Source="{Binding Preview}" Crop="{Binding Crop}" />
+    <!-- The tool's picture view (the crop box, say): ImageToolWindow puts it in. -->
+    <Border x:Name="PictureHost" />
   </DockPanel>
 </Window>

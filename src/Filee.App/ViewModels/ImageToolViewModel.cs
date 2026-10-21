@@ -1,11 +1,14 @@
-// The image tool window (the crop so far): the files it previews one at a time, the box and its ratio, the size the
-// panel shows, undo and redo, and the edit it hands back. One box goes on every file: another file only shows it
-// refitted there (CropMath.Refit), which is what the engine does with it when it cuts that file, so every preview is
-// the result.
+// What every image tool window shares (crop, add background, redact, annotate): the files it previews one at a time and
+// their preview, "1 of 3" and ‹ ›, undo and redo, Reset / Save / Cancel, and the result it hands back. A tool
+// (ViewModels/Tools) adds its own state and panel and fills in what it saves, what Reset does and what an undo step holds.
 
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Filee.App.Controls;
+using Filee.App.ViewModels.Tools;
 using Filee.Core.Formats;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
@@ -13,71 +16,72 @@ using Filee.Core.Settings;
 using Filee.Engines.Magick;
 using ImageMagick;
 using Microsoft.Extensions.Logging;
+using SkiaSharp;
 
 namespace Filee.App.ViewModels;
 
-public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
+/// <summary>What an image tool window hands back for its files to run with.</summary>
+/// <param name="Shared">One edit for every file (crop, add background, redact).</param>
+/// <param name="PerFile">Each file's own edit, by full path (annotate); a file without one is left out of the job.</param>
+public sealed record ToolResult(ImageEdit? Shared, IReadOnlyDictionary<string, ImageEdit>? PerFile);
+
+/// <summary>The image tool window's view model: the part every tool shares. <see cref="Create"/> makes the tool's own.</summary>
+public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
 {
     /// <summary>Longest side of the preview: enough for a window on a 4K screen, far less than a camera's photo.</summary>
     private const int PreviewEdge = 2048;
 
-    private readonly IReadOnlyList<string> _files;
-    private readonly UserDataStore _store;
-    private readonly ILocalizer _loc;
-    private readonly ILogger? _log;
-    private readonly Stack<Step> _undo = new();
-    private readonly Stack<Step> _redo = new();
-    private Choice<string> _aspect;
-    private CropRect _box;  // the box as last set, on whichever file: the one that goes on every file
-    private CropRect _crop; // _box on the file shown
+    private readonly Stack<object> _undo = new();
+    private readonly Stack<object> _redo = new();
     private bool _disposed;
 
-    /// <summary>One undo step: the ratio and the box before a change (a drag, a ratio, a typed size).</summary>
-    private readonly record struct Step(Choice<string> Aspect, CropRect Box);
-
-    /// <param name="tool">The tool (only <see cref="ImageToolKind.Crop"/> so far).</param>
-    /// <param name="files">The pictures; the edit goes on all of them.</param>
-    /// <param name="store">Where the last ratio is remembered.</param>
-    /// <param name="log">Where a ratio that can't be remembered is reported.</param>
-    public ImageToolViewModel(ImageToolKind tool, IReadOnlyList<string> files, UserDataStore store, ILocalizer loc, ILogger? log = null)
+    /// <param name="tool">The tool.</param>
+    /// <param name="files">The pictures it edits.</param>
+    /// <param name="store">Where the tool's last choices are remembered.</param>
+    /// <param name="log">Where choices that can't be remembered are reported.</param>
+    protected ImageToolViewModel(ImageToolKind tool, IReadOnlyList<string> files, UserDataStore store, ILocalizer loc, ILogger? log)
     {
         Tool = tool;
-        _files = files;
-        _store = store;
-        _loc = loc;
-        _log = log;
-        Aspects = CropMath.AspectIds.Select(id => new Choice<string>(id, id switch
-        {
-            "free" => loc["tool.crop.free"],
-            "original" => loc["tool.crop.original"],
-            _ => id,
-        })).ToList();
-        // A ratio from a newer Filee: free, as CropMath.RatioOf reads it.
-        _aspect = Aspects.FirstOrDefault(a => a.Value == store.Settings.ImageTools.CropAspect) ?? Aspects[0];
+        Files = files;
+        Store = store;
+        Loc = loc;
+        Log = log;
         (ImageWidth, ImageHeight) = OrientedSize(files[0]);
-        _box = CropMath.Initial(Ratio(_aspect), ImageWidth, ImageHeight);
-        _crop = Fit(_box, _aspect);
         _ = LoadPreviewAsync(0);
     }
 
+    /// <summary>
+    /// The view model of <paramref name="tool"/> on <paramref name="files"/>; null for a tool whose window is not built
+    /// yet, which then opens none (never the crop window under another tool's name).
+    /// </summary>
+    public static ImageToolViewModel? Create(ImageToolKind tool, IReadOnlyList<string> files, UserDataStore store, ILocalizer loc,
+        ILogger? log = null) => tool switch
+        {
+            ImageToolKind.Crop => new CropToolViewModel(files, store, loc, log),
+            _ => null,
+        };
+
     public ImageToolKind Tool { get; }
+
+    /// <summary>The pictures, in the order ‹ › goes through them.</summary>
+    public IReadOnlyList<string> Files { get; }
 
     /// <summary>The file shown, from 0.</summary>
     public int Index { get; private set; }
 
-    public int Count => _files.Count;
+    public int Count => Files.Count;
 
     /// <summary>More than one file: the window shows "1 of 3" and the ‹ › buttons.</summary>
     public bool HasMany => Count > 1;
 
     /// <summary>"Crop · photo.jpg".</summary>
-    public string Title => $"{_loc["tool.crop.title"]} · {Path.GetFileName(_files[Index])}";
+    public string Title => $"{Loc[TitleKey]} · {Path.GetFileName(Files[Index])}";
 
     /// <summary>"1 of 3".</summary>
-    public string PositionText => _loc.Format("tool.position", Index + 1, Count);
+    public string PositionText => Loc.Format("tool.position", Index + 1, Count);
 
-    /// <summary>"Applies to all 3 files"; empty for one file.</summary>
-    public string FooterText => HasMany ? _loc.Format("tool.applies_to_all", Count) : "";
+    /// <summary>The note left of the buttons: "Applies to all 3 files", empty for one file.</summary>
+    public string FooterText => HasMany ? Loc.Format("tool.applies_to_all", Count) : "";
 
     /// <summary>Size of the file shown, the way it stands (EXIF orientation applied); 0 when it can't be read.</summary>
     public int ImageWidth { get; private set; }
@@ -85,61 +89,60 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <inheritdoc cref="ImageWidth"/>
     public int ImageHeight { get; private set; }
 
-    /// <summary>The ratio chips, in the order of <see cref="CropMath.AspectIds"/>.</summary>
-    public IReadOnlyList<Choice<string>> Aspects { get; }
-
-    /// <summary>
-    /// The ratio. A fixed one starts over with its largest box in the middle; free keeps the box as it is. One undo step.
-    /// </summary>
-    public Choice<string> Aspect
-    {
-        get => _aspect;
-        set
-        {
-            // Null: a list box letting go of its selection (Ctrl+click); the choice stays and shows again.
-            if (value is null)
-            {
-                OnPropertyChanged();
-                return;
-            }
-            if (value == _aspect)
-                return;
-            Change(value, value.Value == "free" ? _crop : CropMath.Initial(Ratio(value), ImageWidth, ImageHeight));
-        }
-    }
-
-    /// <summary>The box on the file shown (fractions; refitted from the box set on any file). Setting it is one undo step.</summary>
-    public CropRect Crop
-    {
-        get => _crop;
-        set => Change(_aspect, value);
-    }
-
-    /// <summary>The box's width in pixels of the file shown. Typed: the box keeps its middle (a fixed ratio its shape).</summary>
-    public int PixelWidth
-    {
-        get => Pixels.Width;
-        set => SetPixels(Math.Max(1, value), null);
-    }
-
-    /// <inheritdoc cref="PixelWidth"/>
-    public int PixelHeight
-    {
-        get => Pixels.Height;
-        set => SetPixels(null, Math.Max(1, value));
-    }
+    /// <summary>The short side of the file shown, full size: what the renderer sizes cells, pens and padding by.</summary>
+    public int FullShortSide => Math.Min(ImageWidth, ImageHeight);
 
     /// <summary>The file shown, turned upright and made smaller; null while it is read (or when it can't be).</summary>
     [ObservableProperty] private Bitmap? _preview;
 
-    /// <summary>The edit to run, set by Save; null after Cancel (or when the window was closed).</summary>
-    public ImageEdit? Result { get; private set; }
+    /// <summary>
+    /// The same preview for Skia: what <see cref="EditPreviewDrawOperation"/> draws the tool's edit on. It comes and goes
+    /// with <see cref="Preview"/>.
+    /// </summary>
+    [ObservableProperty] private SKImage? _previewImage;
+
+    /// <summary>The result to run, set by Save; null after Cancel (or when the window was closed).</summary>
+    public ToolResult? Result { get; private set; }
 
     /// <summary>Save or Cancel: the window closes.</summary>
     public event EventHandler? Finished;
 
-    private (int X, int Y, int Width, int Height) Pixels =>
-        ImageWidth > 0 && ImageHeight > 0 ? CropMath.ToPixels(_crop, ImageWidth, ImageHeight) : default;
+    /// <summary>The store the tool remembers its last choices in; Save writes it.</summary>
+    protected UserDataStore Store { get; }
+
+    protected ILocalizer Loc { get; }
+
+    protected ILogger? Log { get; }
+
+    /// <summary>The tool's name in the title bar, e.g. <c>tool.crop.title</c>.</summary>
+    protected abstract string TitleKey { get; }
+
+    /// <summary>What Save hands back, for every file; the tool also sets its choices in <see cref="Store"/> here.</summary>
+    protected abstract ToolResult? BuildResult();
+
+    /// <summary>The tool's starting state again (Reset), as one undo step.</summary>
+    protected abstract void ResetTool();
+
+    /// <summary>The tool's state now, as an undo step.</summary>
+    protected abstract object Snapshot();
+
+    /// <summary>Puts back a state <see cref="Snapshot"/> took.</summary>
+    protected abstract void Restore(object snapshot);
+
+    /// <summary>Another file is shown (<see cref="Index"/> and its size are already its own).</summary>
+    protected virtual void OnFileShown()
+    {
+    }
+
+    /// <summary>A key the window doesn't use (1 to 7 for a ratio, say); true when the tool took it. Not called while typing.</summary>
+    public virtual bool HandleKey(Key key, KeyModifiers modifiers) => false;
+
+    /// <summary>Call before a change by the user: the state until now becomes one undo step.</summary>
+    protected void RecordStep()
+    {
+        _undo.Push(Snapshot());
+        _redo.Clear();
+    }
 
     [RelayCommand(CanExecute = nameof(CanGoNext))]
     private void Next() => Show(Index + 1);
@@ -151,17 +154,16 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
 
     private bool CanGoPrevious => Index > 0;
 
-    /// <summary>The ratio's largest box in the middle again (the whole picture when free).</summary>
     [RelayCommand]
-    private void Reset() => Change(_aspect, CropMath.Initial(Ratio(_aspect), ImageWidth, ImageHeight));
+    private void Reset() => ResetTool();
 
     [RelayCommand]
     private void Undo()
     {
         if (_undo.TryPop(out var step))
         {
-            _redo.Push(new Step(_aspect, _box));
-            Set(step);
+            _redo.Push(Snapshot());
+            Restore(step);
         }
     }
 
@@ -170,29 +172,24 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
     {
         if (_redo.TryPop(out var step))
         {
-            _undo.Push(new Step(_aspect, _box));
-            Set(step);
+            _undo.Push(Snapshot());
+            Restore(step);
         }
     }
 
-    /// <summary>Hands the box back for every file and remembers the ratio for next time.</summary>
+    /// <summary>Hands the result back and remembers the tool's choices for next time.</summary>
     [RelayCommand]
     private void Save()
     {
-        var crop = _box.Clone();
-        // "Original" is each picture's own shape: the same fraction of either side, which a free box keeps on every
-        // file. As a number it would give every file the shape of the one on screen.
-        crop.Aspect = _aspect.Value == "original" ? null : Ratio(_aspect);
-        Result = new ImageEdit { Crop = crop };
-        _store.Settings.ImageTools.CropAspect = _aspect.Value;
+        Result = BuildResult();
         try
         {
-            _store.SaveSettings();
+            Store.SaveSettings();
         }
         catch (Exception ex)
         {
-            // A full disk or a locked settings file: the crop still runs, only the ratio is not remembered on disk.
-            _log?.LogWarning(ex, "Could not save the crop ratio");
+            // A full disk or a locked settings file: the edit still runs, only the choices are not remembered on disk.
+            Log?.LogWarning(ex, "Could not save the {Tool} tool's settings", Tool);
         }
         Finished?.Invoke(this, EventArgs.Empty);
     }
@@ -204,91 +201,21 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
         Finished?.Invoke(this, EventArgs.Empty);
     }
 
-    /// <summary>The ratio of a choice on the file shown (pixel width / height); null when free.</summary>
-    private double? Ratio(Choice<string> aspect) => CropMath.RatioOf(aspect.Value, ImageWidth, ImageHeight);
-
-    /// <summary><paramref name="box"/> with the ratio of <paramref name="aspect"/>, on the file shown.</summary>
-    private CropRect Fit(CropRect box, Choice<string> aspect)
-    {
-        var fitted = box.Clone();
-        fitted.Aspect = Ratio(aspect);
-        return CropMath.Refit(fitted, ImageWidth, ImageHeight);
-    }
-
-    /// <summary>Typed width or height (pixels): the box keeps its middle; a fixed ratio takes the height as a width.</summary>
-    private void SetPixels(double? width, double? height)
-    {
-        if (ImageWidth <= 0 || ImageHeight <= 0)
-            return;
-        if (_crop.Aspect is { } ratio && height is { } h)
-            (width, height) = (h * ratio, null);
-        var box = _crop.Clone();
-        if (width is { } w)
-        {
-            var f = Math.Clamp(w / ImageWidth, 0, 1);
-            box.X = Math.Clamp(box.X + box.Width / 2 - f / 2, 0, 1 - f);
-            box.Width = f;
-        }
-        if (height is { } hh)
-        {
-            var f = Math.Clamp(hh / ImageHeight, 0, 1);
-            box.Y = Math.Clamp(box.Y + box.Height / 2 - f / 2, 0, 1 - f);
-            box.Height = f;
-        }
-        Change(_aspect, box);
-    }
-
-    /// <summary>A change by the user: one undo step, unless it changes nothing.</summary>
-    private void Change(Choice<string> aspect, CropRect box)
-    {
-        var fitted = Fit(box, aspect);
-        if (aspect == _aspect && Same(fitted, _crop))
-        {
-            OnPropertyChanged(nameof(Crop)); // a canvas that set this box shows the one kept
-            return;
-        }
-        _undo.Push(new Step(_aspect, _box));
-        _redo.Clear();
-        Set(new Step(aspect, fitted));
-    }
-
-    private static bool Same(CropRect a, CropRect b) =>
-        Math.Abs(a.X - b.X) < 1e-9 && Math.Abs(a.Y - b.Y) < 1e-9 && Math.Abs(a.Width - b.Width) < 1e-9
-        && Math.Abs(a.Height - b.Height) < 1e-9 && a.Aspect == b.Aspect;
-
-    private void Set(Step step)
-    {
-        _aspect = step.Aspect;
-        _box = step.Box;
-        Refresh();
-    }
-
-    /// <summary>Shows the box (and what follows from it) on the file shown.</summary>
-    private void Refresh()
-    {
-        _crop = Fit(_box, _aspect);
-        OnPropertyChanged(nameof(Aspect));
-        OnPropertyChanged(nameof(Crop));
-        OnPropertyChanged(nameof(PixelWidth));
-        OnPropertyChanged(nameof(PixelHeight));
-    }
-
-    /// <summary>Goes to another file: the same box, refitted there; its picture is read now.</summary>
+    /// <summary>Goes to another file; its picture is read now.</summary>
     private void Show(int index)
     {
         if (index < 0 || index >= Count || index == Index)
             return;
         Index = index;
-        (ImageWidth, ImageHeight) = OrientedSize(_files[index]);
-        var old = Preview;
-        Preview = null;
-        old?.Dispose();
-        Refresh();
+        (ImageWidth, ImageHeight) = OrientedSize(Files[index]);
+        SetPreview(null);
+        OnFileShown();
         OnPropertyChanged(nameof(Index));
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(PositionText));
         OnPropertyChanged(nameof(ImageWidth));
         OnPropertyChanged(nameof(ImageHeight));
+        OnPropertyChanged(nameof(FullShortSide));
         NextCommand.NotifyCanExecuteChanged();
         PreviousCommand.NotifyCanExecuteChanged();
         _ = LoadPreviewAsync(index);
@@ -296,25 +223,34 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
 
     private async Task LoadPreviewAsync(int index)
     {
-        Bitmap? bitmap = null;
+        (Bitmap, SKImage)? read = null;
         try
         {
-            var path = _files[index];
-            bitmap = await Task.Run(() => ReadPreview(path));
+            var path = Files[index];
+            read = await Task.Run(() => ReadPreview(path));
         }
         catch (Exception)
         {
-            // Damaged, gone or locked since the donut looked at it: no picture, the box still goes on it.
+            // Damaged, gone or locked since the donut looked at it: no picture, the edit still goes on it.
         }
         // Another file was asked for meanwhile, or the window is gone.
         if (_disposed || index != Index)
         {
-            bitmap?.Dispose();
+            read?.Item1.Dispose();
+            EditPreviewDrawOperation.Release(read?.Item2);
             return;
         }
-        var old = Preview;
-        Preview = bitmap;
-        old?.Dispose();
+        SetPreview(read);
+    }
+
+    /// <summary>Shows a new preview (or none) and lets go of the one before.</summary>
+    private void SetPreview((Bitmap Bitmap, SKImage Image)? preview)
+    {
+        var (bitmap, image) = (Preview, PreviewImage);
+        Preview = preview?.Bitmap;
+        PreviewImage = preview?.Image;
+        bitmap?.Dispose();
+        EditPreviewDrawOperation.Release(image); // a frame being drawn finishes with it first
     }
 
     /// <summary>
@@ -338,27 +274,26 @@ public sealed partial class ImageToolViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// The picture read the way the engine reads it (its first frame only), turned upright, at most
-    /// <see cref="PreviewEdge"/> pixels on its long side, as a bitmap (through PNG in memory).
+    /// <see cref="PreviewEdge"/> pixels on its long side, handed over as saving hands it to the renderer (straight RGBA,
+    /// see EditBridge). One decode gives both: the bitmap the crop box is drawn over and the picture the renderer draws on.
     /// </summary>
-    private static Bitmap ReadPreview(string path)
+    private static (Bitmap, SKImage) ReadPreview(string path)
     {
         using var frames = ImageReader.Read(path, FormatRegistry.Detect(path)?.Id ?? "", new Preset(), firstFrameOnly: true);
         var image = frames[0];
         image.AutoOrient();
         if (Math.Max(image.Width, image.Height) > PreviewEdge)
             image.Resize(new MagickGeometry(PreviewEdge, PreviewEdge)); // fits inside, keeping the shape
-        image.Quality = 10; // zlib level 1, no filter: the PNG only lives until Avalonia has decoded it
-        using var png = new MemoryStream();
-        image.Write(png, MagickFormat.Png);
-        png.Position = 0;
-        return new Bitmap(png);
+        using var pixels = EditBridge.ToBitmap(image);
+        var bitmap = new Bitmap(PixelFormats.Rgba8888, AlphaFormat.Unpremul, pixels.GetPixels(),
+            new Avalonia.PixelSize(pixels.Width, pixels.Height), new Avalonia.Vector(96, 96), pixels.RowBytes);
+        pixels.SetImmutable(); // so the picture shares its pixels instead of copying them
+        return (bitmap, SKImage.FromBitmap(pixels));
     }
 
     public void Dispose()
     {
         _disposed = true;
-        var old = Preview;
-        Preview = null;
-        old?.Dispose();
+        SetPreview(null);
     }
 }

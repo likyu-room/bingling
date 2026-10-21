@@ -218,13 +218,19 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
 
     /// <summary>
     /// Opens the window of image tool <paramref name="tool"/> on <paramref name="files"/>, centred on
-    /// <paramref name="cursor"/> (screen pixels), and returns the edit the user applied; null when they closed it without.
+    /// <paramref name="cursor"/> (screen pixels), and returns what the user applied; null when they closed it without
+    /// (or when the tool has no window yet).
     /// </summary>
-    public virtual async Task<ImageEdit?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
+    public virtual async Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
     {
+        var log = services.GetService<ILogger<ImageToolViewModel>>();
+        using var vm = ImageToolViewModel.Create(tool, files, services.GetRequiredService<UserDataStore>(), loc, log);
+        if (vm is null)
+        {
+            log?.LogWarning("The {Tool} tool has no window yet; nothing opens", tool);
+            return null;
+        }
         Motion.Refresh();
-        using var vm = new ImageToolViewModel(tool, files, services.GetRequiredService<UserDataStore>(), loc,
-            services.GetService<ILogger<ImageToolViewModel>>());
         var window = new ImageToolWindow { DataContext = vm };
         window.PlaceNear(cursor);
         var closed = new TaskCompletionSource();

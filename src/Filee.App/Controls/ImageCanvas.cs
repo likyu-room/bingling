@@ -1,13 +1,12 @@
-// The picture in the image tool window with the crop box over it: fitted to the control, darker outside the box,
-// eight handles, a rule-of-thirds grid while dragging. A drag outside the box draws a new one, inside moves it, on a
-// handle or an edge resizes it; a fixed ratio is kept (a free box keeps its own while Shift is down). The wheel zooms,
-// Space + drag or the middle button pans. The box goes in and out as a CropRect (fractions of the picture), so it
-// means the same at any zoom, on the small preview and on the full-size file.
+// The picture in the crop window with the crop box over it: darker outside the box, eight handles, a rule-of-thirds
+// grid while dragging. A drag outside the box draws a new one, inside moves it, on a handle or an edge resizes it; a
+// fixed ratio is kept (a free box keeps its own while Shift is down). Zooming and panning are PictureView's. The box
+// goes in and out as a CropRect (fractions of the picture), so it means the same at any zoom, on the small preview and
+// on the full-size file.
 //
 // Drawn by hand like DonutMenu. The geometry is in small static methods (ImageToolWindowTests).
 
 using Avalonia;
-using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -17,24 +16,18 @@ using Filee.Core.Presets;
 namespace Filee.App.Controls;
 
 /// <summary>Shows a picture and lets the user draw, move and resize a crop box on it.</summary>
-public sealed class ImageCanvas : Control
+public sealed class ImageCanvas : PictureView
 {
     public static readonly StyledProperty<Bitmap?> SourceProperty =
         AvaloniaProperty.Register<ImageCanvas, Bitmap?>(nameof(Source));
     public static readonly StyledProperty<CropRect?> CropProperty =
         AvaloniaProperty.Register<ImageCanvas, CropRect?>(nameof(Crop), defaultBindingMode: BindingMode.TwoWay);
 
-    /// <summary>Room around the fitted picture, so the handles on its edges are not cut off.</summary>
-    internal const double Inset = 16;
-
     /// <summary>How far from an edge or a corner (in DIPs) the pointer still takes it.</summary>
     private const double Reach = 8;
 
     /// <summary>How far the pointer moves before a press becomes a drag: a click (or a double click) changes nothing.</summary>
     private const double DragThreshold = 3;
-
-    private const double MinZoom = .2;
-    private const double MaxZoom = 40;
 
     private static readonly IBrush Shade = new SolidColorBrush(Color.FromArgb(128, 0, 0, 0));
     private static readonly IPen BoxPen = new Pen(Brushes.White, 1.5);
@@ -53,21 +46,14 @@ public sealed class ImageCanvas : Control
         Move = 16,
     }
 
-    /// <summary>A press in progress: what it took, where, and the box and pan it started from.</summary>
-    private sealed record Press(Grip Grip, Point Start, CropRect Box, Vector Pan, bool Panning);
+    /// <summary>A press in progress: what it took, where, and the box it started from.</summary>
+    private sealed record Press(Grip Grip, Point Start, CropRect Box);
 
-    private double _zoom = 1;
-    private Vector _pan;
     private Press? _press;
     private CropRect? _live; // the box while it is dragged; the Crop property gets it on release
     private Grip? _hover;
 
-    static ImageCanvas()
-    {
-        AffectsRender<ImageCanvas>(SourceProperty, CropProperty);
-        FocusableProperty.OverrideDefaultValue<ImageCanvas>(true);
-        ClipToBoundsProperty.OverrideDefaultValue<ImageCanvas>(true);
-    }
+    static ImageCanvas() => AffectsRender<ImageCanvas>(SourceProperty, CropProperty);
 
     public ImageCanvas() => RenderOptions.SetBitmapInterpolationMode(this, BitmapInterpolationMode.HighQuality);
 
@@ -85,69 +71,20 @@ public sealed class ImageCanvas : Control
         set => SetValue(CropProperty, value);
     }
 
-    /// <summary>Space is held: a left drag pans (set by the window, which sees the keys wherever the focus is).</summary>
-    internal bool PanKeyDown { get; set; }
-
     /// <summary>Raised on a double click inside the box (the window saves).</summary>
     public event EventHandler? BoxDoubleClicked;
 
-    /// <summary>Shows the whole picture again (Ctrl+0).</summary>
-    public void Fit()
-    {
-        (_zoom, _pan) = (1, default);
-        InvalidateVisual();
-    }
+    /// <summary>The bitmap's size: this canvas draws <see cref="Source"/>, not the Skia picture.</summary>
+    protected override Size ContentSize => Source is { } source ? new Size(source.PixelSize.Width, source.PixelSize.Height) : default;
 
-    /// <summary>
-    /// One pixel of the file on one pixel of the screen (Ctrl+1), around the box. <paramref name="pixelWidth"/>: the
-    /// file's width, as the preview may be smaller.
-    /// </summary>
-    public void ShowActualSize(int pixelWidth)
-    {
-        if (Source is not { } source || pixelWidth <= 0)
-            return;
-        var scaling = TopLevel.GetTopLevel(this)?.RenderScaling ?? 1;
-        var fitted = ImageRect(Bounds.Size, SizeOf(source), 1, default);
-        _zoom = Math.Clamp(pixelWidth / scaling / fitted.Width, MinZoom, MaxZoom);
-        var image = ImageRect(Bounds.Size, SizeOf(source), _zoom, default);
-        _pan = Crop is { } crop ? new Rect(Bounds.Size).Center - ToScreen(crop, image).Center : default;
-        InvalidateVisual();
-    }
-
-    private static Size SizeOf(Bitmap source) => new(source.PixelSize.Width, source.PixelSize.Height);
-
-    private Rect ImageBounds(Bitmap source) => ImageRect(Bounds.Size, SizeOf(source), _zoom, _pan);
+    /// <summary>Ctrl+1 centres the box.</summary>
+    protected override Point? ActualSizeCentre(Rect picture) => Crop is { } crop ? ToScreen(crop, picture).Center : null;
 
     // ───────── Geometry ─────────
-
-    /// <summary>
-    /// Where the picture is drawn: fitted into <paramref name="bounds"/> less <see cref="Inset"/> and centred, then
-    /// <paramref name="zoom"/> times as large around the centre (1 = fitted) and moved by <paramref name="pan"/>.
-    /// </summary>
-    internal static Rect ImageRect(Size bounds, Size image, double zoom, Vector pan)
-    {
-        if (image.Width <= 0 || image.Height <= 0)
-            return default;
-        var fit = Math.Min(Math.Max(bounds.Width - 2 * Inset, 1) / image.Width, Math.Max(bounds.Height - 2 * Inset, 1) / image.Height);
-        var (w, h) = (image.Width * fit * zoom, image.Height * fit * zoom);
-        return new Rect(bounds.Width / 2 - w / 2 + pan.X, bounds.Height / 2 - h / 2 + pan.Y, w, h);
-    }
-
-    /// <summary>A point of the control as fractions of the picture drawn at <paramref name="image"/> (not clamped).</summary>
-    internal static Point ToFraction(Point p, Rect image) =>
-        new((p.X - image.X) / image.Width, (p.Y - image.Y) / image.Height);
 
     /// <summary>Where <paramref name="crop"/> is on the control, for the picture drawn at <paramref name="image"/>.</summary>
     internal static Rect ToScreen(CropRect crop, Rect image) =>
         new(image.X + crop.X * image.Width, image.Y + crop.Y * image.Height, crop.Width * image.Width, crop.Height * image.Height);
-
-    /// <summary>The pan that keeps the picture point under <paramref name="at"/> in place when the zoom becomes <paramref name="newZoom"/>.</summary>
-    internal static Vector ZoomAt(Size bounds, Size image, double zoom, Vector pan, Point at, double newZoom)
-    {
-        var u = ToFraction(at, ImageRect(bounds, image, zoom, pan));
-        var unpanned = ImageRect(bounds, image, newZoom, default);
-        return at - new Point(unpanned.X + u.X * unpanned.Width, unpanned.Y + u.Y * unpanned.Height);
-    }
 
     /// <summary>
     /// What a press at <paramref name="p"/> takes of <paramref name="box"/> (on the control): a corner, an edge (anywhere
@@ -243,65 +180,49 @@ public sealed class ImageCanvas : Control
     // ───────── Pointer ─────────
 
     /// <summary>What a press at <paramref name="p"/> takes. A box over the whole picture can't move: inside it, a drag draws a new one.</summary>
-    private Grip GripAt(CropRect crop, Point p, Bitmap source)
+    private Grip GripAt(CropRect crop, Point p)
     {
-        var grip = HitTest(ToScreen(crop, ImageBounds(source)), p, Reach);
+        var grip = HitTest(ToScreen(crop, PictureRect), p, Reach);
         return grip == Grip.Move && crop.Width >= .999 && crop.Height >= .999 ? Grip.None : grip;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
-        base.OnPointerPressed(e);
-        Focus();
-        if (Source is not { } source || Crop is not { } crop)
+        base.OnPointerPressed(e); // a pan
+        if (e.Handled || Source is null || Crop is not { } crop)
             return;
         var point = e.GetCurrentPoint(this);
         var p = point.Position;
-        if (point.Properties.IsMiddleButtonPressed || (point.Properties.IsLeftButtonPressed && PanKeyDown))
+        if (!point.Properties.IsLeftButtonPressed)
+            return;
+        if (e.ClickCount == 2 && ToScreen(crop, PictureRect).Contains(p))
         {
-            _press = new Press(Grip.None, p, crop, _pan, Panning: true);
-        }
-        else if (point.Properties.IsLeftButtonPressed)
-        {
-            if (e.ClickCount == 2 && ToScreen(crop, ImageBounds(source)).Contains(p))
-            {
-                BoxDoubleClicked?.Invoke(this, EventArgs.Empty);
-                e.Handled = true;
-                return;
-            }
-            _press = new Press(GripAt(crop, p, source), p, crop, _pan, Panning: false);
-        }
-        else
-        {
+            BoxDoubleClicked?.Invoke(this, EventArgs.Empty);
+            e.Handled = true;
             return;
         }
+        _press = new Press(GripAt(crop, p), p, crop);
         e.Pointer.Capture(this);
         e.Handled = true;
     }
 
     protected override void OnPointerMoved(PointerEventArgs e)
     {
-        base.OnPointerMoved(e);
-        var p = e.GetPosition(this);
-        if (Source is not { } source)
+        base.OnPointerMoved(e); // a pan
+        if (e.Handled || Source is null)
             return;
+        var p = e.GetPosition(this);
         if (_press is not { } press)
         {
-            ShowCursor(PanKeyDown ? null : Crop is { } crop ? GripAt(crop, p, source) : Grip.None);
-            return;
-        }
-        if (press.Panning)
-        {
-            _pan = press.Pan + (p - press.Start);
-            InvalidateVisual();
+            ShowCursor(PanKeyDown ? null : Crop is { } crop ? GripAt(crop, p) : Grip.None);
             return;
         }
         if (_live is null && Point.Distance(p, press.Start) < DragThreshold)
             return;
 
-        var image = ImageBounds(source);
+        var image = PictureRect;
         var to = ToFraction(p, image);
-        var ratio = FractionRatio(press.Box, e.KeyModifiers.HasFlag(KeyModifiers.Shift), SizeOf(source));
+        var ratio = FractionRatio(press.Box, e.KeyModifiers.HasFlag(KeyModifiers.Shift), ContentSize);
         _live = press.Grip switch
         {
             Grip.Move => Move(press.Box, to - ToFraction(press.Start, image)),
@@ -317,8 +238,8 @@ public sealed class ImageCanvas : Control
 
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
-        base.OnPointerReleased(e);
-        if (_press is null)
+        base.OnPointerReleased(e); // a pan
+        if (e.Handled || _press is null)
             return;
         var live = _live;
         EndPress();
@@ -338,18 +259,6 @@ public sealed class ImageCanvas : Control
         _press = null;
         _live = null;
         InvalidateVisual();
-    }
-
-    protected override void OnPointerWheelChanged(PointerWheelEventArgs e)
-    {
-        base.OnPointerWheelChanged(e);
-        if (Source is not { } source)
-            return;
-        var zoom = Math.Clamp(_zoom * Math.Pow(1.2, e.Delta.Y), MinZoom, MaxZoom);
-        _pan = ZoomAt(Bounds.Size, SizeOf(source), _zoom, _pan, e.GetPosition(this), zoom);
-        _zoom = zoom;
-        InvalidateVisual();
-        e.Handled = true;
     }
 
     /// <summary>The pointer's shape for what it would take; null: the hand of Space + drag.</summary>
@@ -384,10 +293,10 @@ public sealed class ImageCanvas : Control
 
     public override void Render(DrawingContext context)
     {
-        context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size)); // takes the pointer everywhere, also off the picture
+        base.Render(context); // takes the pointer everywhere (no Skia picture is set here)
         if (Source is not { } source)
             return;
-        var image = ImageBounds(source);
+        var image = PictureRect;
         context.DrawImage(source, image);
         if ((_live ?? Crop) is not { } crop)
             return;

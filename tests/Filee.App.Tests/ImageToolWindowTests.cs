@@ -11,6 +11,7 @@ using Avalonia.VisualTree;
 using Filee.App.Controls;
 using Filee.App.Services;
 using Filee.App.ViewModels;
+using Filee.App.ViewModels.Tools;
 using Filee.App.Views;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
@@ -62,6 +63,9 @@ public class ImageToolWindowTests
         return AppHost.Get<ILocalizer>();
     }
 
+    private static CropToolViewModel Crop(IReadOnlyList<string> files, UserDataStore store, ILocalizer loc) =>
+        Assert.IsType<CropToolViewModel>(ImageToolViewModel.Create(ImageToolKind.Crop, files, store, loc));
+
     /// <summary>Runs the UI thread until the preview, read on another thread, has arrived.</summary>
     private static void WaitForPreview(ImageToolViewModel vm)
     {
@@ -81,7 +85,7 @@ public class ImageToolWindowTests
     {
         var store = TestStore();
         store.Settings.ImageTools.CropAspect = "1:1";
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200)], store, Loc("ko"));
+        var vm = Crop([TestImages.Png(400, 200)], store, Loc("ko"));
         Assert.Equal("1:1", vm.Aspect.Value);
         Assert.Equal((200, 200), (vm.PixelWidth, vm.PixelHeight));
         Assert.Equal(.25, vm.Crop.X, 3);
@@ -94,7 +98,7 @@ public class ImageToolWindowTests
     [AvaloniaFact]
     public void Next_file_shows_the_same_box_refitted_and_save_returns_one_shared_edit()
     {
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
+        var vm = Crop([TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
         Assert.Equal("2개 중 1", vm.PositionText);
         Assert.Equal("2개 파일에 함께 적용돼요", vm.FooterText);
         vm.Aspect = vm.Aspects.Single(a => a.Value == "1:1");
@@ -104,8 +108,9 @@ public class ImageToolWindowTests
         Assert.Equal((100, 100), (vm.PixelWidth, vm.PixelHeight)); // half the width of the portrait picture
         Assert.False(vm.NextCommand.CanExecute(null));
         vm.SaveCommand.Execute(null);
-        Assert.Equal(1.0, vm.Result!.Crop!.Aspect);
-        Assert.Equal(.5, vm.Result.Crop.Width, 6);
+        Assert.Equal(1.0, vm.Result!.Shared!.Crop!.Aspect);
+        Assert.Equal(.5, vm.Result.Shared!.Crop.Width, 6);
+        Assert.Null(vm.Result.PerFile); // one edit for every file
     }
 
     [AvaloniaFact]
@@ -114,22 +119,22 @@ public class ImageToolWindowTests
         // The engine refits the one box on every file (CropMath.Refit), as the preview did: so Save hands back the box
         // itself. A 1:1 box on the 400 × 200 file is half its width and all of its height; on the 200 × 400 file it shows
         // as all of the width and a quarter of the height.
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
+        var vm = Crop([TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
         vm.Aspect = vm.Aspects.Single(a => a.Value == "1:1");
         vm.NextCommand.Execute(null);
         Assert.Equal(.25, vm.Crop.Height, 6); // the one shown
         vm.SaveCommand.Execute(null);
-        var saved = vm.Result!.Crop!;
+        var saved = vm.Result!.Shared!.Crop!;
         Assert.Equal((.25, 0.0, .5, 1.0, (double?)1.0), (saved.X, saved.Y, saved.Width, saved.Height, saved.Aspect));
 
         // "원본" (each file's own shape) on several files: saved without a ratio, so every file keeps its own.
-        vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
+        vm = Crop([TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
         Assert.Equal("원본", vm.Aspect.Label);
         vm.PixelWidth = 200;
         vm.NextCommand.Execute(null);
         vm.SaveCommand.Execute(null);
-        Assert.Null(vm.Result!.Crop!.Aspect);
-        Assert.Equal((.5, .5), (vm.Result.Crop.Width, vm.Result.Crop.Height));
+        Assert.Null(vm.Result!.Shared!.Crop!.Aspect);
+        Assert.Equal((.5, .5), (vm.Result.Shared!.Crop.Width, vm.Result.Shared!.Crop.Height));
     }
 
     [AvaloniaFact]
@@ -142,7 +147,7 @@ public class ImageToolWindowTests
         var store = new UserDataStore(blocked);
         Assert.ThrowsAny<IOException>(store.SaveSettings);
 
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200)], store, Loc("ko"));
+        var vm = Crop([TestImages.Png(400, 200)], store, Loc("ko"));
         var finished = false;
         vm.Finished += (_, _) => finished = true;
         vm.SaveCommand.Execute(null);
@@ -156,7 +161,7 @@ public class ImageToolWindowTests
     public void Typing_a_pixel_width_keeps_a_fixed_ratio_and_save_remembers_the_aspect()
     {
         var store = TestStore();
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200)], store, Loc("ko"));
+        var vm = Crop([TestImages.Png(400, 200)], store, Loc("ko"));
         vm.Aspect = vm.Aspects.Single(a => a.Value == "16:9");
         vm.PixelWidth = 160;
         Assert.Equal(90, vm.PixelHeight);
@@ -177,7 +182,7 @@ public class ImageToolWindowTests
     [AvaloniaFact]
     public void Undo_restores_the_previous_box_and_cancel_returns_nothing()
     {
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        var vm = Crop([TestImages.Png(400, 200)], TestStore(), Loc("ko"));
         var before = vm.Crop.Clone();
         vm.Aspect = vm.Aspects.Single(a => a.Value == "free");
         vm.Crop = new CropRect { X = .1, Y = .1, Width = .2, Height = .2 };
@@ -198,14 +203,14 @@ public class ImageToolWindowTests
     public void Original_keeps_each_files_own_shape()
     {
         // The box of "original" is the same fraction of either side: on another file it has that file's shape.
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("en"));
+        var vm = Crop([TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("en"));
         Assert.Equal("original", vm.Aspect.Value);
         vm.PixelWidth = 200;
         Assert.Equal(100, vm.PixelHeight);
         vm.NextCommand.Execute(null);
         Assert.Equal((100, 200), (vm.PixelWidth, vm.PixelHeight));
         vm.SaveCommand.Execute(null);
-        var crop = vm.Result!.Crop!;
+        var crop = vm.Result!.Shared!.Crop!;
         Assert.Null(crop.Aspect); // so the engine keeps the fractions on every file
         Assert.Equal((100, 50), (CropMath.ToPixels(crop, 200, 100).Width, CropMath.ToPixels(crop, 200, 100).Height));
     }
@@ -213,7 +218,7 @@ public class ImageToolWindowTests
     [AvaloniaFact]
     public void A_turned_phone_photo_is_measured_and_shown_the_way_it_stands()
     {
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.TurnedJpeg(400, 200)], TestStore(), Loc("en"));
+        var vm = Crop([TestImages.TurnedJpeg(400, 200)], TestStore(), Loc("en"));
         Assert.Equal((200, 400), (vm.ImageWidth, vm.ImageHeight));
         WaitForPreview(vm);
         Assert.Equal(new PixelSize(200, 400), vm.Preview!.PixelSize);
@@ -223,7 +228,7 @@ public class ImageToolWindowTests
     [AvaloniaFact]
     public void The_preview_is_no_larger_than_2048_pixels()
     {
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(3000, 1000)], TestStore(), Loc("en"));
+        var vm = Crop([TestImages.Png(3000, 1000)], TestStore(), Loc("en"));
         Assert.Equal((3000, 1000), (vm.ImageWidth, vm.ImageHeight));
         WaitForPreview(vm);
         Assert.Equal(2048, vm.Preview!.PixelSize.Width);
@@ -232,9 +237,9 @@ public class ImageToolWindowTests
 
     // ───────── The window ─────────
 
-    private static (ImageToolWindow Window, ImageToolViewModel Vm) Open(params string[] files)
+    private static (ImageToolWindow Window, CropToolViewModel Vm) Open(params string[] files)
     {
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, files, TestStore(), Loc("ko"));
+        var vm = Crop(files, TestStore(), Loc("ko"));
         var window = new ImageToolWindow { DataContext = vm, Width = 900, Height = 600 };
         window.Show();
         WaitForPreview(vm);
@@ -262,7 +267,7 @@ public class ImageToolWindowTests
         window.Closed += (_, _) => closed = true;
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         Assert.True(closed);
-        Assert.Equal(1.0, vm.Result!.Crop!.Aspect);
+        Assert.Equal(1.0, vm.Result!.Shared!.Crop!.Aspect);
     }
 
     [AvaloniaFact]
@@ -285,7 +290,7 @@ public class ImageToolWindowTests
         Assert.False(closed);
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         Assert.True(closed);
-        Assert.Equal(.25, vm.Result!.Crop!.Width, 6);
+        Assert.Equal(.25, vm.Result!.Shared!.Crop!.Width, 6);
     }
 
     [AvaloniaFact]
@@ -304,7 +309,7 @@ public class ImageToolWindowTests
     {
         var (window, vm) = Open(TestImages.Png(400, 200));
         vm.Aspect = vm.Aspects.Single(a => a.Value == "free");
-        var canvas = window.FindControl<ImageCanvas>("Picture")!;
+        var canvas = window.GetVisualDescendants().OfType<ImageCanvas>().Single();
         var image = ImageCanvas.ImageRect(canvas.Bounds.Size, new Size(400, 200), 1, default);
         Point At(double x, double y) => canvas.TranslatePoint(new Point(image.X + x * image.Width, image.Y + y * image.Height), window)!.Value;
 
@@ -337,7 +342,7 @@ public class ImageToolWindowTests
         window.MouseDown(At(.3, .5), MouseButton.Left); // the second one makes it a double click: saved and closed
         Assert.True(closed);
         Assert.NotNull(vm.Result);
-        Assert.Equal(.1, vm.Result.Crop!.X, 2);
+        Assert.Equal(.1, vm.Result.Shared!.Crop!.X, 2);
     }
 
     [AvaloniaFact]
@@ -372,7 +377,7 @@ public class ImageToolWindowTests
         Assert.InRange(position.X, area.X, area.Right - (int)(size.Width * 2.5));
 
         // At that size the picture gives way, not the bar with Save.
-        var vm = new ImageToolViewModel(ImageToolKind.Crop, [TestImages.Png(400, 300)], TestStore(), Loc("ko"));
+        var vm = Crop([TestImages.Png(400, 300)], TestStore(), Loc("ko"));
         var window = new ImageToolWindow { DataContext = vm, MinWidth = smallest.Width, MinHeight = smallest.Height, Width = size.Width, Height = size.Height };
         window.Show();
         Dispatcher.UIThread.RunJobs();
@@ -380,7 +385,7 @@ public class ImageToolWindowTests
         var bottom = save.TranslatePoint(new Point(0, save.Bounds.Height), window)!.Value.Y;
         Assert.Equal(size.Height, window.ClientSize.Height, 1);
         Assert.InRange(bottom, 0, window.ClientSize.Height);
-        Assert.True(window.FindControl<ImageCanvas>("Picture")!.Bounds.Height > 0);
+        Assert.True(window.GetVisualDescendants().OfType<ImageCanvas>().Single().Bounds.Height > 0);
         window.Close();
         vm.Dispose();
     }

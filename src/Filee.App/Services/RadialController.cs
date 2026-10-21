@@ -347,9 +347,10 @@ public sealed class RadialController(
 
     /// <summary>
     /// A tool slice (crop): the donut closes and the tool's window opens where the donut was; the conversion starts with
-    /// the edit it made (none: closed without applying, nothing runs). It shows in the toast, not on a ring. The donut
-    /// looked into the first files only (<see cref="ImageToolSupport.LookedIntoOnOpen"/>): now all of them are, and what
-    /// is not a still picture is left out, with a note that says so (no window when nothing is left).
+    /// the edit it made, one for every file or each file's own (none: closed without applying, nothing runs). It shows
+    /// in the toast, not on a ring. The donut looked into the first files only
+    /// (<see cref="ImageToolSupport.LookedIntoOnOpen"/>): now all of them are, and what is not a still picture is left
+    /// out, with a note that says so (no window when nothing is left).
     /// </summary>
     private void OpenTool(Preset preset, IReadOnlyList<string> files)
     {
@@ -377,10 +378,16 @@ public sealed class RadialController(
                         lines.Add("…");
                     await windows.MessageAsync(null, string.Join(Environment.NewLine, lines));
                 }
-                if (picked.Count == 0 || await windows.EditImageAsync(preset.Tool, picked, cursor) is not { } edit)
+                if (picked.Count == 0 || await windows.EditImageAsync(preset.Tool, picked, cursor) is not { } result)
                     return;
+                if (result.PerFile is { } perFile)
+                {
+                    // Each file its own edit (annotate): one job of the files that have one.
+                    conversions.Start(perFile.Keys.ToList(), preset, perFile);
+                    return;
+                }
                 var run = preset.Clone();
-                run.Image.Edit = edit;
+                run.Image.Edit = result.Shared;
                 conversions.Start(picked, run);
             }
             catch (Exception ex)

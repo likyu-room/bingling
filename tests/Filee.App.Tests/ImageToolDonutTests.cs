@@ -166,8 +166,8 @@ public class ImageToolDonutTests
         Assert.False(ImageToolSupport.IsEditable("ico"));
     }
 
-    /// <summary>A WindowService whose tool window "opens" at once and answers with the edit the test hands it.</summary>
-    private sealed class FakeToolWindows(ImageEdit? answer)
+    /// <summary>A WindowService whose tool window "opens" at once and answers with the result the test hands it.</summary>
+    private sealed class FakeToolWindows(ToolResult? answer)
         : WindowService(AppHost.Get<ILocalizer>(), AppHost.Get<IServiceProvider>(), AppHost.Get<MemoryTrimmer>())
     {
         public List<(ImageToolKind Tool, string[] Files, PixelPoint Cursor)> Opened { get; } = [];
@@ -175,7 +175,7 @@ public class ImageToolDonutTests
         /// <summary>The messages shown (answered at once, as if OK was pressed).</summary>
         public List<string> Messages { get; } = [];
 
-        public override Task<ImageEdit?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
+        public override Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
         {
             Opened.Add((tool, [.. files], cursor));
             return Task.FromResult(answer);
@@ -198,12 +198,19 @@ public class ImageToolDonutTests
 
     /// <summary>
     /// Opens the donut on <paramref name="files"/> at (400, 400) and clicks the crop slice of its tools ring
-    /// (<paramref name="beforeClick"/> runs in between, with the donut open).
+    /// (<paramref name="beforeClick"/> runs in between, with the donut open). The window answers with one
+    /// <paramref name="edit"/> for every file.
     /// </summary>
     private static (RadialController Radial, FakeToolWindows Windows) ClickCrop(string[] files, ImageEdit? edit, Action? beforeClick = null)
     {
+        var windows = new FakeToolWindows(edit is null ? null : new ToolResult(edit, null));
+        return (ClickTool(files, windows, slice: 0, beforeClick), windows);
+    }
+
+    /// <summary>Opens the donut on <paramref name="files"/> with <paramref name="windows"/> and clicks slice <paramref name="slice"/> of its tools ring (0: crop).</summary>
+    private static RadialController ClickTool(string[] files, WindowService windows, int slice, Action? beforeClick = null)
+    {
         TestServices.EnsureInitialized("ko");
-        var windows = new FakeToolWindows(edit);
         var radial = new RadialController(AppHost.Get<RadialViewModel>(), AppHost.Get<ConversionService>(), windows,
             AppHost.Get<Filee.Core.Settings.UserDataStore>(), AppHost.Get<Filee.Core.Platform.IPlatformServices>(),
             AppHost.Get<Microsoft.Extensions.Logging.ILogger<RadialController>>(), AppHost.Get<ILocalizer>());
@@ -217,8 +224,10 @@ public class ImageToolDonutTests
         donut.SetExternalHit(donut.HitTest(onGroup), onGroup);
         donut.ExpandPendingGroup();
         donut.HandleKey(Key.Enter); // into the ring, on the crop slice
+        for (var i = 0; i < slice; i++)
+            donut.HandleKey(Key.Right);
         donut.HandleKey(Key.Enter); // and click it
-        return (radial, windows);
+        return radial;
     }
 
     [AvaloniaFact]
@@ -262,6 +271,58 @@ public class ImageToolDonutTests
 
         Assert.False(radial.IsVisible);
         Assert.Single(windows.Opened);
+        Assert.Equal(jobs, conversions.Jobs.Count);
+    }
+
+    [AvaloniaFact]
+    public void Tool_result_with_per_file_edits_starts_one_job_with_them()
+    {
+        TestServices.EnsureInitialized("ko");
+        var files = TestImages.Png(3);
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        // Drawn on the first and the last file; nothing on the middle one.
+        var windows = new FakeToolWindows(new ToolResult(null, new Dictionary<string, ImageEdit>
+        {
+            [files[0]] = new() { Annotations = [new Annotation { Kind = AnnotationKind.Arrow }] },
+            [files[2]] = new() { Annotations = [new Annotation { Kind = AnnotationKind.Number, Number = 1 }] },
+        }));
+        ClickTool(files, windows, slice: 0);
+        RunUntil(() => conversions.Jobs.Count > jobs);
+
+        Assert.Equal(jobs + 1, conversions.Jobs.Count); // one job, one card
+        var job = conversions.Jobs[0].Job;
+        Assert.Equal([files[0], files[2]], job.Sources);
+        Assert.Equal(AnnotationKind.Arrow, Assert.Single(job.EditsByFile![files[0]].Annotations!).Kind);
+        Assert.Equal(AnnotationKind.Number, Assert.Single(job.EditsByFile[files[2]].Annotations!).Kind);
+        Assert.Null(job.Preset.Image.Edit); // each file runs with its own
+        conversions.Jobs[0].DismissCommand.Execute(null);
+    }
+
+    /// <summary>The real tool windows, noting what opening one handed back.</summary>
+    private sealed class RecordingToolWindows()
+        : WindowService(AppHost.Get<ILocalizer>(), AppHost.Get<IServiceProvider>(), AppHost.Get<MemoryTrimmer>())
+    {
+        public Task<ToolResult?>? Opening { get; private set; }
+
+        public override Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor) =>
+            Opening = base.EditImageAsync(tool, files, cursor);
+    }
+
+    [AvaloniaFact]
+    public void Redact_opens_no_window_and_runs_nothing_before_its_window_is_built()
+    {
+        TestServices.EnsureInitialized("ko");
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        var windows = new RecordingToolWindows();
+        ClickTool(TestImages.Png(1), windows, slice: 2); // crop, add background, redact
+        RunUntil(() => windows.Opening is not null);
+        Dispatcher.UIThread.RunJobs();
+
+        // Done at once with nothing: a window would have kept it waiting until it was closed.
+        Assert.True(windows.Opening!.IsCompletedSuccessfully);
+        Assert.Null(windows.Opening.Result);
         Assert.Equal(jobs, conversions.Jobs.Count);
     }
 
