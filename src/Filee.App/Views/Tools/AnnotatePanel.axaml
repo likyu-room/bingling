@@ -61,9 +61,9 @@
         </ListBoxItem>
       </ListBox>
 
-      <!-- What the cells' tips don't say: Shift, Enter, a double click. The room for two lines is kept, so the chips below
-           don't jump when another tool is picked. -->
-      <TextBlock Classes="caption" TextWrapping="Wrap" MinHeight="32" Text="{Binding ToolHint}" />
+      <!-- What the cells' tips don't say: Shift, Enter, a double click. The room for three lines (the longest hints of the
+           other languages, checked by a test) is kept, so the chips below don't jump when another tool is picked. -->
+      <TextBlock x:Name="HintText" Classes="caption" TextWrapping="Wrap" MinHeight="50" Text="{Binding ToolHint}" />
 
       <!-- Always there, on while a drawing is picked: the Delete key was the only way, and nothing said so. -->
       <Button x:Name="DeleteButton" HorizontalAlignment="Left" Padding="10,5" Focusable="False" Command="{Binding DeleteSelectionCommand}"

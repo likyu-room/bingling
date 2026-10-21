@@ -80,7 +80,12 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
         set => Change(value, _selected);
     }
 
-    /// <summary>The picked drawing, an index into <see cref="Annotations"/>; -1 for none. Picking is not an undo step.</summary>
+    /// <summary>
+    /// The picked drawing, an index into <see cref="Annotations"/>; -1 for none. Picking is not an undo step. Picking one
+    /// makes the colour and thickness chips show its own (as drawing programs do), so that pressing the chip a drawing does
+    /// not have is a change, and the chip it has is not mistaken for "already chosen". Those are then also what the next
+    /// drawings are drawn with.
+    /// </summary>
     public int SelectedIndex
     {
         get => _selected;
@@ -92,6 +97,7 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
             _selected = picked;
             OnPropertyChanged();
             NotifySelection();
+            ShowPickedStyle();
         }
     }
 
@@ -307,6 +313,38 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
         return new ToolResult(null, perFile);
     }
 
+    /// <summary>
+    /// The chips (and the typed colour) show the picked drawing's colour and thickness, which new drawings then take. Not a
+    /// change of the drawing: <see cref="RestylePicked"/> is not called, and a drawing already in this style is left alone.
+    /// </summary>
+    private void ShowPickedStyle()
+    {
+        if (_selected < 0 || _selected >= Annotations.Count)
+            return;
+        var picked = Annotations[_selected];
+        if (BackgroundToolViewModel.HexColor(picked.Color) is { } hex && hex != _color)
+        {
+            _color = hex;
+            OnPropertyChanged(nameof(Color));
+            OnPropertyChanged(nameof(SelectedColor));
+            OnPropertyChanged(nameof(IsCustomColor));
+        }
+        if (picked.Width != _width)
+        {
+            _width = picked.Width;
+            OnPropertyChanged(nameof(StrokeWidth));
+            OnPropertyChanged(nameof(SelectedWidth));
+        }
+        // A colour no chip has goes in the box too, as the one that is on (a code being typed is the same colour: left as typed).
+        if (IsCustomColor && BackgroundToolViewModel.HexColor(_hex) != _color)
+        {
+            _hex = _color;
+            OnPropertyChanged(nameof(CustomColorHex));
+            OnPropertyChanged(nameof(CustomColorBrush));
+            OnPropertyChanged(nameof(HasCustomColor));
+        }
+    }
+
     private void SetColor(string hex)
     {
         _color = hex;
@@ -364,6 +402,7 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
         OnPropertyChanged(nameof(Annotations));
         OnPropertyChanged(nameof(SelectedIndex));
         NotifySelection();
+        ShowPickedStyle(); // an undo gives the picked drawing its old colour back, and the chips follow
         OnPropertyChanged(nameof(FooterText));
         NotifyCanSaveChanged();
     }

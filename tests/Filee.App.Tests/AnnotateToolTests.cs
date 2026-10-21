@@ -802,6 +802,90 @@ public class AnnotateToolTests
         vm.Dispose();
     }
 
+    /// <summary>A mouse press and release on chip <paramref name="index"/> of the panel's list <paramref name="list"/>.</summary>
+    private static void PressChip(Window window, string list, int index)
+    {
+        var chip = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == list).ContainerFromIndex(index)!;
+        var at = chip.TranslatePoint(new Point(chip.Bounds.Width / 2, chip.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+    }
+
+    [AvaloniaFact]
+    public void Picking_a_drawing_shows_its_own_colour_and_thickness_so_the_chip_it_lacks_changes_it()
+    {
+        var (window, vm) = Open();
+        bool IsOn(string list, int index) =>
+            window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == list).ContainerFromIndex(index) is ListBoxItem { IsSelected: true };
+
+        // A red arrow; then blue and thick, and a line in that.
+        Key(window, PhysicalKey.A);
+        Drag(window, At(window, .1, .2), At(window, .6, .8));
+        PressChip(window, "ColorChips", 4);
+        PressChip(window, "WidthChips", 2);
+        Key(window, PhysicalKey.L);
+        Drag(window, At(window, .1, .85), At(window, .6, .95));
+        Assert.Equal([("#FF3B30", StrokeLevel.Normal), ("#007AFF", StrokeLevel.Thick)], vm.Annotations.Select(a => (a.Color, a.Width)));
+
+        // Pick the arrow: the chips show red and normal, not the blue and thick of the last drawing. (Pressing blue now,
+        // with blue still shown, did nothing: the chip that is on cannot change.)
+        Key(window, PhysicalKey.V);
+        var drawn = vm.Annotations;
+        Click(window, At(window, .35, .5));
+        Assert.Equal(0, vm.SelectedIndex);
+        Assert.Same(drawn, vm.Annotations); // picking changed nothing and made no undo step
+        Assert.Equal(("#FF3B30", StrokeLevel.Normal), (vm.SelectedColor!.Hex, vm.StrokeWidth));
+        Assert.True(IsOn("ColorChips", 0) && IsOn("WidthChips", 1));
+        Assert.False(IsOn("ColorChips", 4));
+
+        PressChip(window, "ColorChips", 4);
+        Assert.Equal(("#007AFF", StrokeLevel.Normal), (vm.Annotations[0].Color, vm.Annotations[0].Width));
+        PressChip(window, "WidthChips", 2);
+        Assert.Equal(("#007AFF", StrokeLevel.Thick), (vm.Annotations[0].Color, vm.Annotations[0].Width));
+        Assert.Equal(("#007AFF", StrokeLevel.Thick), (vm.Annotations[1].Color, vm.Annotations[1].Width)); // the line, as it was
+        Key(window, PhysicalKey.Z, RawInputModifiers.Control); // one step each, with the chips following
+        Assert.Equal(StrokeLevel.Normal, vm.Annotations[0].Width);
+        Assert.True(IsOn("WidthChips", 1));
+        Key(window, PhysicalKey.Z, RawInputModifiers.Control);
+        Assert.Equal("#FF3B30", vm.Annotations[0].Color);
+        Assert.True(IsOn("ColorChips", 0));
+
+        // What was picked last is what the next drawing is drawn with.
+        PressChip(window, "ColorChips", 1); // the arrow, orange now
+        Key(window, PhysicalKey.R);
+        Drag(window, At(window, .7, .2), At(window, .9, .5));
+        Assert.Equal(("#FF9500", StrokeLevel.Normal), (vm.Annotations[^1].Color, vm.Annotations[^1].Width));
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Picking_a_drawing_with_a_colour_no_chip_has_puts_it_in_the_colour_box()
+    {
+        var vm = Annotate([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore());
+        vm.Annotations = [Arrow("#AB1234", StrokeLevel.Thick), Arrow()];
+
+        vm.SelectedIndex = 0;
+        Assert.Null(vm.SelectedColor);
+        Assert.True(vm.IsCustomColor);
+        Assert.Equal("#AB1234", vm.CustomColorHex);
+        Assert.True(vm.HasCustomColor);
+        Assert.Equal(StrokeLevel.Thick, vm.StrokeWidth);
+
+        vm.SelectedIndex = 1; // a chip's colour: the chip, and the box keeps its code
+        Assert.Equal("#FF3B30", vm.SelectedColor!.Hex);
+        Assert.False(vm.IsCustomColor);
+        Assert.Equal(StrokeLevel.Normal, vm.StrokeWidth);
+
+        // A code typed in is the picked drawing's colour at once, and is left as typed.
+        vm.CustomColorHex = "12ab34";
+        Assert.Equal("#12AB34", vm.Annotations[1].Color);
+        Assert.Equal("12ab34", vm.CustomColorHex);
+        vm.UndoCommand.Execute(null); // the drawing red again, and the chips with it
+        Assert.Equal("#FF3B30", vm.SelectedColor!.Hex);
+        vm.Dispose();
+    }
+
     [AvaloniaFact]
     public void The_thickness_keys_change_the_picked_drawing_and_a_text_changes_its_size()
     {
@@ -910,6 +994,46 @@ public class AnnotateToolTests
         Assert.Equal("누른 곳에 써요. Enter로 마치고, Shift+Enter로 줄을 바꿔요.", Hint("text"));
         Assert.Equal("끌어서 그려요. Shift를 누르면 반듯하게 꺾여요.", Hint("line"));
         Assert.Equal("끌어서 그려요. Shift를 누르면 정사각형·정원이 돼요.", Hint("shape"));
+        vm.Dispose();
+    }
+
+    /// <summary>
+    /// The room kept for the hint is enough for every hint in every language (the longer Polish, Spanish and Hindi ones
+    /// take three or four lines in the 224 px of the panel): the text is never cut, and the chips below do not jump when
+    /// another tool is picked.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("ko")]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("hi")]
+    [InlineData("pl")]
+    [InlineData("zh-CN")]
+    public void The_room_for_the_hint_holds_every_hint_in_every_language(string language)
+    {
+        TestServices.EnsureInitialized(language);
+        var vm = Assert.IsType<AnnotateToolViewModel>(ImageToolViewModel.Create(ImageToolKind.Annotate,
+            [ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), AppHost.Get<ILocalizer>()));
+        var window = new ImageToolWindow { DataContext = vm, Width = 900, Height = 600 };
+        window.Show();
+        WaitForPreview(vm);
+        var hint = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Name == "HintText");
+        var chips = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "ColorChips");
+        double ChipsTop() => chips.TranslatePoint(default, window)!.Value.Y;
+
+        double? top = null;
+        foreach (var tool in new AnnotationKind?[] { null, AnnotationKind.Pen, AnnotationKind.Highlighter, AnnotationKind.Arrow,
+            AnnotationKind.Line, AnnotationKind.Rectangle, AnnotationKind.Ellipse, AnnotationKind.Text, AnnotationKind.Number })
+        {
+            vm.DrawingTool = tool;
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Assert.Equal(vm.ToolHint, hint.Text);
+            Assert.True(hint.Bounds.Height <= hint.MinHeight + .01, $"{language} {tool}: the hint needs {hint.Bounds.Height} of {hint.MinHeight}");
+            top ??= ChipsTop();
+            Assert.Equal(top.Value, ChipsTop(), 1); // the colour chips stay where they are
+        }
+        window.Close();
         vm.Dispose();
     }
 

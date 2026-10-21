@@ -1033,10 +1033,11 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
         DrawGlassEdge(context, disc);
 
         var maxWidth = radius * 1.6;
-        // measured only when there is a dot to break at, so the usual title costs nothing per frame
+        // ponytail: the title is measured on every frame (it has a dot whenever it has a size), like the labels of the slices;
+        // cache by (title, width) if profiling ever shows it.
         var title = MakeText(BreakAtLastDot(CenterTitle ?? "", maxWidth,
             s => new FormattedText(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, bold, 14, null).Width), bold, 14, Foreground, maxWidth, maxLines: 2);
-        // Broken at a space, not between two syllables: "클릭 → 오른쪽으" / "로 회전" otherwise.
+        // Broken at a space, not between two syllables ("클릭 → 오른쪽으" / "로 회전" otherwise); measured on every frame too.
         var subtitle = MakeText(WrapAtSpaces(CenterSubtitle ?? "", maxWidth,
             s => new FormattedText(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, regular, 11.5, null).Width),
             regular, 11.5, cancelHot ? DangerBrush : SecondaryForeground, maxWidth, maxLines: 2);

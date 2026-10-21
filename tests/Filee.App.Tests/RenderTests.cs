@@ -430,6 +430,7 @@ public class RenderTests
             donut.SetExternalHit(new DonutHit(DonutHitKind.SubSegment, rotate, 1));
             vm.ShowHint(rotate, donut.ActiveSubIndex, centerHot: false);
             Pump();
+            AtRest(donut);
             Save(window, $"donut-rotate-{language}.png");
             window.Close();
         }
@@ -445,9 +446,9 @@ public class RenderTests
     /// centre saying what the pointer is over in the words of the slice ("Click → Strip photo info").
     /// </summary>
     [AvaloniaTheory]
-    [InlineData("ko", "정보 지우기", "클릭 → 사진 정보 지우기")]
-    [InlineData("en", "Metadata", "Click → Strip metadata")]
-    public void The_tools_ring_fans_out_six_names_that_fit(string language, string lastRingName, string centre)
+    [InlineData("ko", "정보 지우기", "클릭 → 사진 정보 지우기", true)]
+    [InlineData("en", "Metadata", "Click → Strip metadata", false)] // English names are wider than a ring slice: they break inside a word
+    public void The_tools_ring_fans_out_six_names_that_fit(string language, string lastRingName, string centre, bool namesFit)
     {
         TestServices.EnsureInitialized(language);
         var vm = AppHost.Get<RadialViewModel>();
@@ -462,12 +463,28 @@ public class RenderTests
         var window = new RadialWindow { DataContext = vm };
         window.Show();
         var donut = window.DonutControl;
+        if (namesFit)
+        {
+            // Each name, broken at its spaces as the slice does it, is at most two lines and each line fits the narrowest
+            // slice's label width (the slice less its 8 px margin): no "자르 / 기", no "정보 / 지…".
+            var width = DonutGeometry.MinSubWidth - 8;
+            var font = new Avalonia.Media.Typeface(donut.GetValue(Avalonia.Controls.Documents.TextElement.FontFamilyProperty), Avalonia.Media.FontStyle.Normal, Avalonia.Media.FontWeight.SemiBold);
+            double Measure(string s) => new Avalonia.Media.FormattedText(s, System.Globalization.CultureInfo.CurrentUICulture,
+                Avalonia.Media.FlowDirection.LeftToRight, font, 13, null).Width;
+            foreach (var item in ring)
+            {
+                var lines = DonutMenu.WrapAtSpaces(item.Label, width, Measure).Split('\n');
+                Assert.True(lines.Length <= 2, item.Label);
+                Assert.All(lines, line => Assert.True(Measure(line) <= width, $"{item.Label}: \"{line}\" is {Measure(line):0.0} wide in {width}"));
+            }
+        }
         donut.SetExternalHit(new DonutHit(DonutHitKind.Segment, tools));
         donut.ExpandPendingGroup();
         donut.SetExternalHit(new DonutHit(DonutHitKind.SubSegment, tools, 5));
         vm.ShowHint(tools, donut.ActiveSubIndex, centerHot: false);
         Assert.Equal(centre, vm.CenterSubtitle);
         Pump();
+        AtRest(donut);
         Save(window, $"donut-tools-{language}.png");
         window.Close();
     }
@@ -527,6 +544,7 @@ public class RenderTests
             Assert.Equal(new DonutHit(DonutHitKind.Segment, index - 1),
                 donut.HitTest(DonutGeometry.PointAt(center, vm.OuterRadius * vm.HoleRatio + 6, neighbour)));
             Assert.Contains("JPG", vm.CenterSubtitle);
+            AtRest(donut);
             Save(window, $"donut-group-{language}.png");
             window.Close();
         }
@@ -1718,6 +1736,17 @@ public class RenderTests
             Dispatcher.UIThread.RunJobs();
             AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         }
+    }
+
+    /// <summary>
+    /// The donut with its animations finished (every slice of a ring open, the highlights where they end). Forty forced
+    /// frames run back to back, in no time at all, so the later slices of a ring have hardly begun to open: a screenshot
+    /// taken then shows them dark and half drawn.
+    /// </summary>
+    private static void AtRest(DonutMenu donut)
+    {
+        donut.FinishAnimations();
+        Pump();
     }
 
     private static void Save(TopLevel window, string name)
