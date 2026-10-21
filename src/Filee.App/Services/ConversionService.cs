@@ -11,6 +11,7 @@ using Filee.Core.Localization;
 using Filee.Core.Platform;
 using Filee.Core.Presets;
 using Filee.Core.Settings;
+using Microsoft.Extensions.Logging;
 
 namespace Filee.App.Services;
 
@@ -26,18 +27,20 @@ public sealed class ConversionService
     private readonly UserDataStore _store;
     private readonly ILocalizer _loc;
     private readonly IPlatformServices _platform;
+    private readonly ILogger? _log;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, JobViewModel> _byId = new();
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<ConversionJob>> _waiting = new();
 
     /// <summary>Jobs that came from a watch folder: job id → rule id (for the history and for retrying).</summary>
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _watchJobs = new();
 
-    public ConversionService(JobQueue queue, UserDataStore store, ILocalizer loc, IPlatformServices platform)
+    public ConversionService(JobQueue queue, UserDataStore store, ILocalizer loc, IPlatformServices platform, ILogger<ConversionService>? log = null)
     {
         _queue = queue;
         _store = store;
         _loc = loc;
         _platform = platform;
+        _log = log;
         _queue.JobUpdated += OnJobUpdated;
         _queue.JobFinished += OnJobFinished;
     }
@@ -78,7 +81,7 @@ public sealed class ConversionService
         // A preset on "Default" saves where Settings > General says (read now, so a changed default applies at once).
         preset = _store.Settings.WithDefaultOutput(preset);
         var job = _queue.Enqueue(files, preset, _loc.DisplayName(preset), perFile);
-        var vm = new JobViewModel(job, _loc, _platform, Remove, RetryFailed);
+        var vm = new JobViewModel(job, _loc, _platform, Remove, RetryFailed, log: _log);
         _byId[job.Id] = vm;
         Jobs.Insert(0, vm);
         if (showInToast)

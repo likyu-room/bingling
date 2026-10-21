@@ -118,6 +118,9 @@
               <TextBlock Classes="caption" Text="{Binding SizeChange}" TextWrapping="Wrap"
                          IsVisible="{Binding SizeChange, Converter={x:Static ObjectConverters.IsNotNull}}" />
               <ProgressBar Value="{Binding Progress}" Maximum="100" IsVisible="{Binding IsRunning}" />
+              <!-- What failed ("1 of 2 failed") has a line to itself: beside Retry and Show it had 25 to 80 px of the card's 240, and
+                   was cut off behind the buttons in most languages. -->
+              <TextBlock Classes="caption" Text="{Binding Status}" TextWrapping="Wrap" IsVisible="{Binding HasErrors}" />
               <DockPanel>
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="6">
                   <Button Content="{DynamicResource toast.cancel}" Command="{Binding CancelCommand}" IsVisible="{Binding IsRunning}" Padding="10,4" />
@@ -127,10 +130,12 @@
                       <TextBlock Text="{DynamicResource common.retry}" />
                     </StackPanel>
                   </Button>
-                  <!-- Only for a card with a picture (the thumbnail): the picture goes on the clipboard, several results as files.
-                       The label turns to "Copied" for a moment; the click is handled in ToastWindow.axaml.cs, which has the clipboard. -->
+                  <!-- Only on the card of a job that went well and made a picture (CanCopy): the picture goes on the clipboard, several
+                       results as files. Not beside Retry: that row (status, Retry, Copy, Show) is wider than the card's 240 px in
+                       Korean, Spanish and Hindi, even with the icon alone, and Show was cut off. The label turns to "Copied" for a
+                       moment; the click is handled in ToastWindow.axaml.cs, which has the clipboard. -->
                   <Button Classes="copy" Click="OnCopyResult" Padding="10,4" ToolTip.Tip="{DynamicResource toast.copy_tip}"
-                          IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}">
+                          IsVisible="{Binding CanCopy}">
                     <Panel>
                       <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !JustCopied}">
                         <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Copy}" />
@@ -149,7 +154,7 @@
                     </StackPanel>
                   </Button>
                 </StackPanel>
-                <TextBlock Classes="caption" Text="{Binding Status}" IsVisible="{Binding ShowsStatus}" VerticalAlignment="Center" />
+                <TextBlock Classes="caption" Text="{Binding Status}" IsVisible="{Binding ShowsStatusBeside}" VerticalAlignment="Center" />
               </DockPanel>
               <TextBlock Classes="caption danger" Text="{Binding ErrorDetails}" TextWrapping="Wrap" MaxLines="4"
                          IsVisible="{Binding HasErrors}" />

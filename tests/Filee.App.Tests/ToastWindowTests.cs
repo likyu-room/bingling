@@ -458,7 +458,7 @@ public class ToastWindowTests
         Assert.Equal(0, mark.Opacity);
     }
 
-    /// <summary>A result that has gone (moved, deleted) or has no app: pressing does nothing and nothing is thrown.</summary>
+    /// <summary>A result that has gone (moved, deleted) or has no app: pressing does nothing to the card, nothing is thrown, and the log says why.</summary>
     [AvaloniaFact]
     public async Task Pressing_the_thumbnail_of_a_result_that_cannot_be_opened_does_nothing()
     {
@@ -466,12 +466,16 @@ public class ToastWindowTests
         using var dir = new TempFolder();
         var source = dir.NoisyPicture("photo.png", 600, 400);
         var output = dir.Reencoded(source, "photo.jpg", quality: 30);
-        var vm = Finished(source, [output], open: _ => throw new InvalidOperationException("no app for this"));
+        var log = new ListLogger();
+        var vm = Finished(source, [output], open: _ => throw new InvalidOperationException("no app for this"), log: log);
         await vm.LoadFinishDetailsAsync();
 
         vm.OpenResultCommand.Execute(null); // would throw on the UI thread if the failure were not swallowed
 
         Assert.NotNull(vm.Thumbnail); // the card is as it was
+        var line = Assert.Single(log.Lines);
+        Assert.Equal(Microsoft.Extensions.Logging.LogLevel.Warning, line.Level);
+        Assert.Contains("photo.jpg", line.Message);
     }
 
     /// <summary>Copy is a button of the picture's card: next to "Show", with its own tip, and not on a card that has no picture.</summary>
@@ -480,9 +484,7 @@ public class ToastWindowTests
     {
         TestServices.EnsureInitialized("ko");
         using var dir = new TempFolder();
-        var source = dir.NoisyPicture("photo.png", 600, 400);
-        var picture = Finished(source, [dir.Reencoded(source, "photo.jpg", quality: 30)]);
-        await picture.LoadFinishDetailsAsync();
+        var picture = await RunToTheEnd(dir.NoisyPicture("photo.png", 600, 400), "to-jpg");
         using (var shown = new ShownCard(picture))
         {
             var copy = shown.Toast.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("copy"));
@@ -530,16 +532,13 @@ public class ToastWindowTests
     {
         TestServices.EnsureInitialized("ko");
         using var dir = new TempFolder();
-        var source = dir.NoisyPicture("photo.png", 600, 400);
-        var output = dir.Reencoded(source, "photo.jpg", quality: 30);
-        var vm = Finished(source, [output]);
-        await vm.LoadFinishDetailsAsync();
+        var vm = await RunToTheEnd(dir.NoisyPicture("photo.png", 600, 400), "to-jpg");
         using var shown = new ShownCard(vm);
         await shown.Toast.Clipboard!.SetTextAsync("what was there before");
-        File.Delete(output); // moved away after the card had its picture
+        File.Delete(vm.Job.Outputs.Single()); // moved away after the card had its picture
 
         shown.Click(shown.Toast.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("copy")));
-        await Task.Delay(300);
+        await Until(() => !vm.IsCopying); // the attempt is over, whichever way it went
         Pump();
 
         Assert.False(vm.JustCopied);
@@ -555,25 +554,110 @@ public class ToastWindowTests
         var source = dir.NoisyPicture("photo.png", 100, 100);
         var vm = Finished(source, [dir.Reencoded(source, "photo.jpg", quality: 30)]);
 
-        var first = vm.ShowCopiedAsync(TimeSpan.FromMilliseconds(250));
-        await Task.Delay(150);
-        var second = vm.ShowCopiedAsync(TimeSpan.FromMilliseconds(250));
-        await first; // the first moment is over: the second one has 150 ms more
+        // 400 ms between the first moment's end and the second's: a stalled UI thread on a loaded PC does not eat it.
+        var first = vm.ShowCopiedAsync(TimeSpan.FromMilliseconds(1000));
+        await Task.Delay(400);
+        var second = vm.ShowCopiedAsync(TimeSpan.FromMilliseconds(1000));
+        await first; // the first moment is over: the second one has 400 ms more
         Assert.True(vm.JustCopied);
         await second;
         Assert.False(vm.JustCopied);
     }
 
+    /// <summary>A second press while the first copy is still being made (a camera's photo takes a while) does nothing.</summary>
+    [AvaloniaFact]
+    public async Task A_second_press_while_the_first_copy_is_still_being_made_does_nothing()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var source = dir.NoisyPicture("photo.png", 3000, 2000);
+        var vm = Finished(source, [source]);
+        using var shown = new ShownCard(vm);
+        var (clipboard, storage) = (shown.Toast.Clipboard!, shown.Toast.StorageProvider);
+
+        var first = vm.CopyResultAsync(clipboard, storage);
+        Assert.True(vm.IsCopying); // the picture is being read on another thread
+        var second = vm.CopyResultAsync(clipboard, storage);
+        Assert.True(second.IsCompleted); // turned away at once, nothing read
+        Assert.False(await second);
+        Assert.True(await first);
+        Assert.False(vm.IsCopying);
+
+        Assert.True(await vm.CopyResultAsync(clipboard, storage)); // once it is done, a press copies again
+    }
+
+    /// <summary>
+    /// The card's button row must fit its 240 px column in every language, for both cards that have Copy or Retry: the one of a job
+    /// that went well (Copy and Show) and the one of a job that failed in part (Retry and Show, no Copy: with it the row was cut
+    /// off in Korean, Spanish and Hindi even as an icon). Nothing may stick out of the column or lie over another button.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("en")]
+    [InlineData("ko")]
+    [InlineData("es")]
+    [InlineData("hi")]
+    [InlineData("pl")]
+    [InlineData("zh-CN")]
+    public async Task The_buttons_of_a_finished_card_fit_it_in_every_language(string language)
+    {
+        TestServices.EnsureInitialized(language);
+        using var dir = new TempFolder();
+        var service = AppHost.Get<ConversionService>();
+        var preset = AppHost.Get<UserDataStore>().FindPreset("to-jpg")!;
+        var well = service.Start([dir.NoisyPicture("photo.png", 600, 400)], preset, showInToast: false)!;
+        var inPart = service.Start([dir.NoisyPicture("second.png", 600, 400), dir.Bytes("unknown.xyz", 200)], preset, showInToast: false)!;
+        await Until(() => new[] { well, inPart }.All(j => !j.IsRunning && j.Thumbnail is not null && j.SizeChange is not null), seconds: 30);
+        Assert.True(inPart.CanRetry);
+
+        foreach (var vm in new[] { well, inPart })
+        {
+            using var shown = new ShownCard(vm);
+            var toast = shown.Toast;
+            var buttons = toast.GetVisualDescendants().OfType<Button>()
+                .Where(b => b.IsEffectivelyVisible && (b.Command == vm.RetryCommand || b.Classes.Contains("copy") || b.Command == vm.OpenFolderCommand)).ToList();
+            // Copy and Show for the card that went well; Retry and Show for the other, which has no Copy.
+            Assert.Equal(2, buttons.Count);
+            Assert.Equal(vm == well, buttons.Any(b => b.Classes.Contains("copy")));
+            Assert.Equal(vm != well, buttons.Any(b => b.Command == vm.RetryCommand));
+            Assert.Contains(buttons, b => b.Command == vm.OpenFolderCommand);
+
+            var column = buttons[0].GetVisualAncestors().OfType<StackPanel>().First(p => Grid.GetColumn(p) == 1);
+            double Left(Control c) => c.TranslatePoint(default, toast)!.Value.X;
+            double Right(Control c) => c.TranslatePoint(new Avalonia.Point(c.Bounds.Width, 0), toast)!.Value.X;
+            buttons.Sort((a, b) => Left(a).CompareTo(Left(b)));
+            var card = vm == well ? "went well" : "failed in part";
+            foreach (var button in buttons)
+            {
+                Assert.True(Right(button) <= Right(column) + 0.5, $"{language}, {card}: a button ends at {Right(button)}, the card's column at {Right(column)}");
+                Assert.True(Left(button) >= Left(column) - 0.5, $"{language}, {card}: a button starts at {Left(button)}, the card's column at {Left(column)}");
+                Assert.True(button.Bounds.Width >= button.DesiredSize.Width - 0.5, $"{language}, {card}: a button is {button.Bounds.Width} wide, it needs {button.DesiredSize.Width}");
+            }
+            for (var i = 1; i < buttons.Count; i++)
+                Assert.True(Left(buttons[i]) >= Right(buttons[i - 1]) - 0.5, $"{language}, {card}: the buttons overlap");
+            // What failed is told in full, on a line of its own: no button lies over it (it was cut off behind Retry).
+            if (vm == inPart)
+            {
+                var status = toast.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == vm.Status && t.IsEffectivelyVisible);
+                var statusBox = new Avalonia.Rect(status.TranslatePoint(default, toast)!.Value, status.Bounds.Size);
+                foreach (var button in buttons)
+                    Assert.False(statusBox.Intersects(new Avalonia.Rect(button.TranslatePoint(default, toast)!.Value, button.Bounds.Size)),
+                        $"{language}: the status {statusBox} is under a button");
+                status.Measure(new Avalonia.Size(column.Bounds.Width, double.PositiveInfinity)); // as much room as the card's column has
+                Assert.True(statusBox.Height >= status.DesiredSize.Height - 1, $"{language}: \"{vm.Status}\" has {statusBox.Height} of the {status.DesiredSize.Height} it needs");
+            }
+            shown.Save($"toast-{(vm == well ? "copy" : "partial")}-{language}.png");
+        }
+    }
     /// <summary>A job for <paramref name="source"/> that is done and wrote <paramref name="outputs"/>.</summary>
     private static JobViewModel Finished(string source, params string[] outputs) => Finished(source, outputs, null);
 
-    /// <summary>The same, with what opens a file in place of the system's (so a test sees what was opened).</summary>
-    private static JobViewModel Finished(string source, string[] outputs, Action<string>? open)
+    /// <summary>The same, with what opens a file in place of the system's (so a test sees what was opened) and where the card logs.</summary>
+    private static JobViewModel Finished(string source, string[] outputs, Action<string>? open, Microsoft.Extensions.Logging.ILogger? log = null)
     {
         var conversion = new ConversionJob([source], new Preset { TargetFormat = "jpg" }, "JPG");
         conversion.Files[0].State = FileState.Done;
         conversion.Files[0].Outputs.AddRange(outputs);
-        return new JobViewModel(conversion, AppHost.Get<ILocalizer>(), AppHost.Get<IPlatformServices>(), _ => { }, open: open);
+        return new JobViewModel(conversion, AppHost.Get<ILocalizer>(), AppHost.Get<IPlatformServices>(), _ => { }, open: open, log: log);
     }
 
     /// <summary>

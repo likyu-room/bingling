@@ -5,7 +5,6 @@ using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Filee.App.Services;
 using Filee.App.ViewModels;
-using Microsoft.Extensions.Logging;
 
 namespace Filee.App.Views;
 
@@ -30,15 +29,13 @@ public partial class ToastWindow : Window
     }
 
     /// <summary>
-    /// The Copy button: the card's results go on the clipboard (<see cref="ResultClipboard"/>), and the button says "Copied" for
-    /// a moment. When there was nothing to copy it says nothing (the log has the reason).
+    /// The Copy button: the card's results go on the clipboard and the button says "Copied" for a moment (<see cref="JobViewModel.CopyResultAsync"/>);
+    /// when there was nothing to copy it says nothing (the log has the reason). It is here because the window has the clipboard.
     /// </summary>
     private async void OnCopyResult(object? sender, RoutedEventArgs e)
     {
-        if ((sender as Control)?.DataContext is not JobViewModel job || Clipboard is not { } clipboard)
-            return;
-        if (await ResultClipboard.CopyAsync(clipboard, StorageProvider, [.. job.Job.Outputs], AppHost.Get<ILogger<ToastWindow>>()))
-            await job.ShowCopiedAsync();
+        if ((sender as Control)?.DataContext is JobViewModel job && Clipboard is { } clipboard)
+            await job.CopyResultAsync(clipboard, StorageProvider);
     }
 
     private bool _closed;

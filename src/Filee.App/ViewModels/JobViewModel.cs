@@ -3,8 +3,10 @@
 using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -17,6 +19,7 @@ using Filee.Core.Platform;
 using Filee.Core.Presets;
 using Filee.Engines.Magick;
 using ImageMagick;
+using Microsoft.Extensions.Logging;
 
 namespace Filee.App.ViewModels;
 
@@ -39,8 +42,10 @@ public sealed partial class JobViewModel : ObservableObject
     private readonly Action<JobViewModel> _dismiss;
     private readonly Action<JobViewModel>? _retry;
     private readonly Action<string> _open;
+    private readonly ILogger? _log;
     private int _refreshPending;
     private int _copiedRound;
+    private bool _copying;
     private bool _detailsRequested;
 
     /// <summary>
@@ -50,8 +55,9 @@ public sealed partial class JobViewModel : ObservableObject
     private readonly long[] _sourceSizes;
 
     /// <param name="open">Opens a file in the app the system has for it; null for the system's own way (tests see what was opened).</param>
+    /// <param name="log">Where a result that could not be opened or copied is reported (the card itself stays silent about it).</param>
     public JobViewModel(ConversionJob job, ILocalizer loc, IPlatformServices platform, Action<JobViewModel> dismiss,
-        Action<JobViewModel>? retry = null, Action<string>? open = null)
+        Action<JobViewModel>? retry = null, Action<string>? open = null, ILogger? log = null)
     {
         Job = job;
         _loc = loc;
@@ -59,6 +65,7 @@ public sealed partial class JobViewModel : ObservableObject
         _dismiss = dismiss;
         _retry = retry;
         _open = open ?? OpenWithSystemApp;
+        _log = log;
         _sourceSizes = [.. job.Sources.Select(SizeOf)];
         var what = job.Sources.Count == 1 ? Path.GetFileName(job.Sources[0]) : loc.Format("home.files", job.Sources.Count);
         Title = loc.Format("toast.converting", what, job.PresetDisplayName);
@@ -73,9 +80,11 @@ public sealed partial class JobViewModel : ObservableObject
     [ObservableProperty] private string _status = "";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsStatus))]
+    [NotifyPropertyChangedFor(nameof(ShowsStatusBeside))]
     private bool _isRunning = true;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsStatus))]
+    [NotifyPropertyChangedFor(nameof(ShowsStatusBeside))]
     private bool _hasErrors;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FormatIcon))]
@@ -94,13 +103,23 @@ public sealed partial class JobViewModel : ObservableObject
     public bool CanRequestFormat => UnknownExtensions.Count > 0;
 
     /// <summary>True once the job is over and every file converted: the card then wears a check.</summary>
-    [ObservableProperty] private bool _isSucceeded;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanCopy))]
+    private bool _isSucceeded;
 
     /// <summary>
     /// A small picture of the first output (upright, the card's thumbnail size), once the job is over and that output is a
     /// still image Filee can read; null otherwise and the card shows <see cref="FormatIcon"/> in a circle instead.
     /// </summary>
-    [ObservableProperty] private Bitmap? _thumbnail;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanCopy))]
+    private Bitmap? _thumbnail;
+
+    /// <summary>
+    /// The card offers Copy: the job went well and made a picture. A card that failed in part shows Retry and Show beside its
+    /// status already, and a third button does not fit there in every language.
+    /// </summary>
+    public bool CanCopy => IsSucceeded && Thumbnail is not null;
 
     /// <summary>True for a moment after the results were copied: the Copy button says "Copied" and then goes back.</summary>
     [ObservableProperty] private bool _justCopied;
@@ -108,6 +127,7 @@ public sealed partial class JobViewModel : ObservableObject
     /// <summary>"1.2 MB → 340.5 KB · 72% smaller" once the job is over; null when the sizes can't be told.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ShowsStatus))]
+    [NotifyPropertyChangedFor(nameof(ShowsStatusBeside))]
     private string? _sizeChange;
 
     /// <summary>
@@ -115,6 +135,12 @@ public sealed partial class JobViewModel : ObservableObject
     /// and so does a cancelled job that wrote some files before it stopped (it says so).
     /// </summary>
     public bool ShowsStatus => SizeChange is null || HasErrors || Job.State == JobState.Cancelled;
+
+    /// <summary>
+    /// The status is shown beside the buttons, as "37%" or "Cancelled" is. A failure's ("1 of 2 failed" is long) is not: the card
+    /// gives it a line of its own (<see cref="HasErrors"/>), as Retry and Show leave it too little room.
+    /// </summary>
+    public bool ShowsStatusBeside => ShowsStatus && !HasErrors;
 
     /// <summary>
     /// The icon of what the job makes (the first output's format, before there is one the preset's); a plain file for a
@@ -290,13 +316,43 @@ public sealed partial class JobViewModel : ObservableObject
         {
             _open(first);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            // The file is gone, or no app takes it: the card stays as it is, and "Show" still leads to the folder.
+            // The file is gone, or no app takes it: the card stays as it is (and "Show" still leads to the folder); the log has why.
+            _log?.LogWarning(ex, "Could not open the result {Path}", first);
         }
     }
 
     private static void OpenWithSystemApp(string path) => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
+
+    /// <summary>
+    /// Copies the results to <paramref name="clipboard"/> (<see cref="ResultClipboard"/>) and, when something was copied, says so for
+    /// a moment (<see cref="JustCopied"/>). A press while an earlier copy is still being made does nothing: a camera's photo takes
+    /// a while, and a second press would read it all over again. UI thread only.
+    /// </summary>
+    /// <returns>True when something was copied; false when nothing was (a copy is under way, or the results are gone).</returns>
+    public async Task<bool> CopyResultAsync(IClipboard clipboard, IStorageProvider storage)
+    {
+        if (_copying)
+            return false;
+        _copying = true;
+        try
+        {
+            if (!await ResultClipboard.CopyAsync(clipboard, storage, [.. Job.Outputs], _log))
+                return false;
+        }
+        finally
+        {
+            _copying = false;
+        }
+        _ = ShowCopiedAsync(); // not awaited: pressing again while it says "Copied" is a new copy, not a wait
+        return true;
+    }
+
+    /// <summary>
+    /// True while a copy is being made (<see cref="CopyResultAsync"/>).
+    /// </summary>
+    public bool IsCopying => _copying;
 
     /// <summary>
     /// Makes <see cref="JustCopied"/> true for <paramref name="hold"/> (a moment by default). Copying again meanwhile gives
