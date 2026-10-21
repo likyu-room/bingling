@@ -3,17 +3,20 @@
 ;   ISCC.exe /DAppVersion=1.2.0 /DPublishDir=<published app> /O<output folder> installer\Filee.iss
 ;
 ; Besides copying files it
-;  - installs for all users into Program Files (administrator rights, one UAC prompt). Filee itself keeps running as
-;    the signed-in user without elevation: Windows blocks drag and drop from Explorer into elevated windows;
-;  - closes a running Filee first ("Filee.exe --quit") and moves FileeExplorerMenu.dll aside when Explorer has it
-;    loaded, so updates need no restart;
+;  - installs for all users into Program Files (administrator rights, one UAC prompt). Bingling itself keeps running
+;    as the signed-in user without elevation: Windows blocks drag and drop from Explorer into elevated windows;
+;  - removes Filee Plus, what Bingling was called up to 1.1.0 (its own id, folder and Explorer menu): ends it, keeps
+;    its downloaded engines and runs its uninstaller silently (RemoveFileePlus); Bingling moves its settings over at
+;    its first start;
+;  - closes a running Bingling first ("Bingling.exe --quit") and moves BinglingExplorerMenu.dll aside when Explorer
+;    has it loaded, so updates need no restart;
 ;  - leaves the original Filee alone: settings are in %APPDATA%\Bingling, downloaded engines in
 ;    %LocalAppData%\Bingling\engines;
 ;  - on Windows 11 registers the top-level File Explorer menu entry (an unsigned sparse package, which needs the
 ;    administrator rights Setup already has);
-;  - offers the optional conversion engines; Filee downloads the chosen ones (verified) when Setup starts it;
-;  - can put the "filee" command line on PATH ({app}\cli\filee.cmd runs filee-cli.exe).
-; The uninstaller runs "Filee.exe --uninstall-cleanup" for the per-user parts (UninstallCleanup.cs).
+;  - offers the optional conversion engines; Bingling downloads the chosen ones (verified) when Setup starts it;
+;  - can put the "bingling" command line on PATH ({app}\cli\bingling.cmd runs bingling-cli.exe).
+; The uninstaller runs "Bingling.exe --uninstall-cleanup" for the per-user parts (UninstallCleanup.cs).
 
 #ifndef AppVersion
   #error AppVersion is not defined: build with build/build-installer.ps1
@@ -24,8 +27,9 @@
 
 #define AppName "Bingling"
 #define AppExe "Bingling.exe"
-; Never change: Windows finds the installed Bingling by this id (uninstall key "{<id>}_is1"). It differs from the original Filee's id, so both install.
-#define AppGuid "A10409B5-6A21-4C67-9A0C-84B49B4629AF"
+; Never change: Windows finds the installed Bingling by this id (uninstall key "{<id>}_is1"). It differs from the
+; original Filee's and from Filee Plus's (FileePlusGuid), so Bingling installs as a program of its own.
+#define AppGuid "EB9635DC-3FFF-43EE-B49C-7BF81348CC0B"
 
 [Setup]
 AppId={{{#AppGuid}}
@@ -54,14 +58,14 @@ WizardSmallImageFile=..\src\Filee.App\Assets\Icons\filee.png
 OutputBaseFilename=Bingling-{#AppVersion}-win-Setup
 Compression=lzma2/ultra64
 SolidCompression=yes
-; Filee is closed by PrepareToInstall; Restart Manager is only the fallback, and only for Filee.exe: with DLLs in the
-; filter it would offer to close Explorer, which loads FileeExplorerMenu.dll.
+; Bingling is closed by PrepareToInstall; Restart Manager is only the fallback, and only for Bingling.exe: with DLLs in
+; the filter it would offer to close Explorer, which loads BinglingExplorerMenu.dll.
 CloseApplications=yes
 CloseApplicationsFilter=*.exe
 RestartApplications=no
 ; Per-user parts (Start menu shortcuts) belong to the account that runs Setup.
 UsedUserAreasWarning=no
-; The "filee" command folder is added to PATH: tell running programs (new terminals) about it.
+; The "bingling" command folder can be added to PATH: tell running programs (new terminals) about it.
 ChangesEnvironment=yes
 SetupLogging=yes
 
@@ -94,9 +98,9 @@ zhcn.ReadyEngines=转换引擎（Bingling 启动后下载）：
 en.FinishedRunning=Bingling is installed and running in the notification area of the taskbar.%n%nTo convert files, drag them while holding the trigger key, or right-click them in File Explorer.
 ko.FinishedRunning=빙글링이 설치되어 작업 표시줄 알림 영역에서 실행 중이에요.%n%n파일을 변환하려면 지정한 키를 누른 채 파일을 끌거나, 탐색기에서 파일을 우클릭하세요.
 zhcn.FinishedRunning=Bingling 已安装，正在任务栏通知区域运行。%n%n要转换文件，请按住触发键拖动文件，或在资源管理器中右键单击文件。
-en.TaskCli=Add the "filee" command to PATH (convert from the command line)
-ko.TaskCli="filee" 명령어를 PATH에 추가 (명령줄에서 변환)
-zhcn.TaskCli=将 "filee" 命令添加到 PATH（在命令行中转换）
+en.TaskCli=Add the "bingling" command to PATH (convert from the command line)
+ko.TaskCli="bingling" 명령어를 PATH에 추가 (명령줄에서 변환)
+zhcn.TaskCli=将 "bingling" 命令添加到 PATH（在命令行中转换）
 en.FinishedEngines=The conversion engines you picked are downloading in the Bingling window.
 ko.FinishedEngines=선택한 변환 엔진은 빙글링 창에서 내려받고 있어요.
 zhcn.FinishedEngines=你选择的转换引擎正在 Bingling 窗口中下载。
@@ -105,24 +109,19 @@ zhcn.FinishedEngines=你选择的转换引擎正在 Bingling 窗口中下载。
 Name: "contextmenu"; Description: "{cm:TaskContextMenu}"; GroupDescription: "{cm:GroupOptions}"; Check: IsFreshInstall
 Name: "contextmenu\top"; Description: "{cm:TaskModernMenu}"; GroupDescription: "{cm:GroupOptions}"; Check: IsFreshInstall and IsExplorerMenuSupported
 Name: "startup"; Description: "{cm:TaskStartup}"; GroupDescription: "{cm:GroupOptions}"; Check: IsFreshInstall
-Name: "cli"; Description: "{cm:TaskCli}"; GroupDescription: "{cm:GroupOptions}"; Check: not IsCliOnPath
+Name: "cli"; Description: "{cm:TaskCli}"; GroupDescription: "{cm:GroupOptions}"; Flags: unchecked; Check: not IsCliOnPath
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
 Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-
-[InstallDelete]
-; 1.1.0 named its shortcuts "Filee Plus". The ones below replace them, so an update leaves no second entry.
-Type: files; Name: "{autoprograms}\Filee Plus.lnk"
-Type: files; Name: "{autodesktop}\Filee Plus.lnk"
 
 [Icons]
 Name: "{autoprograms}\{cm:ShortcutName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{cm:ShortcutName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [UninstallRun]
-; Quits Filee, then removes the Explorer menu entries, the startup entry and downloaded engines. Settings stay.
-Filename: "{app}\{#AppExe}"; Parameters: "--uninstall-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "FileeCleanup"
+; Quits Bingling, then removes the Explorer menu entries, the startup entry and downloaded engines. Settings stay.
+Filename: "{app}\{#AppExe}"; Parameters: "--uninstall-cleanup"; Flags: runhidden waituntilterminated; RunOnceId: "BinglingCleanup"
 
 [Code]
 const
@@ -135,9 +134,14 @@ const
   // EngineInstaller marks every installed engine folder with this file.
   EngineMarker = '.filee-component';
   ERROR_INSUFFICIENT_BUFFER = 122;
+  // Filee Plus, what Bingling was called up to 1.1.0: its installer id, executable and per-user folder name
+  // (AppIdentity.LegacyFolder). Only used to remove it (RemoveFileePlus); the original Filee's id is another one.
+  FileePlusGuid = 'A10409B5-6A21-4C67-9A0C-84B49B4629AF';
+  FileePlusExe = 'Filee.exe';
+  FileePlusFolder = 'FileePlus';
 
 var
-  // Filee 1.2 or later is installed already: this run is an update, which keeps the user's choices.
+  // Bingling is installed already: this run is an update, which keeps the user's choices.
   WasInstalled: Boolean;
   ExplorerMenuWasRegistered: Boolean;
   EnginePage: TInputOptionWizardPage;
@@ -224,7 +228,7 @@ begin
   RunPowerShell('Get-AppxPackage -Name ' + PsQuote(ExplorerMenuName) + ' | Remove-AppxPackage', Error);
 end;
 
-// Registers the package next to Filee.exe with the install folder as its external location. A fresh install first
+// Registers the package next to Bingling.exe with the install folder as its external location. A fresh install first
 // removes any older registration, which may point to another folder.
 procedure RegisterExplorerMenu(RemoveFirst: Boolean);
 var
@@ -245,7 +249,7 @@ begin
     Exit;
   if WasInstalled then
   begin
-    // An update keeps what was chosen in Filee (Settings > General) and refreshes the registration.
+    // An update keeps what was chosen in Bingling (Settings > General) and refreshes the registration.
     if ExplorerMenuWasRegistered then
       RegisterExplorerMenu(False);
   end
@@ -255,7 +259,7 @@ begin
     UnregisterExplorerMenu;
 end;
 
-// Explorer keeps FileeExplorerMenu.dll loaded after showing the menu. A loaded DLL cannot be replaced or deleted, but
+// Explorer keeps BinglingExplorerMenu.dll loaded after showing the menu. A loaded DLL cannot be replaced or deleted, but
 // it can be renamed: move it into Folder (same drive) and let Windows delete it at the next restart.
 procedure MoveLoadedDllAside(const Folder: String);
 var
@@ -275,7 +279,7 @@ end;
 const
   EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
 
-// The folder with filee.cmd (the command line), which goes on the system PATH.
+// The folder with bingling.cmd (the command line), which goes on the system PATH.
 function CliFolder: String;
 begin
   Result := ExpandConstant('{app}\cli');
@@ -321,6 +325,15 @@ begin
   RegWriteExpandStringValue(HKLM, EnvironmentKey, 'Path', Copy(Paths, 2, Length(Paths) - 2));
 end;
 
+// The downloaded engines (EngineEnvironment.DownloadRoot). While Bingling has no folder of its own yet, those of Filee
+// Plus count: Setup (KeepFileePlusEngines) or the app's first start (LegacyDataMigration) makes them Bingling's.
+function EnginesFolder: String;
+begin
+  Result := ExpandConstant('{localappdata}\Bingling\engines\');
+  if not DirExists(ExpandConstant('{localappdata}\Bingling')) and DirExists(ExpandConstant('{localappdata}\' + FileePlusFolder)) then
+    Result := ExpandConstant('{localappdata}\' + FileePlusFolder + '\engines\');
+end;
+
 // True when every listed component has been downloaded already (EngineInstaller writes the marker last).
 function IsEngineInstalled(const MarkerFolders: String): Boolean;
 var
@@ -342,7 +355,7 @@ begin
       Folder := Copy(Rest, 1, Comma - 1);
       Rest := Copy(Rest, Comma + 1, MaxInt);
     end;
-    if not FileExists(ExpandConstant('{localappdata}\Bingling\engines\') + Folder + '\' + EngineMarker) then
+    if not FileExists(EnginesFolder + Folder + '\' + EngineMarker) then
     begin
       Result := False;
       Exit;
@@ -397,9 +410,9 @@ begin
     Result := 'off';
 end;
 
-// Starts Filee as the signed-in user (not elevated) with the choices made in the wizard. An update starts it in
+// Starts Bingling as the signed-in user (not elevated) with the choices made in the wizard. An update starts it in
 // the tray, as it was running before.
-procedure StartFilee;
+procedure StartBingling;
 var
   Parameters: String;
   ResultCode: Integer;
@@ -411,7 +424,7 @@ begin
       ' --start-with-windows=' + OnOff(WizardIsTaskSelected('startup')) +
       ' --context-menu=' + OnOff(WizardIsTaskSelected('contextmenu'));
   if not ExecAsOriginalUser(ExpandConstant('{app}\{#AppExe}'), Parameters, '', SW_SHOWNORMAL, ewNoWait, ResultCode) then
-    Log('Could not start Filee: ' + SysErrorMessage(ResultCode));
+    Log('Could not start Bingling: ' + SysErrorMessage(ResultCode));
 end;
 
 function InitializeSetup: Boolean;
@@ -465,30 +478,92 @@ begin
     Result := Result + NewLine + NewLine + CustomMessage('ReadyEngines') + NewLine + Engines;
 end;
 
-// Ends the Filee that runs from this install folder, and only that one. The original Filee has the same image name
-// (Filee.exe) and may be running next to it, so ending it by image name would end that one too; Get-Process
-// knows the full path.
-procedure KillInstalledFilee;
+// Ends the program running from Exe, and only that one. Others may have the same image name (Filee Plus and the
+// original Filee are both Filee.exe and may run side by side), so ending it by image name could end the wrong one;
+// Get-Process knows the full path.
+procedure KillProcessAt(const Exe: String);
 var
   Error: String;
 begin
-  RunPowerShell('Get-Process -Name ' + PsQuote(ChangeFileExt('{#AppExe}', '')) + ' -ErrorAction SilentlyContinue | ' +
-    'Where-Object { $_.Path -eq ' + PsQuote(ExpandConstant('{app}\{#AppExe}')) + ' } | ' +
+  RunPowerShell('Get-Process -Name ' + PsQuote(ChangeFileExt(ExtractFileName(Exe), '')) + ' -ErrorAction SilentlyContinue | ' +
+    'Where-Object { $_.Path -eq ' + PsQuote(Exe) + ' } | ' +
     'Stop-Process -Force -ErrorAction SilentlyContinue', Error);
+end;
+
+// The uninstaller of Filee Plus, from its uninstall entry: per machine (how it was installed), else per user.
+function FindFileePlus(var Uninstaller: String): Boolean;
+var
+  Key: String;
+begin
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{' + FileePlusGuid + '}_is1';
+  Result := RegQueryStringValue(HKLM, Key, 'UninstallString', Uninstaller);
+  if not Result then
+    Result := RegQueryStringValue(HKCU, Key, 'UninstallString', Uninstaller);
+  if Result then
+    Uninstaller := RemoveQuotes(Uninstaller);
+end;
+
+// The uninstaller of Filee Plus deletes its downloaded engines (UninstallCleanup.cs), which are several hundred MB.
+// They are Bingling's now: rename the folder before it runs (same drive, instant). Its settings it keeps; the app
+// moves them at its first start, after the uninstaller has written its last log line there.
+procedure KeepFileePlusEngines;
+var
+  Source, Target: String;
+begin
+  Source := ExpandConstant('{localappdata}\' + FileePlusFolder);
+  Target := ExpandConstant('{localappdata}\Bingling');
+  if DirExists(Source) and not DirExists(Target) then
+  begin
+    if RenameFile(Source, Target) then
+      Log('Moved ' + Source + ' to ' + Target)
+    else
+      Log('Could not move ' + Source + ' to ' + Target);
+  end;
+end;
+
+// Filee Plus is Bingling under its former name, with its own id, folder, Explorer menu and startup entry. Setup ends
+// it, keeps its engines and runs its uninstaller silently, which also removes what it registered for this user. When
+// that fails it is only logged: Bingling installs anyway, and the old copy can still be removed in Settings > Apps.
+procedure RemoveFileePlus;
+var
+  Uninstaller, Exe: String;
+  ResultCode: Integer;
+begin
+  if not FindFileePlus(Uninstaller) then
+    Exit;
+  Log('Filee Plus is installed: ' + Uninstaller);
+  // Its uninstaller lives in its install folder, next to Filee.exe. It exits when asked (after saving); one that
+  // doesn't answer is ended.
+  Exe := ExtractFilePath(Uninstaller) + FileePlusExe;
+  ResultCode := 0;
+  if FileExists(Exe) then
+    Exec(Exe, '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  if ResultCode <> 0 then
+    KillProcessAt(Exe);
+  KeepFileePlusEngines;
+  if not FileExists(Uninstaller) then
+    Log('The Filee Plus uninstaller is missing')
+  else if not Exec(Uninstaller, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Log('Could not start the Filee Plus uninstaller: ' + SysErrorMessage(ResultCode))
+  else if ResultCode <> 0 then
+    Log(Format('The Filee Plus uninstaller ended with exit code %d', [ResultCode]))
+  else
+    Log('Filee Plus was removed');
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
   ResultCode: Integer;
 begin
+  RemoveFileePlus;
   Result := '';
-  // Filee 1.2 and later exit when asked (after saving); this waits until they have.
+  // Bingling exits when asked (after saving); this waits until it has.
   ResultCode := 0;
   if WasInstalled and FileExists(ExpandConstant('{app}\{#AppExe}')) then
     Exec(ExpandConstant('{app}\{#AppExe}'), '--quit', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  // A Filee that did not answer: end it.
+  // A copy that did not answer: end it.
   if ResultCode <> 0 then
-    KillInstalledFilee;
+    KillProcessAt(ExpandConstant('{app}\{#AppExe}'));
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -501,7 +576,7 @@ begin
         UpdateExplorerMenu;
         if WizardIsTaskSelected('cli') then
           AddCliToPath;
-        StartFilee;
+        StartBingling;
       end;
   end;
 end;

@@ -17,6 +17,9 @@ public sealed class WindowsPlatformServices : IPlatformServices
     private const string ContextMenuKey = @"Software\Classes\*\shell\" + AppIdentity.Folder;
     private const string AppName = AppIdentity.Name;
 
+    /// <summary>The classic verb of Filee Plus (1.1.0), removed like its startup entry and Send To shortcut.</summary>
+    private const string LegacyContextMenuKey = @"Software\Classes\*\shell\" + AppIdentity.LegacyFolder;
+
     /// <summary>Window classes that belong to Explorer windows and the desktop.</summary>
     private static readonly HashSet<string> FileManagerClasses = new(StringComparer.Ordinal)
     {
@@ -200,7 +203,8 @@ public sealed class WindowsPlatformServices : IPlatformServices
     public void SetStartWithSystem(bool enabled, string executablePath)
     {
         using var key = Registry.CurrentUser.CreateSubKey(RunKey);
-        // 1.1.0 filed its entry under its old name; the app applies this on every start, so that entry never stays behind.
+        // Filee Plus (1.1.0) filed its entry under its old name. Its uninstaller removes it, but only for the account
+        // that ran it; the app applies this on every start, so the entry never stays behind for this one.
         key.DeleteValue(AppIdentity.LegacyName, throwOnMissingValue: false);
         if (enabled)
             key.SetValue(AppName, $"\"{executablePath}\" --background");
@@ -221,6 +225,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
             ExplorerMenuRegistration.SetTitle(enabled ? label : null);
 
         TryDelete(LegacySendToShortcutPath);
+        Registry.CurrentUser.DeleteSubKeyTree(LegacyContextMenuKey, throwOnMissingSubKey: false);
         if (!enabled)
         {
             RemoveClassicVerb();
