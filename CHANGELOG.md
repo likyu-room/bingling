@@ -1,10 +1,11 @@
 # Changelog
 
-What changed in each version of Filee, for the people using it. The release workflow puts the section of the
+What changed in each version of Bingling, for the people using it. The release workflow puts the section of the
 version it publishes under "What's Changed" in the GitHub release notes, above the list of pull requests.
 
-Add a `## <version>` section before tagging a release. Write what someone using Filee notices: what's new, where to
-find it, what it does and doesn't do.
+Add a `## <version>` section before tagging a release. Write what someone using Bingling notices: what's new, where to
+find it, what it does and doesn't do. Bingling counts its own versions from 1.0.0; the sections from 1.12.0 down are
+the history of the original Filee it is based on.
 
 Start the section with an `<!-- update -->` block (hidden on GitHub). The app's update notice shows its level and its
 one-line summaries in the user's language (`ko`, `en`, `zh`, `pl`; a line per change, a language may repeat; a language
@@ -13,6 +14,33 @@ without lines shows the English ones):
 - `required`: wrong or lost results, security, Filee not starting. The card shows every time Filee starts.
 - `recommended`: bug fixes. The card shows once per version.
 - `optional`: new features only. No card, the sidebar button only.
+
+## 1.1.0
+
+<!-- update
+level: optional
+ko: 새 이름 빙글링: 이름, 로고, 실행 파일, 명령(bingling)이 바뀌었어요
+ko: 사진 도구에 배경 넣기, 가리기(검은 상자·모자이크), 그리기(펜·화살표·글자·번호)가 생겼어요
+ko: 알림 카드에서 결과를 복사하고, 미리보기를 눌러 바로 열 수 있어요
+ko: Shift 끌기는 기본으로 꺼졌어요. Ctrl을 누른 채 끌어 주세요
+en: New name, Bingling: the name, logo, program and command (bingling) changed
+en: New picture tools: add background, redact (black box or mosaic) and annotate (pen, arrows, text, numbers)
+en: Copy a result from its notification card, or click the preview to open it
+en: Shift + drag is off by default; hold Ctrl while you drag
+-->
+
+- **Bingling**: Filee Plus is now called Bingling (빙글링), with a peach logo. The program is `Bingling.exe`, the
+  command is `bingling`, and settings live in `%APPDATA%\Bingling`. Setup removes an installed Filee Plus and moves its
+  settings and engines over. The original Filee is never touched.
+- **Add background**: put a picture on a gradient, a colour, your own image or a pastel taken from the photo, with
+  margin, rounded corners, shadow and a fixed ratio (1:1, 16:9, 9:16, 4:5, 4:3). Saved as PNG.
+- **Redact**: draw black boxes or mosaic over what you want hidden. The result never keeps the photo's EXIF data.
+- **Annotate**: pen, highlighter, arrow, line, rectangle, ellipse, text (Korean too) and numbered stickers, drawn
+  separately on each photo.
+- Editor windows have undo, redo and fit buttons, a hint for each tool and shortcuts in the tooltips.
+- Notification card: **Copy** puts the result on the clipboard; clicking the preview opens the result.
+- Compress never keeps a result that is not smaller than the original.
+- Shift + drag is off by default (Ctrl + drag opens the ring); you can turn it on in Settings › Shortcuts.
 
 ## 1.12.0
 
