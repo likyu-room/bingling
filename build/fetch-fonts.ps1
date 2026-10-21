@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Downloads the Noto Sans fonts (SIL Open Font License 1.1) used by the Filee UI.
+  Downloads the Noto Sans fonts (SIL Open Font License 1.1) used by the Bingling UI.
 
 .DESCRIPTION
   Fonts are not committed to git (≈27 MB). Run this once after cloning, and CI runs it before publishing.

@@ -22,9 +22,9 @@ var output = Path.GetFullPath(args[0]);
 Directory.CreateDirectory(output);
 var repo = Environment.CurrentDirectory;
 while (!File.Exists(Path.Combine(repo, "Filee.slnx")))
-    repo = Path.GetDirectoryName(repo) ?? throw new InvalidOperationException("Run this from inside the Filee repository.");
+    repo = Path.GetDirectoryName(repo) ?? throw new InvalidOperationException("Run this inside the repository.");
 
-var work = Directory.CreateTempSubdirectory("filee-msix-");
+var work = Directory.CreateTempSubdirectory("bingling-msix-");
 try
 {
     var manifestPath = Path.Combine(work.FullName, "AppxManifest.xml");

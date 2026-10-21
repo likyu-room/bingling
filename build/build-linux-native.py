@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Builds the Linux native pieces of the portable package that upstream builds on a newer glibc than Filee supports.
+"""Builds the Linux native pieces of the portable package that upstream builds on a newer glibc than Bingling
+supports.
 
-Filee's Linux packages must start on Ubuntu 22.04 (glibc 2.35). The rhwp CLI (HWP/HWPX -> PDF) release binary is linked
-on Ubuntu 24.04 (GLIBC_2.39), so CI builds it from its pinned source on Ubuntu 22.04 and build/build-portable.ps1 puts it
-into the package. SharpHook's native libraries (libuiohook) come from its NuGet package: from 8.0.1 on they need glibc
-2.34 at most.
+Bingling's Linux packages must start on Ubuntu 22.04 (glibc 2.35). The rhwp CLI (HWP/HWPX -> PDF) release binary is
+linked on Ubuntu 24.04 (GLIBC_2.39), so CI builds it from its pinned source on Ubuntu 22.04 and build/build-portable.ps1
+puts it into the package. SharpHook's native libraries (libuiohook) come from its NuGet package: from 8.0.1 on they
+need glibc 2.34 at most.
 
 Subcommands:
   check                     verify the rhwp pin below still matches engines.json
@@ -112,7 +113,7 @@ def build_rhwp(output, work):
 
 def write_source_note(output, name, repository, commit, details):
     with open(os.path.join(output, "SOURCE.txt"), "w", encoding="utf-8") as stream:
-        stream.write(f"{name} built from source by Filee's CI on {distribution()}.\n"
+        stream.write(f"{name} built from source by Bingling's CI on {distribution()}.\n"
                      f"Source: {repository}/tree/{commit}\n{details}\n")
 
 
@@ -144,7 +145,8 @@ def main(argv=None):
         output = os.path.abspath(options.output)
         if os.path.exists(output):
             raise BuildError(f"{output} already exists. Use a fresh output folder.")
-        work = os.path.abspath(options.work) if options.work else tempfile.mkdtemp(prefix=f"filee-{options.component}-")
+        work = (os.path.abspath(options.work) if options.work
+                else tempfile.mkdtemp(prefix=f"bingling-{options.component}-"))
         os.makedirs(work, exist_ok=True)
         build_rhwp(output, work)
         print(f"{options.component} ready in {output}: {', '.join(sorted(os.listdir(output)))}")

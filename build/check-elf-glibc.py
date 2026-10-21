@@ -4,7 +4,7 @@ newer glibc than --max allows.
 
 A Linux package runs only on systems whose glibc is at least as new as the newest GLIBC_x.y version any of its
 programs or libraries asks for (the .gnu.version_r section, what `objdump -T` prints). The portable package is
-checked against the oldest Ubuntu LTS Filee supports. Standard library only, so it runs on any CI image.
+checked against the oldest Ubuntu LTS Bingling supports. Standard library only, so it runs on any CI image.
 
 Usage: check-elf-glibc.py [--max 2.35] [--needed] PATH [PATH ...]
 Exit codes: 0 every file is within the limit, 1 a file needs a newer glibc, 2 no ELF files or a file can't be read.

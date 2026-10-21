@@ -19,7 +19,7 @@ if (args.Length != 1)
 
 var repo = Environment.CurrentDirectory;
 while (!File.Exists(Path.Combine(repo, "Filee.slnx")))
-    repo = Path.GetDirectoryName(repo) ?? throw new InvalidOperationException("Run this from inside the Filee repository.");
+    repo = Path.GetDirectoryName(repo) ?? throw new InvalidOperationException("Run this inside the repository.");
 
 // [Languages] names in installer/Filee.iss → the app's translation files.
 (string Inno, string App)[] languages = [("en", "en"), ("ko", "ko"), ("zhcn", "zh-CN")];
