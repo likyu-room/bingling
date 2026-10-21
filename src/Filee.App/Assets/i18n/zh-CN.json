@@ -93,6 +93,13 @@
   "tool.background.swatch.solid-peach": "桃色",
   "tool.background.swatch.solid-sky": "天蓝",
   "tool.background.swatch.solid-mint": "薄荷绿",
+  "tool.redact.title": "遮挡",
+  "tool.redact.mode": "方式",
+  "tool.redact.black": "黑框",
+  "tool.redact.mosaic": "马赛克",
+  "tool.redact.count": "{0} 个框",
+  "tool.redact.hint": "在图片上拖动，选择要遮挡的位置",
+  "tool.redact.metadata_note": "结果中的照片信息（EXIF）也会被清除",
 
   "toast.converting": "{0} → {1}",
   "toast.done": "完成",

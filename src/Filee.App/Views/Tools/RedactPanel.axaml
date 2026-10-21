@@ -1,0 +1,37 @@
+<!-- The redact tool's side of the image tool window: the way of hiding (a black box or a mosaic), how many boxes there are,
+     what to do on the picture, and the note that the result carries no photo info. -->
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Filee.App.ViewModels"
+             xmlns:tools="using:Filee.App.ViewModels.Tools"
+             x:Class="Filee.App.Views.Tools.RedactPanel"
+             x:DataType="tools:RedactToolViewModel">
+  <StackPanel Spacing="18">
+    <StackPanel>
+      <TextBlock Classes="label" Text="{DynamicResource tool.redact.mode}" />
+      <ListBox x:Name="ModeChips" Classes="chips" ItemsSource="{Binding Modes}" SelectedItem="{Binding Mode}">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:IChoice">
+            <TextBlock Text="{Binding Label}" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </StackPanel>
+
+    <StackPanel Spacing="4">
+      <TextBlock FontWeight="SemiBold" Text="{Binding BoxCountText}" />
+      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{DynamicResource tool.redact.hint}" />
+    </StackPanel>
+
+    <!-- Always there, set apart as the last word of the panel: the saved picture never keeps the photo's own info, which
+         can hold what was hidden. -->
+    <Border BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SubtleBorderBrush}" Padding="0,12,0,0">
+      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{DynamicResource tool.redact.metadata_note}" />
+    </Border>
+  </StackPanel>
+</UserControl>

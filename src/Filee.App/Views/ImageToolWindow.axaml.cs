@@ -54,6 +54,7 @@ public partial class ImageToolWindow : Window
         {
             CropToolViewModel => (new CropPanel(), CropCanvas()),
             BackgroundToolViewModel => (new BackgroundPanel(), BackdropCanvas()),
+            RedactToolViewModel => (new RedactPanel(), BoxesCanvas()),
             _ => ((Control?, PictureView?))(null, null),
         };
         PictureHost.Child = _picture;
@@ -77,6 +78,15 @@ public partial class ImageToolWindow : Window
         [!PictureView.PictureProperty] = CompiledBinding.Create<ImageToolViewModel, SKImage?>(vm => vm.PreviewImage),
         [!PictureView.FullShortSideProperty] = CompiledBinding.Create<ImageToolViewModel, int>(vm => vm.FullShortSide),
         [!PictureView.EditProperty] = CompiledBinding.Create<BackgroundToolViewModel, ImageEdit?>(vm => vm.PreviewEdit),
+    };
+
+    /// <summary>The preview picture with the redact boxes, which are drawn, picked, moved and resized on it.</summary>
+    private RedactCanvas BoxesCanvas() => new()
+    {
+        [!PictureView.PictureProperty] = CompiledBinding.Create<ImageToolViewModel, SKImage?>(vm => vm.PreviewImage),
+        [!PictureView.FullShortSideProperty] = CompiledBinding.Create<ImageToolViewModel, int>(vm => vm.FullShortSide),
+        [!RedactCanvas.RedactProperty] = CompiledBinding.Create<RedactToolViewModel, RedactEdit>(vm => vm.Redact),
+        [!RedactCanvas.SelectedIndexProperty] = CompiledBinding.Create<RedactToolViewModel, int>(vm => vm.SelectedIndex),
     };
 
     private void OnFinished(object? sender, EventArgs e) => Close();

@@ -75,6 +75,12 @@ public class PictureView : Control
     /// <summary>The size of what is drawn, in its own pixels: the picture's (the crop canvas draws a bitmap instead).</summary>
     protected virtual Size ContentSize => Picture is { } picture ? new Size(picture.Width, picture.Height) : default;
 
+    /// <summary>
+    /// What the next frame draws on the picture: <see cref="Edit"/>, unless a tool's canvas shows more than the view model
+    /// has (the box being dragged, which is only the view model's once it is let go of).
+    /// </summary>
+    protected virtual ImageEdit? EditToDraw => Edit;
+
     /// <summary>Where the picture is drawn on the control now, at this zoom and pan.</summary>
     protected Rect PictureRect => ImageRect(Bounds.Size, ContentSize, _zoom, _pan);
 
@@ -198,6 +204,6 @@ public class PictureView : Control
     {
         context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size)); // takes the pointer everywhere, also off the picture
         if (Picture is { } picture)
-            context.Custom(new EditPreviewDrawOperation(PictureRect, picture, Edit ?? NoEdit, FullShortSide));
+            context.Custom(new EditPreviewDrawOperation(PictureRect, picture, EditToDraw ?? NoEdit, FullShortSide));
     }
 }

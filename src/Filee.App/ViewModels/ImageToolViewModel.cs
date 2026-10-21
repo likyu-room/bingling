@@ -59,6 +59,7 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
         {
             ImageToolKind.Crop => new CropToolViewModel(files, store, loc, log),
             ImageToolKind.AddBackground => new BackgroundToolViewModel(files, store, loc, log),
+            ImageToolKind.Redact => new RedactToolViewModel(files, store, loc, log),
             _ => null,
         };
 
@@ -135,8 +136,17 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     {
     }
 
+    /// <summary>
+    /// False while the tool has nothing to hand back (redact before its first box): Save is off, and Enter does nothing
+    /// either. A tool whose answer changes calls <see cref="NotifyCanSaveChanged"/>.
+    /// </summary>
+    protected virtual bool CanSave => true;
+
     /// <summary>A key the window doesn't use (1 to 7 for a ratio, say); true when the tool took it. Not called while typing.</summary>
     public virtual bool HandleKey(Key key, KeyModifiers modifiers) => false;
+
+    /// <summary>Call when <see cref="CanSave"/> may have changed, so the Save button follows.</summary>
+    protected void NotifyCanSaveChanged() => SaveCommand.NotifyCanExecuteChanged();
 
     /// <summary>Call before a change by the user: the state until now becomes one undo step.</summary>
     protected void RecordStep()
@@ -179,9 +189,12 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Hands the result back and remembers the tool's choices for next time.</summary>
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
+        // Enter and a double click call Execute, which does not ask CanExecute.
+        if (!CanSave)
+            return;
         Result = BuildResult();
         try
         {

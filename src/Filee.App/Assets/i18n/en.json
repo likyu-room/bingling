@@ -93,6 +93,13 @@
   "tool.background.swatch.solid-peach": "Peach",
   "tool.background.swatch.solid-sky": "Sky blue",
   "tool.background.swatch.solid-mint": "Mint",
+  "tool.redact.title": "Redact",
+  "tool.redact.mode": "Style",
+  "tool.redact.black": "Black box",
+  "tool.redact.mosaic": "Mosaic",
+  "tool.redact.count": "Boxes: {0}",
+  "tool.redact.hint": "Drag on the picture to choose what to hide",
+  "tool.redact.metadata_note": "Photo info (EXIF) is also removed from the result",
 
   "toast.converting": "{0} → {1}",
   "toast.done": "Done",

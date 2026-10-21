@@ -93,6 +93,13 @@
   "tool.background.swatch.solid-peach": "Brzoskwiniowy",
   "tool.background.swatch.solid-sky": "Błękitny",
   "tool.background.swatch.solid-mint": "Miętowy",
+  "tool.redact.title": "Zasłoń",
+  "tool.redact.mode": "Sposób",
+  "tool.redact.black": "Czarne pole",
+  "tool.redact.mosaic": "Mozaika",
+  "tool.redact.count": "Pola: {0}",
+  "tool.redact.hint": "Przeciągnij po obrazie, aby wybrać, co zasłonić",
+  "tool.redact.metadata_note": "Z wyniku usuwane są też informacje o zdjęciu (EXIF)",
 
   "toast.converting": "{0} → {1}",
   "toast.done": "Gotowe",

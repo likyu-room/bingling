@@ -310,13 +310,13 @@ public class ImageToolDonutTests
     }
 
     [AvaloniaFact]
-    public void Redact_opens_no_window_and_runs_nothing_before_its_window_is_built()
+    public void Annotate_opens_no_window_and_runs_nothing_before_its_window_is_built()
     {
         TestServices.EnsureInitialized("ko");
         var conversions = AppHost.Get<ConversionService>();
         var jobs = conversions.Jobs.Count;
         var windows = new RecordingToolWindows();
-        ClickTool(TestImages.Png(1), windows, slice: 2); // crop, add background, redact
+        ClickTool(TestImages.Png(1), windows, slice: 3); // crop, add background, redact, annotate
         RunUntil(() => windows.Opening is not null);
         Dispatcher.UIThread.RunJobs();
 

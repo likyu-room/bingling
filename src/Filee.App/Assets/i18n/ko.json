@@ -93,6 +93,13 @@
   "tool.background.swatch.solid-peach": "피치색",
   "tool.background.swatch.solid-sky": "하늘색",
   "tool.background.swatch.solid-mint": "민트색",
+  "tool.redact.title": "가리기",
+  "tool.redact.mode": "방식",
+  "tool.redact.black": "검은 상자",
+  "tool.redact.mosaic": "모자이크",
+  "tool.redact.count": "상자 {0}개",
+  "tool.redact.hint": "그림 위를 끌어서 가릴 곳을 고르세요",
+  "tool.redact.metadata_note": "결과에서 사진 정보(EXIF)도 지워져요",
 
   "toast.converting": "{0} → {1}",
   "toast.done": "완료",

@@ -24,10 +24,10 @@ public sealed class ImageCanvas : PictureView
         AvaloniaProperty.Register<ImageCanvas, CropRect?>(nameof(Crop), defaultBindingMode: BindingMode.TwoWay);
 
     /// <summary>How far from an edge or a corner (in DIPs) the pointer still takes it.</summary>
-    private const double Reach = 8;
+    internal const double Reach = 8;
 
     /// <summary>How far the pointer moves before a press becomes a drag: a click (or a double click) changes nothing.</summary>
-    private const double DragThreshold = 3;
+    internal const double DragThreshold = 3;
 
     private static readonly IBrush Shade = new SolidColorBrush(Color.FromArgb(128, 0, 0, 0));
     private static readonly IPen BoxPen = new Pen(Brushes.White, 1.5);
@@ -267,6 +267,12 @@ public sealed class ImageCanvas : PictureView
         if (grip == _hover)
             return;
         _hover = grip;
+        Cursor = CursorFor(grip);
+    }
+
+    /// <summary>The pointer's shape for what a press would take (<see cref="ShowCursor"/>); null: the hand of Space + drag.</summary>
+    internal static Cursor CursorFor(Grip? grip)
+    {
         var shape = grip switch
         {
             null => StandardCursorType.Hand,
@@ -283,7 +289,7 @@ public sealed class ImageCanvas : PictureView
         };
         if (!Cursors.TryGetValue(shape, out var cursor))
             Cursors[shape] = cursor = new Cursor(shape);
-        Cursor = cursor;
+        return cursor;
     }
 
     /// <summary>The pointer shapes in use, made once (the pointer changes shape at every edge it crosses).</summary>
@@ -320,7 +326,12 @@ public sealed class ImageCanvas : PictureView
             }
         }
         context.DrawRectangle(null, BoxPen, box);
+        DrawHandles(context, box);
+    }
 
+    /// <summary>The eight handles of a box: its corners and the middles of its edges.</summary>
+    internal static void DrawHandles(DrawingContext context, Rect box)
+    {
         foreach (var x in new[] { box.Left, box.Center.X, box.Right })
         {
             foreach (var y in new[] { box.Top, box.Center.Y, box.Bottom })
