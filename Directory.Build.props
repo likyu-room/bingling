@@ -14,7 +14,7 @@
          parameters of a member is fine (CS1573). -->
     <NoWarn>$(NoWarn);CS1591;CS1573</NoWarn>
 
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
     <Product>Bingling</Product>
     <Authors>Beomsuk Kim (LikeU)</Authors>
     <Copyright>Copyright (c) 2026 Beomsuk Kim (LikeU); based on Filee, (c) Myeonggu Kim (KnifeLemon) and Filee contributors</Copyright>

@@ -15,6 +15,26 @@ without lines shows the English ones):
 - `recommended`: bug fixes. The card shows once per version.
 - `optional`: new features only. No card, the sidebar button only.
 
+## 1.1.1
+
+<!-- update
+level: optional
+ko: 관리자 권한 없이 내 계정에만 설치할 수 있어요(회사 PC 등)
+ko: 설치 파일이 작아졌어요
+ko: 설치 화면이 스페인어와 폴란드어도 지원해요
+en: Install for your account only, without administrator rights (work PCs and the like)
+en: A smaller download
+en: Setup also speaks Spanish and Polish
+-->
+
+- **Install for me only**: Setup's first window asks how to install. "Install for all users" works as before and
+  needs administrator rights. "Install for me only" needs none: Bingling goes into `%LocalAppData%\Programs\Bingling`,
+  and the `bingling` command goes on your own PATH. This helps on a work PC where you are not an administrator. Two
+  things need administrator rights and are left out: the entry at the top of the Windows 11 menu (Bingling stays under
+  "Show more options") and removing Filee Plus. Updates keep the mode of the first install.
+- **Smaller download**: Setup no longer carries debug files of the graphics libraries (about 100 MB unpacked).
+- Setup also speaks Spanish and Polish, like the app.
+
 ## 1.1.0
 
 <!-- update
