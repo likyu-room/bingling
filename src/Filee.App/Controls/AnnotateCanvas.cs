@@ -98,6 +98,10 @@ public sealed class AnnotateCanvas : PictureView
             BorderThickness = new Thickness(1),
             FontFamily = new FontFamily(AnnotationFonts.FamilyName),
         };
+        // The box is see-through, in every state: the theme paints a text box white (or dark) when it has the focus, and a
+        // white text, or a black one on a dark theme, would be typed where it can't be seen. The border stays, to show the box.
+        foreach (var key in new[] { "TextControlBackground", "TextControlBackgroundPointerOver", "TextControlBackgroundFocused" })
+            _editor.Resources[key] = Brushes.Transparent;
         // Tunnelled: Enter puts the text there before the text box would take it as a new line (Shift+Enter is one).
         _editor.AddHandler(KeyDownEvent, OnEditorKeyDown, RoutingStrategies.Tunnel);
         // After the text box: an undo it does not take must not reach the window, which would undo a drawing under the text.

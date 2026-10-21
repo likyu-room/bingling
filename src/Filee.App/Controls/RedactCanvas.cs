@@ -1,6 +1,7 @@
 // The picture in the redact window with its boxes: a drag on bare picture draws a box, a click picks one, a drag on it
 // moves it, a drag on a handle or an edge of the picked one resizes it. What the boxes hide (black or mosaic) is drawn by
-// the renderer that saves the picture; the picked box gets an outline and eight handles on top. Zooming and panning are
+// the renderer that saves the picture; the picked box gets an outline and eight handles on top, the others a thin dashed
+// outline (so a mosaic on a flat sky is still a box that can be seen and counted). Zooming and panning are
 // PictureView's, and the box geometry is ImageCanvas's (Grip, HitTest, Resize, Move), used as it is on CropRects.
 //
 // The boxes go in and out as one RedactEdit (fractions of the picture), set back once per drag, when the button is let go.
@@ -30,6 +31,10 @@ public sealed class RedactCanvas : PictureView
 
     private static readonly IPen OutlinePen = new Pen(Brushes.White, 1.5);
     private static readonly IPen OutlineShadowPen = new Pen(new SolidColorBrush(Color.FromArgb(150, 0, 0, 0)), 1);
+
+    // A box that is not picked: dark under white dashes, one DIP thick, lighter than the picked box's.
+    private static readonly IPen DimShadowPen = new Pen(new SolidColorBrush(Color.FromArgb(120, 0, 0, 0)), 2);
+    private static readonly IPen DimPen = new Pen(Brushes.White, 1, new DashStyle([4, 3], 0));
 
     /// <summary>A press in progress: the box it took (-1: it is drawing a new one), what of it, where, and the box it started from.</summary>
     private sealed record Press(int Index, ImageCanvas.Grip Grip, Point Start, CropRect Box);
@@ -230,6 +235,16 @@ public sealed class RedactCanvas : PictureView
         if (Picture is null)
             return;
         var (redact, selected) = Shown();
+        // The boxes not picked get a thin dashed outline, so a mosaic on a flat sky or a white wall can be told from no box
+        // at all, and the boxes counted. Only the preview has it; the saved picture never does.
+        for (var i = 0; i < redact.Boxes.Count; i++)
+        {
+            if (i == selected)
+                continue;
+            var outline = ImageCanvas.ToScreen(AsCrop(redact.Boxes[i]), PictureRect);
+            context.DrawRectangle(null, DimShadowPen, outline);
+            context.DrawRectangle(null, DimPen, outline);
+        }
         if (selected < 0)
             return;
         var box = ImageCanvas.ToScreen(AsCrop(redact.Boxes[selected]), PictureRect);

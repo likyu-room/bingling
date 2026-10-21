@@ -40,6 +40,15 @@ public class ImageToolWindowTests
             return path;
         }
 
+        /// <summary>A picture of one colour: a mosaic on it changes nothing, so anything else at a box is the box's outline.</summary>
+        public static string Flat(int width, int height, MagickColor color)
+        {
+            var path = Path.Combine(Folder(), "flat.png");
+            using var image = new MagickImage(color, (uint)width, (uint)height);
+            image.Write(path, MagickFormat.Png);
+            return path;
+        }
+
         /// <summary>A JPEG stored as <paramref name="width"/> × <paramref name="height"/> that a phone turned: EXIF orientation 6.</summary>
         public static string TurnedJpeg(int width, int height)
         {
@@ -90,7 +99,7 @@ public class ImageToolWindowTests
         Assert.Equal((200, 200), (vm.PixelWidth, vm.PixelHeight));
         Assert.Equal(.25, vm.Crop.X, 3);
         Assert.Equal("자르기 · photo.png", vm.Title);
-        Assert.Equal("", vm.FooterText); // one file: nothing to say
+        Assert.Equal("원본은 그대로 두고 옆에 새 파일로 저장해요", vm.FooterText); // one file: the original stays
         Assert.Equal(CropMath.AspectIds, vm.Aspects.Select(a => a.Value));
         Assert.Equal("자유", vm.Aspects[0].Label);
     }
@@ -100,7 +109,7 @@ public class ImageToolWindowTests
     {
         var vm = Crop([TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
         Assert.Equal("2개 중 1", vm.PositionText);
-        Assert.Equal("2개 파일에 함께 적용돼요", vm.FooterText);
+        Assert.Equal("파일 2개에 똑같이 적용돼요", vm.FooterText);
         vm.Aspect = vm.Aspects.Single(a => a.Value == "1:1");
         vm.NextCommand.Execute(null);
         Assert.Equal("2개 중 2", vm.PositionText);
@@ -291,6 +300,70 @@ public class ImageToolWindowTests
         window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
         Assert.True(closed);
         Assert.Equal(.25, vm.Result!.Shared!.Crop!.Width, 6);
+    }
+
+    private static Button ButtonOf(Window window, System.Windows.Input.ICommand command) =>
+        window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == command);
+
+    [AvaloniaFact]
+    public void The_top_bar_has_undo_and_redo_buttons_that_follow_the_steps_even_for_one_file()
+    {
+        var (window, vm) = Open(TestImages.Png(400, 200)); // one file: no ‹ ›, but undo and redo are there all the same
+        var (undo, redo) = (ButtonOf(window, vm.UndoCommand), ButtonOf(window, vm.RedoCommand));
+        Assert.True(undo.IsEffectivelyVisible && redo.IsEffectivelyVisible);
+        Assert.False(undo.IsEffectivelyEnabled); // nothing done yet
+        Assert.False(redo.IsEffectivelyEnabled);
+        Assert.Equal("되돌리기 (Ctrl+Z)", ToolTip.GetTip(undo));
+        Assert.Equal("다시 하기 (Ctrl+Y)", ToolTip.GetTip(redo));
+        Assert.False(undo.Focusable); // the keys stay with the picture
+
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "1:1");
+        Assert.True(undo.IsEffectivelyEnabled);
+        Assert.False(redo.IsEffectivelyEnabled);
+
+        Point Centre(Control c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), window)!.Value;
+        window.FocusManager!.Focus(null); // as after another window had it: the press brings the keys back to the picture
+        window.MouseDown(Centre(undo), MouseButton.Left);
+        window.MouseUp(Centre(undo), MouseButton.Left);
+        Assert.IsType<ImageCanvas>(window.FocusManager.GetFocusedElement());
+        Assert.Equal("original", vm.Aspect.Value);
+        Assert.False(undo.IsEffectivelyEnabled);
+        Assert.True(redo.IsEffectivelyEnabled);
+
+        window.MouseDown(Centre(redo), MouseButton.Left);
+        window.MouseUp(Centre(redo), MouseButton.Left);
+        Assert.Equal("1:1", vm.Aspect.Value);
+        Assert.True(undo.IsEffectivelyEnabled);
+        Assert.False(redo.IsEffectivelyEnabled);
+
+        // A new step after an undo clears what could be redone; Reset is a step too.
+        vm.UndoCommand.Execute(null);
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "free");
+        Assert.False(redo.IsEffectivelyEnabled);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void Buttons_and_the_ratio_chips_tell_their_keys_in_tooltips()
+    {
+        var (window, vm) = Open(TestImages.Png(400, 200), TestImages.Png(200, 400));
+        Assert.Equal("Enter", ToolTip.GetTip(ButtonOf(window, vm.SaveCommand)));
+        Assert.Equal("Esc", ToolTip.GetTip(ButtonOf(window, vm.CancelCommand)));
+        Assert.Equal("이전 파일 (←)", ToolTip.GetTip(ButtonOf(window, vm.PreviousCommand)));
+        Assert.Equal("다음 파일 (→)", ToolTip.GetTip(ButtonOf(window, vm.NextCommand)));
+        Assert.Equal("숫자 키 1~7로도 골라요", ToolTip.GetTip(window.GetVisualDescendants().OfType<ListBox>().Single()));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void One_file_says_the_original_stays_and_several_say_the_edit_goes_on_all()
+    {
+        var vm = Crop([TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        Assert.Equal("원본은 그대로 두고 옆에 새 파일로 저장해요", vm.FooterText);
+        vm.Dispose();
+        vm = Crop([TestImages.Png(400, 200), TestImages.Png(200, 400)], TestStore(), Loc("ko"));
+        Assert.Equal("파일 2개에 똑같이 적용돼요", vm.FooterText);
+        vm.Dispose();
     }
 
     [AvaloniaFact]

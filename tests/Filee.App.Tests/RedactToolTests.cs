@@ -21,6 +21,7 @@ using Filee.App.Views.Tools;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
 using Filee.Core.Settings;
+using ImageMagick;
 
 namespace Filee.App.Tests;
 
@@ -465,6 +466,68 @@ public class RedactToolTests
         Assert.Single(vm.Redact.Boxes); // the same boxes on the next file
         window.KeyPressQwerty(PhysicalKey.B, RawInputModifiers.None);
         Assert.Equal(RedactMode.Black, vm.Mode.Value);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_delete_button_follows_the_picked_box_and_hands_the_keys_back()
+    {
+        var (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Png(400, 200));
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.DeleteSelectionCommand);
+        Point Centre(Control c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), window)!.Value;
+        Assert.False(vm.HasSelection);
+        Assert.False(button.IsEffectivelyEnabled); // no box picked: nothing to delete
+
+        Drag(window, At(window, Picture, .1, .2), At(window, Picture, .4, .5));
+        Drag(window, At(window, Picture, .5, .5), At(window, Picture, .9, .9));
+        Assert.Equal(2, vm.Redact.Boxes.Count);
+        Assert.True(vm.HasSelection); // a box just drawn is the picked one
+        Assert.True(button.IsEffectivelyEnabled);
+
+        window.FocusManager!.Focus(null);
+        window.MouseDown(Centre(button), MouseButton.Left);
+        window.MouseUp(Centre(button), MouseButton.Left);
+        var left = Assert.Single(vm.Redact.Boxes);
+        Assert.Equal(.1, left.X, 2); // the second box went, the picked one
+        Assert.False(vm.HasSelection);
+        Assert.False(button.IsEffectivelyEnabled);
+        Assert.IsType<RedactCanvas>(window.FocusManager.GetFocusedElement()); // the keys are the picture's again
+
+        vm.UndoCommand.Execute(null); // one undo step, with the box picked again
+        Assert.Equal(2, vm.Redact.Boxes.Count);
+        Assert.True(vm.HasSelection);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_box_that_is_not_picked_still_shows_a_thin_outline_where_a_mosaic_changes_nothing()
+    {
+        // A flat picture: a mosaic on it looks like no box at all, which is what the outline is for.
+        var flat = Avalonia.Media.Color.FromRgb(70, 130, 180);
+        var (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Flat(1000, 700, MagickColors.SteelBlue));
+        var size = new Size(1000, 700);
+        window.KeyPressQwerty(PhysicalKey.M, RawInputModifiers.None);
+        Drag(window, At(window, size, .2, .3), At(window, size, .6, .7));
+        var corner = At(window, size, .95, .95);
+        window.MouseDown(corner, MouseButton.Left); // a click on the bare picture lets go of the box
+        window.MouseUp(corner, MouseButton.Left);
+        Assert.Equal(-1, vm.SelectedIndex);
+        Assert.Equal(RedactMode.Mosaic, vm.Mode.Value);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+
+        using var frame = window.CaptureRenderedFrame()!;
+        Screenshot(window, "tool-redact-unpicked-ko.png");
+        bool Differs(Avalonia.Media.Color c) => Math.Abs(c.R - flat.R) + Math.Abs(c.G - flat.G) + Math.Abs(c.B - flat.B) > 60;
+        var top = At(window, size, .2, .3);
+        var edge = from i in Enumerable.Range(0, 60) from dy in Enumerable.Range(-2, 5) select PixelAt(frame, new Point(top.X + 20 + i, top.Y + dy));
+        Assert.Contains(edge, Differs); // a dash of the outline along the box's top edge
+
+        // The picked box is drawn as before, with handles; the outline is the preview's only, never part of the saved edit.
+        Assert.False(Differs(PixelAt(frame, At(window, size, .4, .5)))); // inside: still the picture's own colour
+        Assert.False(Differs(PixelAt(frame, At(window, size, .1, .5))));
         window.Close();
         vm.Dispose();
     }

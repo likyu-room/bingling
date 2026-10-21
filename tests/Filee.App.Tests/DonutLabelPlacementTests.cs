@@ -252,6 +252,19 @@ public class DonutLabelPlacementTests
     public void A_name_breaks_at_spaces_before_it_breaks_inside_a_word(string name, double width, string expected) =>
         Assert.Equal(expected, DonutMenu.WrapAtSpaces(name, width, text => text.Length * 10));
 
+    /// <summary>
+    /// The centre's "PNG 1개 · 620 B" breaks at the dot when it is too wide, so no dot is left hanging at the end of the
+    /// first line. One line is as it was.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("PNG 1개 · 620 B", 100, "PNG 1개\n620 B")]       // 15 characters × 10 px against 100
+    [InlineData("PNG 1개 · 620 B", 150, "PNG 1개 · 620 B")]      // fits: the spec's "1개 · JPG · 1.2 MB" shape stays
+    [InlineData("1개 · JPG · 1.2 MB", 120, "1개 · JPG\n1.2 MB")] // the last dot is the one before the size
+    [InlineData("파일 3개", 20, "파일 3개")]                        // no dot: the layout's own business
+    [InlineData("", 20, "")]
+    public void A_centre_title_breaks_at_its_last_dot_when_too_wide(string title, double width, string expected) =>
+        Assert.Equal(expected, DonutMenu.BreakAtLastDot(title, width, text => text.Length * 10));
+
     private static (byte[] Pixels, int Width, int Height) Read(Avalonia.Media.Imaging.WriteableBitmap bitmap)
     {
         using var buffer = bitmap.Lock();

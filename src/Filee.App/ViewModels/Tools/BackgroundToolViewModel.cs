@@ -116,6 +116,7 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
             _hex = value ?? "";
             OnPropertyChanged();
             OnPropertyChanged(nameof(CustomColorBrush));
+            OnPropertyChanged(nameof(HasCustomColor));
             if (HexColor(_hex) is { } hex)
                 Change(e => (e.Kind, e.Value, e.ImagePath) = (BackgroundKind.Solid, hex, null));
         }
@@ -123,6 +124,9 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
 
     /// <summary>The typed colour as a chip's paint; nothing while it is not a whole code.</summary>
     public IBrush CustomColorBrush => HexColor(_hex) is { } hex ? new SolidColorBrush(Color.Parse(hex)) : Brushes.Transparent;
+
+    /// <summary>The typed text is a whole colour code: only then is there a colour to show beside the box (not an empty pill).</summary>
+    public bool HasCustomColor => HexColor(_hex) is not null;
 
     /// <summary>Room around the picture in percent of its short side, 0 to 40. A slider drag is one undo step.</summary>
     public double Padding
@@ -153,6 +157,18 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
 
     /// <summary>The shadow's strength: a number, not pixels.</summary>
     public string ShadowText => _edit.Shadow.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>"Result 1920 × 1080px": the size of the saved picture for the file shown, as the crop window shows its pixels.</summary>
+    public string OutputText
+    {
+        get
+        {
+            if (ImageWidth <= 0 || ImageHeight <= 0)
+                return "";
+            var size = ImageEditRenderer.Layout(ImageWidth, ImageHeight, _edit).Output;
+            return Loc.Format("tool.background.output", size.Width, size.Height);
+        }
+    }
 
     /// <summary>The shape of the result. One undo step.</summary>
     public Choice<string> Aspect
@@ -236,6 +252,7 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
     {
         OnPropertyChanged(nameof(PaddingText));
         OnPropertyChanged(nameof(CornerText));
+        OnPropertyChanged(nameof(OutputText));
     }
 
     public override void Dispose()
@@ -290,6 +307,7 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
         {
             nameof(PreviewEdit), nameof(SelectedSwatch), nameof(IsCustomColor), nameof(IsCustomImage), nameof(CustomImageName),
             nameof(Padding), nameof(Corner), nameof(Shadow), nameof(PaddingText), nameof(CornerText), nameof(ShadowText), nameof(Aspect),
+            nameof(OutputText),
         })
             OnPropertyChanged(name);
     }

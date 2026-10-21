@@ -513,7 +513,7 @@ public class AnnotateToolTests
         Assert.Equal(1, vm.Index);
         Assert.Empty(vm.Annotations);
         Assert.Null(Editor(window));
-        Assert.Equal("표시한 1개만 저장돼요", vm.FooterText);
+        Assert.Equal("그린 파일 1개만 저장돼요", vm.FooterText);
 
         // ← / → while typing move the caret, not the file; Enter puts the text here.
         Click(window, At(window, .5, .5));
@@ -532,7 +532,7 @@ public class AnnotateToolTests
         Assert.Equal("안녕", Assert.Single(vm.Annotations).Text);
         Turn(window, vm, PhysicalKey.ArrowRight);
         Assert.Equal(["둘", "셋"], vm.Annotations.Select(a => a.Text));
-        Assert.Equal("표시한 2개만 저장돼요", vm.FooterText);
+        Assert.Equal("그린 파일 2개만 저장돼요", vm.FooterText);
 
         // Each text is one undo step of its own file.
         Key(window, PhysicalKey.Z, RawInputModifiers.Control);
@@ -671,14 +671,14 @@ public class AnnotateToolTests
         Key(window, PhysicalKey.A);
         Drag(window, At(window, .1, .2), At(window, .6, .8));
         Assert.True(save.IsEffectivelyEnabled);
-        Assert.Equal("표시한 1개만 저장돼요", vm.FooterText);
-        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "표시한 1개만 저장돼요");
+        Assert.Equal("그린 파일 1개만 저장돼요", vm.FooterText);
+        Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "그린 파일 1개만 저장돼요");
 
         Turn(window, vm, PhysicalKey.ArrowRight);
         Turn(window, vm, PhysicalKey.ArrowRight);
         Key(window, PhysicalKey.N);
         Click(window, At(window, .5, .5));
-        Assert.Equal("표시한 2개만 저장돼요", vm.FooterText);
+        Assert.Equal("그린 파일 2개만 저장돼요", vm.FooterText);
         Assert.Equal("#FF3B30", store.Settings.ImageTools.PenColor); // only Save remembers
 
         Key(window, PhysicalKey.Enter);
@@ -750,6 +750,291 @@ public class AnnotateToolTests
         Dispatcher.UIThread.RunJobs();
         Assert.True(closed);
         Assert.Null(vm.Result);
+        vm.Dispose();
+    }
+
+    // ───────── Picking a colour or a thickness, deleting, hints ─────────
+
+    private static Annotation Arrow(string color = "#FF3B30", StrokeLevel width = StrokeLevel.Normal) => new()
+    {
+        Kind = AnnotationKind.Arrow,
+        Color = color,
+        Width = width,
+        Points = [new EditPoint { X = .1, Y = .2 }, new EditPoint { X = .6, Y = .8 }],
+    };
+
+    [AvaloniaFact]
+    public void A_colour_or_thickness_picked_while_a_drawing_is_picked_changes_that_drawing_in_one_undo_step()
+    {
+        var vm = Annotate([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore());
+        vm.Annotations = [Arrow(), Arrow()];
+
+        // Nothing picked: the choice is for the drawings to come, and the drawn ones stay as they are.
+        vm.SelectedColor = vm.Colors.Single(c => c.Hex == "#007AFF");
+        Assert.Equal(["#FF3B30", "#FF3B30"], vm.Annotations.Select(a => a.Color));
+        Assert.Equal("#007AFF", vm.Color);
+
+        // The second arrow picked: the blue chip and the thick chip are for it, and for the next ones as well.
+        vm.SelectedIndex = 1;
+        vm.SelectedColor = vm.Colors.Single(c => c.Hex == "#34C759");
+        Assert.Equal(["#FF3B30", "#34C759"], vm.Annotations.Select(a => a.Color));
+        Assert.Equal("#34C759", vm.Color);
+        vm.StrokeWidth = StrokeLevel.Thick;
+        Assert.Equal([StrokeLevel.Normal, StrokeLevel.Thick], vm.Annotations.Select(a => a.Width));
+        Assert.Equal(1, vm.SelectedIndex); // still picked
+
+        // A colour typed in (a whole code) too; the same colour again is no step.
+        vm.CustomColorHex = "12ab34";
+        Assert.Equal("#12AB34", vm.Annotations[1].Color);
+        vm.CustomColorHex = "#12AB34 ";
+        vm.StrokeWidth = StrokeLevel.Thick;
+
+        // One step each, in reverse; picking itself is none.
+        vm.UndoCommand.Execute(null);
+        Assert.Equal("#34C759", vm.Annotations[1].Color);
+        vm.UndoCommand.Execute(null);
+        Assert.Equal(StrokeLevel.Normal, vm.Annotations[1].Width);
+        vm.UndoCommand.Execute(null);
+        Assert.Equal("#FF3B30", vm.Annotations[1].Color);
+        Assert.Equal("#FF3B30", vm.Annotations[0].Color); // the other one was never touched
+        vm.UndoCommand.Execute(null);
+        Assert.Empty(vm.Annotations); // and the first step is the two arrows themselves
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_thickness_keys_change_the_picked_drawing_and_a_text_changes_its_size()
+    {
+        var (window, vm) = Open();
+        vm.Annotations = [Arrow(), new Annotation { Kind = AnnotationKind.Text, Text = "hi", Points = [new EditPoint { X = .5, Y = .5 }] }];
+        vm.SelectedIndex = 1;
+        Key(window, PhysicalKey.BracketRight);
+        Assert.Equal([StrokeLevel.Normal, StrokeLevel.Thick], vm.Annotations.Select(a => a.Width));
+        Key(window, PhysicalKey.BracketLeft);
+        Key(window, PhysicalKey.BracketLeft);
+        Assert.Equal([StrokeLevel.Normal, StrokeLevel.Thin], vm.Annotations.Select(a => a.Width));
+        Key(window, PhysicalKey.Z, RawInputModifiers.Control);
+        Assert.Equal(StrokeLevel.Normal, vm.Annotations[1].Width);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_colour_chip_pressed_while_a_picked_text_is_retyped_keeps_the_new_words_and_colours_the_text()
+    {
+        var (window, vm) = Open();
+        Key(window, PhysicalKey.T);
+        Click(window, At(window, .3, .4));
+        window.KeyTextInput("옛글");
+        Key(window, PhysicalKey.Enter);
+        Key(window, PhysicalKey.V);
+        var inside = At(window, .3, .4) + new Point(6, 6);
+        Click(window, inside);
+        window.MouseDown(inside, MouseButton.Left); // a double click: the text is typed anew, and it is the picked one
+        window.MouseUp(inside, MouseButton.Left);
+        Editor(window)!.SelectAll();
+        window.KeyTextInput("새글");
+        Assert.Equal(0, vm.SelectedIndex);
+
+        var chips = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "ColorChips");
+        var blue = chips.ContainerFromIndex(4)!;
+        var at = blue.TranslatePoint(new Point(blue.Bounds.Width / 2, blue.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+
+        // Not "the words typed are dropped under the colour change": one text, with its new words and its new colour.
+        var text = Assert.Single(vm.Annotations);
+        Assert.Equal(("새글", "#007AFF"), (text.Text, text.Color));
+        Assert.Null(Editor(window));
+        vm.UndoCommand.Execute(null); // the colour
+        Assert.Equal(("새글", "#FF3B30"), (Assert.Single(vm.Annotations).Text, vm.Annotations[0].Color));
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_delete_button_follows_the_picked_drawing_and_hands_the_keys_back()
+    {
+        var (window, vm) = Open();
+        Key(window, PhysicalKey.L);
+        Drag(window, At(window, .1, .5), At(window, .5, .5));
+        Drag(window, At(window, .1, .8), At(window, .5, .8));
+        Key(window, PhysicalKey.V);
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.DeleteSelectionCommand);
+        Point Centre(Control c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), window)!.Value;
+
+        Assert.False(vm.HasSelection);
+        Assert.False(button.IsEffectivelyEnabled); // nothing picked: nothing to delete
+        Click(window, At(window, .3, .5));
+        Assert.True(vm.HasSelection);
+        Assert.True(button.IsEffectivelyEnabled);
+
+        // The focus is elsewhere (as after another window had it): the button brings it back to the picture.
+        window.FocusManager!.Focus(null);
+        window.MouseDown(Centre(button), MouseButton.Left);
+        window.MouseUp(Centre(button), MouseButton.Left);
+        var left = Assert.Single(vm.Annotations);
+        Assert.Equal(.8, left.Points[0].Y, 2);
+        Assert.False(vm.HasSelection);
+        Assert.False(button.IsEffectivelyEnabled);
+        Assert.IsType<AnnotateCanvas>(window.FocusManager.GetFocusedElement());
+
+        vm.UndoCommand.Execute(null); // one undo step, with the drawing picked again
+        Assert.Equal(2, vm.Annotations.Count);
+        Assert.True(vm.HasSelection);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_hint_under_the_tools_tells_how_the_tool_is_used()
+    {
+        var vm = Annotate([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore());
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        var loc = Loc();
+        string Hint(string id) => loc[$"tool.annotate.hint.{id}"];
+
+        vm.DrawingTool = null;
+        Assert.Equal("눌러서 고르고 끌어서 옮겨요. 글자는 두 번 눌러 고쳐요.", vm.ToolHint);
+        Assert.Contains(nameof(vm.ToolHint), changes);
+        foreach (var (kind, hint) in new[]
+        {
+            (AnnotationKind.Pen, "draw"), (AnnotationKind.Highlighter, "draw"), (AnnotationKind.Arrow, "line"), (AnnotationKind.Line, "line"),
+            (AnnotationKind.Rectangle, "shape"), (AnnotationKind.Ellipse, "shape"), (AnnotationKind.Text, "text"), (AnnotationKind.Number, "number"),
+        })
+        {
+            vm.DrawingTool = kind;
+            Assert.Equal(Hint(hint), vm.ToolHint);
+        }
+        Assert.Equal("누른 곳에 써요. Enter로 마치고, Shift+Enter로 줄을 바꿔요.", Hint("text"));
+        Assert.Equal("끌어서 그려요. Shift를 누르면 반듯하게 꺾여요.", Hint("line"));
+        Assert.Equal("끌어서 그려요. Shift를 누르면 정사각형·정원이 돼요.", Hint("shape"));
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_colour_box_says_what_to_type_and_its_swatch_shows_only_for_a_whole_code()
+    {
+        var vm = Annotate([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore());
+        Assert.False(vm.HasCustomColor);
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+        vm.CustomColorHex = "12ab3";
+        Assert.False(vm.HasCustomColor); // half a code: no empty pill that looks like a white swatch
+        vm.CustomColorHex = "12ab34";
+        Assert.True(vm.HasCustomColor);
+        Assert.Contains(nameof(vm.HasCustomColor), changes);
+        vm.CustomColorHex = "";
+        Assert.False(vm.HasCustomColor);
+        vm.Dispose();
+
+        var (window, shown) = Open();
+        var box = window.GetVisualDescendants().OfType<TextBox>().Single(t => AutomationProperties.GetName(t) == "사용자 색");
+        Assert.Equal("예: #FF7A1A", box.PlaceholderText); // not "#RRGGBB"
+        Assert.Equal("색 코드를 넣으면 바로 바뀌어요", ToolTip.GetTip(box));
+        window.Close();
+        shown.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Undo_and_redo_buttons_belong_to_the_file_shown_and_a_text_being_typed_goes_on_before_an_undo()
+    {
+        var (window, vm) = Open(files: 2);
+        var undo = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.UndoCommand);
+        Point Centre(Control c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), window)!.Value;
+        Assert.False(undo.IsEffectivelyEnabled);
+
+        Drag(window, At(window, .1, .2), At(window, .6, .8)); // a pen stroke on the first file
+        Assert.True(undo.IsEffectivelyEnabled);
+        Turn(window, vm, PhysicalKey.ArrowRight);
+        Assert.False(undo.IsEffectivelyEnabled); // the second file has no step of its own
+        Turn(window, vm, PhysicalKey.ArrowLeft);
+        Assert.True(undo.IsEffectivelyEnabled);
+
+        // A text half typed: the button puts it on first, so the undo takes that text away and not the stroke before it.
+        Key(window, PhysicalKey.T);
+        Click(window, At(window, .3, .4));
+        window.KeyTextInput("abc");
+        Assert.NotNull(Editor(window));
+        window.MouseDown(Centre(undo), MouseButton.Left);
+        window.MouseUp(Centre(undo), MouseButton.Left);
+        Assert.Null(Editor(window));
+        Assert.Equal(AnnotationKind.Pen, Assert.Single(vm.Annotations).Kind);
+        Assert.True(undo.IsEffectivelyEnabled); // the stroke is still a step
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_fit_button_shows_the_whole_picture_again_after_zooming()
+    {
+        var (window, vm) = Open();
+        var fit = window.GetVisualDescendants().OfType<Button>().Single(b => Equals(ToolTip.GetTip(b), "화면에 맞춤 (Ctrl+0)"));
+        var canvas = Canvas(window);
+        var middle = canvas.TranslatePoint(new Point(canvas.Bounds.Width / 2, canvas.Bounds.Height / 2), window)!.Value;
+        window.MouseWheel(middle, new Vector(0, 3)); // zoomed in
+        Point Centre(Control c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(Centre(fit), MouseButton.Left);
+        window.MouseUp(Centre(fit), MouseButton.Left);
+
+        // Fitted again, a drag at the places of a fitted picture lands on them.
+        Key(window, PhysicalKey.L);
+        Drag(window, At(window, .1, .5), At(window, .5, .5));
+        var line = Assert.Single(vm.Annotations);
+        Assert.Equal([(.1, .5), (.5, .5)], line.Points.Select(Xy), new PointComparer());
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void One_file_says_the_original_stays_and_several_say_how_many_will_be_saved()
+    {
+        var one = Annotate([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore());
+        Assert.Equal("원본은 그대로 두고 옆에 새 파일로 저장해요", one.FooterText);
+        one.Annotations = [Arrow()];
+        Assert.Equal("원본은 그대로 두고 옆에 새 파일로 저장해요", one.FooterText);
+        one.Dispose();
+
+        var two = Annotate([ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(400, 200)], TestStore());
+        Assert.Equal("", two.FooterText); // nothing drawn: no "applies to all", as the drawings are one file's each
+        two.Annotations = [Arrow()];
+        Assert.Equal("그린 파일 1개만 저장돼요", two.FooterText);
+        two.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_chips_tell_what_they_are_and_which_keys_work_in_tooltips()
+    {
+        var (window, vm) = Open();
+        var colors = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "ColorChips");
+        Assert.Equal(["빨강", "주황", "노랑", "초록", "파랑", "보라", "검정", "흰색"],
+            colors.GetVisualDescendants().OfType<Border>().Select(b => ToolTip.GetTip(b) as string).Where(tip => tip is not null));
+        Assert.Equal("[ ] 키로 바꿔요", ToolTip.GetTip(window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "WidthChips")));
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Text_being_typed_shows_in_its_colour_over_the_picture_not_on_a_white_box()
+    {
+        var (window, vm) = Open();
+        vm.SelectedColor = vm.Colors.Single(c => c.Hex == "#FFFFFF"); // white on a white box was not to be seen
+        Key(window, PhysicalKey.T);
+        Click(window, At(window, .3, .4));
+        window.KeyTextInput("i");
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        var editor = Editor(window)!;
+        Assert.True(editor.IsFocused);
+
+        // Right of the text, inside the box (its padding), the picture shows through: the same blue as just outside the box.
+        Point In(double dx) => editor.TranslatePoint(new Point(editor.Bounds.Width + dx, editor.Bounds.Height / 2), window)!.Value;
+        using var frame = window.CaptureRenderedFrame()!;
+        var (inside, outside) = (PixelAt(frame, In(-4)), PixelAt(frame, In(8)));
+        Assert.True(Math.Abs(inside.R - outside.R) < 12 && Math.Abs(inside.G - outside.G) < 12 && Math.Abs(inside.B - outside.B) < 12,
+            $"the box shows {inside} where the picture has {outside}");
+        window.Close();
         vm.Dispose();
     }
 
@@ -833,6 +1118,71 @@ public class AnnotateToolTests
             frame.Save(stream, new PngBitmapEncoderOptions());
         window.Close();
         vm.Dispose();
+    }
+
+    /// <summary>
+    /// The window in the other looks and modes (the light classic look is the screenshot above): the new buttons and the
+    /// chips on dark and on peach glass, and the text typed on the picture, which stays see-through in a dark theme too.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData(ThemeStyle.Classic, ThemeMode.Dark)]
+    [InlineData(ThemeStyle.PeachGlass, ThemeMode.Light)]
+    [InlineData(ThemeStyle.PeachGlass, ThemeMode.Dark)]
+    public void The_window_looks_right_in_every_look_and_mode_and_typed_text_stays_see_through(ThemeStyle style, ThemeMode mode)
+    {
+        var size = new Size(1000, 700);
+        Loc();
+        var store = AppHost.Get<UserDataStore>();
+        var themes = AppHost.Get<ThemeService>();
+        var before = store.Settings.Theme.Clone();
+        ImageToolWindow? window = null;
+        AnnotateToolViewModel? vm = null;
+        try
+        {
+            // In the store: every Loc() of the tests applies the stored look again.
+            store.Settings.Theme.Style = style;
+            store.Settings.Theme.Mode = mode;
+            themes.Apply(store.Settings.Theme, "ko");
+            (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.Png(1000, 700), ImageToolWindowTests.TestImages.Png(1000, 700));
+            vm.SelectedColor = vm.Colors.Single(c => c.Hex == "#000000");
+            Key(window, PhysicalKey.T);
+            Click(window, At(window, .45, .7, size));
+            window.KeyTextInput("i");
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            var editor = Editor(window)!;
+            Point In(double dx) => editor.TranslatePoint(new Point(editor.Bounds.Width + dx, editor.Bounds.Height / 2), window)!.Value;
+            using (var typing = window.CaptureRenderedFrame()!)
+            {
+                var (inside, outside) = (PixelAt(typing, In(-4)), PixelAt(typing, In(8)));
+                Assert.True(Math.Abs(inside.R - outside.R) < 12 && Math.Abs(inside.G - outside.G) < 12 && Math.Abs(inside.B - outside.B) < 12,
+                    $"{style} {mode}: the box shows {inside} where the picture has {outside}");
+            }
+            window.KeyTextInput("여기를 누르세요");
+            Key(window, PhysicalKey.Enter);
+
+            vm.SelectedColor = vm.Colors.Single(c => c.Hex == "#FF3B30");
+            Key(window, PhysicalKey.A);
+            Drag(window, At(window, .55, .2, size), At(window, .8, .45, size));
+            Key(window, PhysicalKey.N);
+            Click(window, At(window, .15, .2, size));
+            Key(window, PhysicalKey.V);
+            Click(window, At(window, .8, .45, size)); // the arrow's tip: picked, so the delete button is on
+            Assert.True(vm.HasSelection);
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            using var frame = window.CaptureRenderedFrame()!;
+            using var stream = File.Create(Path.Combine(TestServices.ScreenshotDirectory, $"tool-annotate-{style}-{mode}.png".ToLowerInvariant()));
+            frame.Save(stream, new PngBitmapEncoderOptions());
+        }
+        finally
+        {
+            window?.Close();
+            vm?.Dispose();
+            store.Settings.Theme.Style = before.Style;
+            store.Settings.Theme.Mode = before.Mode;
+            themes.Apply(store.Settings.Theme, "ko");
+        }
     }
 
     /// <summary>The frame's colour at <paramref name="p"/> (window DIPs; the headless screen is at 100 %).</summary>

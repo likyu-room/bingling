@@ -21,14 +21,36 @@
             Classes="bar">
       <DockPanel>
         <!-- Not focusable: the keyboard stays with the picture (Enter saves, ← / → change the file). -->
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2" IsVisible="{Binding HasMany}">
-          <TextBlock Classes="muted" Text="{Binding PositionText}" VerticalAlignment="Center" Margin="0,0,8,0" />
-          <Button Classes="icon" Focusable="False" Command="{Binding PreviousCommand}">
-            <PathIcon Width="12" Height="12" Data="{StaticResource Icon.ChevronRight}" RenderTransform="rotate(180deg)" />
-          </Button>
-          <Button Classes="icon" Focusable="False" Command="{Binding NextCommand}">
-            <PathIcon Width="12" Height="12" Data="{StaticResource Icon.ChevronRight}" />
-          </Button>
+        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="2">
+          <!-- Undo, redo and fit are always there (also for one file): a wrong drawing or a Reset could otherwise be put back
+               only with keys the window never mentions. A press here ends what the picture is in the middle of, as a text
+               half typed, so the undo takes that text and not the drawing before it (ImageToolWindow.axaml.cs). -->
+          <StackPanel x:Name="HistoryButtons" Orientation="Horizontal" Spacing="2">
+            <Button Classes="icon" Focusable="False" Command="{Binding UndoCommand}" ToolTip.Tip="{DynamicResource tool.undo}"
+                    AutomationProperties.Name="{DynamicResource tool.undo}">
+              <PathIcon Width="14" Height="14" Data="{StaticResource Icon.Undo}" />
+            </Button>
+            <Button Classes="icon" Focusable="False" Command="{Binding RedoCommand}" ToolTip.Tip="{DynamicResource tool.redo}"
+                    AutomationProperties.Name="{DynamicResource tool.redo}">
+              <PathIcon Width="14" Height="14" Data="{StaticResource Icon.Redo}" />
+            </Button>
+            <Button Classes="icon" Focusable="False" Click="OnFit" ToolTip.Tip="{DynamicResource tool.fit}"
+                    AutomationProperties.Name="{DynamicResource tool.fit}">
+              <PathIcon Width="14" Height="14" Data="{StaticResource Icon.FitToScreen}" />
+            </Button>
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="2" IsVisible="{Binding HasMany}">
+            <Border Width="1" Height="16" Margin="8,0,10,0" Background="{DynamicResource SubtleBorderBrush}" />
+            <TextBlock Classes="muted" Text="{Binding PositionText}" VerticalAlignment="Center" Margin="0,0,8,0" />
+            <Button Classes="icon" Focusable="False" Command="{Binding PreviousCommand}" ToolTip.Tip="{DynamicResource tool.previous}"
+                    AutomationProperties.Name="{DynamicResource tool.previous}">
+              <PathIcon Width="12" Height="12" Data="{StaticResource Icon.ChevronRight}" RenderTransform="rotate(180deg)" />
+            </Button>
+            <Button Classes="icon" Focusable="False" Command="{Binding NextCommand}" ToolTip.Tip="{DynamicResource tool.next}"
+                    AutomationProperties.Name="{DynamicResource tool.next}">
+              <PathIcon Width="12" Height="12" Data="{StaticResource Icon.ChevronRight}" />
+            </Button>
+          </StackPanel>
         </StackPanel>
         <TextBlock Classes="h2" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" MinHeight="32" Padding="0,5,0,0" />
       </DockPanel>
@@ -39,8 +61,8 @@
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
           <Button Content="{DynamicResource tool.reset}" Command="{Binding ResetCommand}" Focusable="False" />
-          <Button Content="{DynamicResource tool.cancel}" Command="{Binding CancelCommand}" />
-          <Button Classes="accent" Content="{DynamicResource tool.save}" Command="{Binding SaveCommand}" />
+          <Button Content="{DynamicResource tool.cancel}" Command="{Binding CancelCommand}" ToolTip.Tip="Esc" />
+          <Button Classes="accent" Content="{DynamicResource tool.save}" Command="{Binding SaveCommand}" ToolTip.Tip="Enter" />
         </StackPanel>
         <TextBlock Classes="caption" Text="{Binding FooterText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" />
       </DockPanel>
@@ -55,7 +77,12 @@
       </ScrollViewer>
     </Border>
 
-    <!-- The tool's picture view (the crop box, say): ImageToolWindow puts it in. -->
-    <Border x:Name="PictureHost" />
+    <!-- The tool's picture view (the crop box, say): ImageToolWindow puts it in. Until the picture is there, a line on top of
+         it says it is being read, or that it can't be shown, so a big or damaged file does not look like a broken window. -->
+    <Panel>
+      <Border x:Name="PictureHost" />
+      <TextBlock Classes="caption" Text="{Binding PreviewStatus}" HorizontalAlignment="Center" VerticalAlignment="Center"
+                 IsHitTestVisible="False" />
+    </Panel>
   </DockPanel>
 </Window>

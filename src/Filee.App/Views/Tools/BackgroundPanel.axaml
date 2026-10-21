@@ -25,13 +25,16 @@
       </ListBox>
 
       <TextBlock Classes="caption" Text="{DynamicResource tool.background.custom_color}" Margin="0,6,0,4" />
+      <!-- The colour comes after the box and only for a whole code: an empty pill looked like a white swatch, and in front of
+           the box it would push the box aside at the last digit typed. -->
       <StackPanel Orientation="Horizontal" Spacing="6">
-        <Border Classes="ring" Classes.selected="{Binding IsCustomColor}">
+        <TextBox Text="{Binding CustomColorHex}" Width="120" PlaceholderText="{DynamicResource tool.custom_color_placeholder}"
+                 VerticalAlignment="Center" ToolTip.Tip="{DynamicResource tool.custom_color_tip}"
+                 AutomationProperties.Name="{DynamicResource tool.background.custom_color}" />
+        <Border Classes="ring" Classes.selected="{Binding IsCustomColor}" IsVisible="{Binding HasCustomColor}">
           <Border Width="40" Height="22" CornerRadius="11" Background="{Binding CustomColorBrush}" BorderThickness="1"
                   BorderBrush="{DynamicResource SubtleBorderBrush}" />
         </Border>
-        <TextBox Text="{Binding CustomColorHex}" Width="120" PlaceholderText="#RRGGBB" VerticalAlignment="Center"
-                 AutomationProperties.Name="{DynamicResource tool.background.custom_color}" />
       </StackPanel>
 
       <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
@@ -72,7 +75,12 @@
     </StackPanel>
 
     <StackPanel>
-      <TextBlock Classes="label" Text="{DynamicResource tool.background.ratio}" />
+      <!-- Beside the label, as the sliders' pixels are: the pixels of the result, as the crop window shows its box, so what a
+           16:9 or 1:1 post will measure is read off the same line the chip is picked on. -->
+      <DockPanel>
+        <TextBlock DockPanel.Dock="Right" FontWeight="SemiBold" Text="{Binding OutputText}" />
+        <TextBlock Classes="label" Text="{DynamicResource tool.background.ratio}" />
+      </DockPanel>
       <ListBox Classes="chips" ItemsSource="{Binding Aspects}" SelectedItem="{Binding Aspect}">
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate>

@@ -441,6 +441,38 @@ public class RenderTests
     }
 
     /// <summary>
+    /// The tools ring, fanned out: six names that say what each slice does (no "Metadata"), broken at their spaces, and the
+    /// centre saying what the pointer is over in the words of the slice ("Click → Strip photo info").
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData("ko", "정보 지우기", "클릭 → 사진 정보 지우기")]
+    [InlineData("en", "Metadata", "Click → Strip metadata")]
+    public void The_tools_ring_fans_out_six_names_that_fit(string language, string lastRingName, string centre)
+    {
+        TestServices.EnsureInitialized(language);
+        var vm = AppHost.Get<RadialViewModel>();
+        vm.Load([ImageToolWindowTests.TestImages.Png(64, 64)], clickMode: true);
+        vm.FitToThisDonut();
+        var tools = vm.Items.ToList().FindIndex(i => i.Id == "tools");
+        var ring = vm.Items[tools].Children!;
+        Assert.Equal(6, ring.Count);
+        Assert.All(ring, item => Assert.True(item.IsEnabled, item.Label));
+        Assert.Equal(lastRingName, ring[^1].Label);
+
+        var window = new RadialWindow { DataContext = vm };
+        window.Show();
+        var donut = window.DonutControl;
+        donut.SetExternalHit(new DonutHit(DonutHitKind.Segment, tools));
+        donut.ExpandPendingGroup();
+        donut.SetExternalHit(new DonutHit(DonutHitKind.SubSegment, tools, 5));
+        vm.ShowHint(tools, donut.ActiveSubIndex, centerHot: false);
+        Assert.Equal(centre, vm.CenterSubtitle);
+        Pump();
+        Save(window, $"donut-tools-{language}.png");
+        window.Close();
+    }
+
+    /// <summary>
     /// A group of three formats on the image donut: hovering it fans PNG / JPG / WEBP out outside it, and the slice
     /// under the pointer there is what a drop or click converts with.
     /// </summary>

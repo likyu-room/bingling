@@ -8,7 +8,8 @@
   <StackPanel Spacing="18">
     <StackPanel>
       <TextBlock Classes="label" Text="{DynamicResource tool.crop.aspect}" />
-      <ListBox Classes="chips" ItemsSource="{Binding Aspects}" SelectedItem="{Binding Aspect}">
+      <ListBox Classes="chips" ItemsSource="{Binding Aspects}" SelectedItem="{Binding Aspect}"
+               ToolTip.Tip="{DynamicResource tool.crop.keys}">
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate>
             <WrapPanel />

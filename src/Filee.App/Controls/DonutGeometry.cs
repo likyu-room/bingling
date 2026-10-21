@@ -64,8 +64,12 @@ public static class DonutGeometry
     /// <summary>How far a group's fan reaches into each neighbouring slice, as a share of a slice.</summary>
     public const double SubOverhang = 0.25;
 
-    /// <summary>Narrowest a slice of a group's ring gets (along its middle), so its label still fits.</summary>
-    public const double MinSubWidth = 44;
+    /// <summary>
+    /// Narrowest a slice of a group's ring gets (along its middle), so its label still fits: the label is laid out in this
+    /// less 8, and three Korean syllables in bold ("자르기") need about 41 (the tools ring: it broke "자르" / "기", and
+    /// cut "정보 지우기" down to "정보 / 지…").
+    /// </summary>
+    public const double MinSubWidth = 52;
 
     /// <summary>
     /// Width of one slice of a group's outer ring: the fan covers the group's slice and a quarter of each neighbour

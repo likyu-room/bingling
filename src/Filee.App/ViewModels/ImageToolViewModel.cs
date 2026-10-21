@@ -35,6 +35,7 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     private readonly Dictionary<int, (Stack<object> Undo, Stack<object> Redo)> _history = [];
     private bool _disposed;
     private bool _asking;
+    private bool _previewFailed; // the file shown could not be read as a picture
 
     /// <param name="tool">The tool.</param>
     /// <param name="files">The pictures it edits.</param>
@@ -84,8 +85,11 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <summary>"1 of 3".</summary>
     public string PositionText => Loc.Format("tool.position", Index + 1, Count);
 
-    /// <summary>The note left of the buttons: "Applies to all 3 files", empty for one file.</summary>
-    public virtual string FooterText => HasMany ? Loc.Format("tool.applies_to_all", Count) : "";
+    /// <summary>
+    /// The note left of the buttons: "Applies to all 3 files", or for one file that the original stays and the result is a
+    /// new file beside it (people hesitate to save when they fear the original is overwritten).
+    /// </summary>
+    public virtual string FooterText => HasMany ? Loc.Format("tool.applies_to_all", Count) : Loc["tool.original_kept"];
 
     /// <summary>
     /// Asks the user a yes / no question, such as whether to throw drawings away (the window service sets it: a dialog over
@@ -104,6 +108,14 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
 
     /// <summary>The file shown, turned upright and made smaller; null while it is read (or when it can't be).</summary>
     [ObservableProperty] private Bitmap? _preview;
+
+    /// <summary>
+    /// What the middle of the window says while there is no picture: that it is being read, or that it can't be shown (a
+    /// damaged file would otherwise leave a grey blank for ever). Empty once there is a picture.
+    /// </summary>
+    public string PreviewStatus => Preview is not null ? "" : _previewFailed ? Loc["tool.preview_failed"] : Loc["tool.preview_loading"];
+
+    partial void OnPreviewChanged(Bitmap? value) => OnPropertyChanged(nameof(PreviewStatus));
 
     /// <summary>
     /// The same preview for Skia: what <see cref="EditPreviewDrawOperation"/> draws the tool's edit on. It comes and goes
@@ -180,6 +192,14 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
         var (undo, redo) = History;
         undo.Push(Snapshot());
         redo.Clear();
+        NotifyHistoryChanged();
+    }
+
+    /// <summary>The undo and redo buttons follow what the file shown has to undo and redo.</summary>
+    private void NotifyHistoryChanged()
+    {
+        UndoCommand.NotifyCanExecuteChanged();
+        RedoCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>The undo and redo steps of the file shown (of every file, unless <see cref="UndoPerFile"/>).</summary>
@@ -207,7 +227,7 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Reset() => ResetTool();
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanUndo))]
     private void Undo()
     {
         var (undo, redo) = History;
@@ -216,9 +236,12 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
             redo.Push(Snapshot());
             Restore(step);
         }
+        NotifyHistoryChanged();
     }
 
-    [RelayCommand]
+    private bool CanUndo => History.Undo.Count > 0;
+
+    [RelayCommand(CanExecute = nameof(CanRedo))]
     private void Redo()
     {
         var (undo, redo) = History;
@@ -227,7 +250,10 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
             undo.Push(Snapshot());
             Restore(step);
         }
+        NotifyHistoryChanged();
     }
+
+    private bool CanRedo => History.Redo.Count > 0;
 
     /// <summary>Hands the result back and remembers the tool's choices for next time.</summary>
     [RelayCommand(CanExecute = nameof(CanSave))]
@@ -278,6 +304,7 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
         FileLeaving?.Invoke(this, EventArgs.Empty);
         Index = index;
         (ImageWidth, ImageHeight) = OrientedSize(Files[index]);
+        _previewFailed = false;
         SetPreview(null);
         OnFileShown();
         OnPropertyChanged(nameof(Index));
@@ -286,8 +313,10 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ImageWidth));
         OnPropertyChanged(nameof(ImageHeight));
         OnPropertyChanged(nameof(FullShortSide));
+        OnPropertyChanged(nameof(PreviewStatus)); // "reading", also when the file before could not be read
         NextCommand.NotifyCanExecuteChanged();
         PreviousCommand.NotifyCanExecuteChanged();
+        NotifyHistoryChanged(); // the steps are the new file's own for a tool with an edit per file
         _ = LoadPreviewAsync(index);
     }
 
@@ -310,7 +339,9 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
             EditPreviewDrawOperation.Release(read?.Item2);
             return;
         }
+        _previewFailed = read is null;
         SetPreview(read);
+        OnPropertyChanged(nameof(PreviewStatus)); // also when there is still no picture: "cannot be shown"
     }
 
     /// <summary>Shows a new preview (or none) and lets go of the one before.</summary>

@@ -232,7 +232,8 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
         }
         Motion.Refresh();
         var window = new ImageToolWindow { DataContext = vm };
-        vm.Ask = question => ConfirmAsync(window, question); // annotate: throw the drawings away?
+        // Annotate: throw the drawings away? Asked after "Cancel" or Esc, so it can't answer with another "Cancel".
+        vm.Ask = question => ConfirmAsync(window, question, yes: loc["tool.discard"], no: loc["tool.keep_editing"]);
         window.PlaceNear(cursor);
         var closed = new TaskCompletionSource();
         window.Closed += (_, _) => closed.TrySetResult();
@@ -268,12 +269,17 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
         return await dialog.ShowDialog<bool>(visibleOwner);
     }
 
-    /// <summary>Simple yes/no confirmation.</summary>
-    public Task<bool> ConfirmAsync(Window owner, string message, bool destructive = false) =>
-        ShowMessageAsync(owner, message, destructive, withCancel: true);
+    /// <summary>
+    /// Simple yes/no confirmation. The buttons say "OK" and "Cancel" (or "Delete" and "Cancel" when
+    /// <paramref name="destructive"/>) unless <paramref name="yes"/> and <paramref name="no"/> name them: a question that
+    /// was asked by pressing "Cancel" must not answer with another "Cancel".
+    /// </summary>
+    public Task<bool> ConfirmAsync(Window owner, string message, bool destructive = false, string? yes = null, string? no = null) =>
+        ShowMessageAsync(owner, message, destructive, withCancel: true, yes, no);
 
     /// <summary>A message with only an OK button. Without a visible owner it shows on its own, centred on the screen.</summary>
-    public virtual Task MessageAsync(Window? owner, string message) => ShowMessageAsync(owner, message, destructive: false, withCancel: false);
+    public virtual Task MessageAsync(Window? owner, string message) =>
+        ShowMessageAsync(owner, message, destructive: false, withCancel: false, yes: null, no: null);
 
     /// <summary>The in-app update failed: say so, then open the website to download the new version there.</summary>
     public async Task ShowUpdateFailedAsync()
@@ -283,7 +289,7 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
         services.GetRequiredService<UpdateService>().OpenDownloadPage();
     }
 
-    private async Task<bool> ShowMessageAsync(Window? owner, string message, bool destructive, bool withCancel)
+    private async Task<bool> ShowMessageAsync(Window? owner, string message, bool destructive, bool withCancel, string? yes, string? no)
     {
         var dialog = new Window
         {
@@ -295,13 +301,13 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
             ShowInTaskbar = false,
         };
         Motion.Track(dialog);
-        var yes = new Button { Content = destructive ? loc["common.delete"] : loc["common.ok"], IsDefault = true };
-        yes.Classes.Add("accent");
-        var no = new Button { Content = loc["common.cancel"], IsCancel = true };
+        var yesButton = new Button { Content = yes ?? (destructive ? loc["common.delete"] : loc["common.ok"]), IsDefault = true };
+        yesButton.Classes.Add("accent");
+        var noButton = new Button { Content = no ?? loc["common.cancel"], IsCancel = true };
         var answer = false;
-        yes.Click += (_, _) => { answer = true; dialog.Close(true); };
-        no.Click += (_, _) => dialog.Close(false);
-        no.IsVisible = withCancel;
+        yesButton.Click += (_, _) => { answer = true; dialog.Close(true); };
+        noButton.Click += (_, _) => dialog.Close(false);
+        noButton.IsVisible = withCancel;
         dialog.Content = new StackPanel
         {
             Margin = new Thickness(22),
@@ -314,7 +320,7 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
                     Orientation = Orientation.Horizontal,
                     HorizontalAlignment = HorizontalAlignment.Right,
                     Spacing = 8,
-                    Children = { no, yes },
+                    Children = { noButton, yesButton },
                 },
             },
         };

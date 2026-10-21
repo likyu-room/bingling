@@ -1033,8 +1033,13 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
         DrawGlassEdge(context, disc);
 
         var maxWidth = radius * 1.6;
-        var title = MakeText(CenterTitle ?? "", bold, 14, Foreground, maxWidth, maxLines: 2);
-        var subtitle = MakeText(CenterSubtitle ?? "", regular, 11.5, cancelHot ? DangerBrush : SecondaryForeground, maxWidth, maxLines: 2);
+        // measured only when there is a dot to break at, so the usual title costs nothing per frame
+        var title = MakeText(BreakAtLastDot(CenterTitle ?? "", maxWidth,
+            s => new FormattedText(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, bold, 14, null).Width), bold, 14, Foreground, maxWidth, maxLines: 2);
+        // Broken at a space, not between two syllables: "클릭 → 오른쪽으" / "로 회전" otherwise.
+        var subtitle = MakeText(WrapAtSpaces(CenterSubtitle ?? "", maxWidth,
+            s => new FormattedText(s, CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, regular, 11.5, null).Width),
+            regular, 11.5, cancelHot ? DangerBrush : SecondaryForeground, maxWidth, maxLines: 2);
         var total = title.Height + (string.IsNullOrEmpty(CenterSubtitle) ? 0 : subtitle.Height + 2);
         var y = center.Y - total / 2;
         DrawCentered(context, title, center.X, y);
@@ -1098,6 +1103,20 @@ public sealed partial class DonutMenu : Control, ICustomHitTest
         while (next < words.Length && measure(first + " " + words[next]) <= width)
             first += " " + words[next++];
         return next == words.Length ? first : first + "\n" + string.Join(' ', words[next..]);
+    }
+
+    /// <summary>
+    /// The centre's title ("PNG 1개 · 620 B") with a line break at its last " · " when it is wider than
+    /// <paramref name="width"/>: "PNG 1개" / "620 B". Left to the text layout, the first line would end on the dot. A title
+    /// that fits on one line, or has no dot, is returned as it is.
+    /// </summary>
+    /// <param name="text">The title.</param>
+    /// <param name="width">The width the title is laid out in.</param>
+    /// <param name="measure">The width of a text on one line.</param>
+    internal static string BreakAtLastDot(string text, double width, Func<string, double> measure)
+    {
+        var dot = text.LastIndexOf(" · ", StringComparison.Ordinal);
+        return dot < 0 || measure(text) <= width ? text : text[..dot] + "\n" + text[(dot + 3)..];
     }
 
     /// <summary>Edge of the icon's box and the gap between it and the name.</summary>

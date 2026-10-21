@@ -5,6 +5,7 @@
 
 using Avalonia.Input;
 using Avalonia.Media;
+using CommunityToolkit.Mvvm.Input;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
 using Filee.Core.Settings;
@@ -20,7 +21,7 @@ namespace Filee.App.ViewModels.Tools;
 public sealed record ColorSwatch(string Hex, string Label, IBrush Brush);
 
 /// <summary>The annotate tool: each file's own drawings, and the tool, colour and thickness they are drawn with.</summary>
-public sealed class AnnotateToolViewModel : ImageToolViewModel
+public sealed partial class AnnotateToolViewModel : ImageToolViewModel
 {
     /// <summary>The tool keys in the order of the panel's cells: V the select tool, then the <see cref="AnnotationKind"/>s in order.</summary>
     private static readonly Key[] ToolKeys = [Key.V, Key.P, Key.H, Key.A, Key.L, Key.R, Key.E, Key.T, Key.N];
@@ -90,8 +91,12 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
                 return;
             _selected = picked;
             OnPropertyChanged();
+            NotifySelection();
         }
     }
+
+    /// <summary>A drawing is picked: the "delete the picked one" button is on.</summary>
+    public bool HasSelection => _selected >= 0;
 
     /// <summary>What a press on the picture draws; null for the select tool. Another tool lets go of the picked drawing.</summary>
     public AnnotationKind? DrawingTool
@@ -107,8 +112,23 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
             SelectedIndex = -1;
             OnPropertyChanged();
             OnPropertyChanged(nameof(ToolIndex));
+            OnPropertyChanged(nameof(ToolHint));
         }
     }
+
+    /// <summary>
+    /// One line on how the tool is used, which its cell's tip (name and key) does not say: Shift for straight lines and
+    /// squares, Enter to finish a text, two clicks to retype one.
+    /// </summary>
+    public string ToolHint => Loc[_tool switch
+    {
+        null => "tool.annotate.hint.select",
+        AnnotationKind.Pen or AnnotationKind.Highlighter => "tool.annotate.hint.draw",
+        AnnotationKind.Arrow or AnnotationKind.Line => "tool.annotate.hint.line",
+        AnnotationKind.Rectangle or AnnotationKind.Ellipse => "tool.annotate.hint.shape",
+        AnnotationKind.Text => "tool.annotate.hint.text",
+        _ => "tool.annotate.hint.number",
+    }];
 
     /// <summary>The tool as the panel's cell: 0 the select tool, then the drawing tools in <see cref="AnnotationKind"/> order.</summary>
     public int ToolIndex
@@ -129,7 +149,10 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
     /// <summary>The colour chips, <see cref="ImageEditRenderer.AnnotationColors"/>.</summary>
     public IReadOnlyList<ColorSwatch> Colors { get; }
 
-    /// <summary>The chip of the colour; null for one typed in. Not an undo step: it is for the drawings to come.</summary>
+    /// <summary>
+    /// The chip of the colour; null for one typed in. It is for the drawings to come, and also for the picked drawing, which
+    /// takes it as one undo step: pressing a chip and seeing nothing change would look like a button that doesn't work.
+    /// </summary>
     public ColorSwatch? SelectedColor
     {
         get => Colors.FirstOrDefault(c => c.Hex == _color);
@@ -161,6 +184,7 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
             _hex = value ?? "";
             OnPropertyChanged();
             OnPropertyChanged(nameof(CustomColorBrush));
+            OnPropertyChanged(nameof(HasCustomColor));
             if (BackgroundToolViewModel.HexColor(_hex) is { } hex)
                 SetColor(hex);
         }
@@ -170,10 +194,13 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
     public IBrush CustomColorBrush =>
         BackgroundToolViewModel.HexColor(_hex) is { } hex ? new SolidColorBrush(Avalonia.Media.Color.Parse(hex)) : Brushes.Transparent;
 
+    /// <summary>The typed text is a whole colour code: only then is there a colour to show beside the box (not an empty pill).</summary>
+    public bool HasCustomColor => BackgroundToolViewModel.HexColor(_hex) is not null;
+
     /// <summary>The thickness chips: thin, normal, thick.</summary>
     public IReadOnlyList<Choice<StrokeLevel>> Widths { get; }
 
-    /// <summary>The thickness chip. Not an undo step.</summary>
+    /// <summary>The thickness chip. Like the colour, it is for the next drawings and for the picked one (one undo step).</summary>
     public Choice<StrokeLevel> SelectedWidth
     {
         get => Widths.FirstOrDefault(w => w.Value == _width) ?? Widths[0];
@@ -199,11 +226,15 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
             _width = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedWidth));
+            RestylePicked(a => a.Width = value, a => a.Width != value);
         }
     }
 
-    /// <summary>"Only the 2 marked are saved": shown once a file is drawn on, when there are more files than one.</summary>
-    public override string FooterText => HasMany && Marked > 0 ? Loc.Format("tool.annotate.saved_count", Marked) : "";
+    /// <summary>
+    /// "Only the 2 drawn files are saved" once a file is drawn on, when there are more files than one (and nothing before
+    /// that: the drawings are one file's each, not for all); for one file, that the original stays.
+    /// </summary>
+    public override string FooterText => !HasMany ? base.FooterText : Marked > 0 ? Loc.Format("tool.annotate.saved_count", Marked) : "";
 
     /// <summary>Nothing drawn on any file: there is nothing to save.</summary>
     protected override bool CanSave => Marked > 0;
@@ -259,6 +290,7 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
         _selected = -1;
         OnPropertyChanged(nameof(Annotations));
         OnPropertyChanged(nameof(SelectedIndex));
+        NotifySelection();
     }
 
     /// <summary>Each file drawn on with its drawings; the tool, colour and thickness are remembered for next time.</summary>
@@ -281,6 +313,21 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
         OnPropertyChanged(nameof(Color));
         OnPropertyChanged(nameof(SelectedColor));
         OnPropertyChanged(nameof(IsCustomColor));
+        RestylePicked(a => a.Color = hex, a => !string.Equals(a.Color, hex, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// The picked drawing, changed by <paramref name="apply"/> as one undo step, when <paramref name="needed"/> says it
+    /// isn't so yet. Nothing when none is picked: a drawing still being drawn is never the picked one, so a colour chosen
+    /// in the middle of drawing is for the next drawing only.
+    /// </summary>
+    private void RestylePicked(Action<Annotation> apply, Func<Annotation, bool> needed)
+    {
+        if (_selected < 0 || _selected >= Annotations.Count || !needed(Annotations[_selected]))
+            return;
+        var next = Annotations.Select(a => a.Clone()).ToList();
+        apply(next[_selected]);
+        Change(next, _selected);
     }
 
     /// <summary>Removes the picked drawing as one undo step; false when none is picked.</summary>
@@ -290,6 +337,17 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
             return false;
         Change([.. Annotations.Where((_, i) => i != _selected)], -1);
         return true;
+    }
+
+    /// <summary>The "delete the picked one" button of the panel: the same as the Delete key.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void DeleteSelection() => DeleteSelected();
+
+    /// <summary>Another drawing is picked, or none: the button that deletes it follows.</summary>
+    private void NotifySelection()
+    {
+        OnPropertyChanged(nameof(HasSelection));
+        DeleteSelectionCommand.NotifyCanExecuteChanged();
     }
 
     /// <summary>A change by the user on the file shown: one undo step of it.</summary>
@@ -305,6 +363,7 @@ public sealed class AnnotateToolViewModel : ImageToolViewModel
         _selected = Math.Clamp(selected, -1, drawings.Count - 1);
         OnPropertyChanged(nameof(Annotations));
         OnPropertyChanged(nameof(SelectedIndex));
+        NotifySelection();
         OnPropertyChanged(nameof(FooterText));
         NotifyCanSaveChanged();
     }

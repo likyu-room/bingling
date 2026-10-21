@@ -1,5 +1,6 @@
 <!-- The annotate tool's side of the image tool window: the nine tools (select and the eight ways of drawing, each with its
-     key in its tip), the colours with one typed in, and the thickness. -->
+     key in its tip, and a line on how the one in use works), the button that deletes the picked drawing, the colours with
+     one typed in, and the thickness. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Filee.App.ViewModels"
@@ -14,50 +15,65 @@
   </UserControl.Styles>
 
   <StackPanel Spacing="18">
-    <!-- In the order of the view model's ToolIndex: select, then AnnotationKind's order. -->
-    <ListBox x:Name="ToolCells" Classes="chips" SelectedIndex="{Binding ToolIndex}">
-      <ListBox.ItemsPanel>
-        <ItemsPanelTemplate>
-          <WrapPanel />
-        </ItemsPanelTemplate>
-      </ListBox.ItemsPanel>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.select}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.select}" /><Run Text=" (V)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="M5,2V19L9.5,14.5L12.5,21L15,20L12,13.5H18Z" />
-      </ListBoxItem>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.pen}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.pen}" /><Run Text=" (P)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="{StaticResource Icon.Pencil}" />
-      </ListBoxItem>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.highlighter}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.highlighter}" /><Run Text=" (H)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="M14,2L22,10L13,19L5,11Z M4,12L12,20L10,22H2V20Z" />
-      </ListBoxItem>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.arrow}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.arrow}" /><Run Text=" (A)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="M5,17.59L15.59,7H9V5H19V15H17V8.41L6.41,19Z" />
-      </ListBoxItem>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.line}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.line}" /><Run Text=" (L)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="M4.4,18.2L18.2,4.4L19.6,5.8L5.8,19.6Z" />
-      </ListBoxItem>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.rectangle}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.rectangle}" /><Run Text=" (R)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="M3,5H21V19H3Z M5,7V17H19V7Z" />
-      </ListBoxItem>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.ellipse}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.ellipse}" /><Run Text=" (E)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="M12,5A9,7 0 1,0 12,19A9,7 0 1,0 12,5Z M12,7A7,5 0 1,1 12,17A7,5 0 1,1 12,7Z" />
-      </ListBoxItem>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.text}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.text}" /><Run Text=" (T)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="M5,4H19V7H13.5V20H10.5V7H5Z" />
-      </ListBoxItem>
-      <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.number}">
-        <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.number}" /><Run Text=" (N)" /></TextBlock></ToolTip.Tip>
-        <PathIcon Data="M12,2A10,10 0 1,0 12,22A10,10 0 1,0 12,2Z M11.5,7H13.5V17H11.5V9.6L9.5,10.4V8.4Z" />
-      </ListBoxItem>
-    </ListBox>
+    <StackPanel Spacing="8">
+      <!-- In the order of the view model's ToolIndex: select, then AnnotationKind's order. -->
+      <ListBox x:Name="ToolCells" Classes="chips" SelectedIndex="{Binding ToolIndex}">
+        <ListBox.ItemsPanel>
+          <ItemsPanelTemplate>
+            <WrapPanel />
+          </ItemsPanelTemplate>
+        </ListBox.ItemsPanel>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.select}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.select}" /><Run Text=" (V)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="M5,2V19L9.5,14.5L12.5,21L15,20L12,13.5H18Z" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.pen}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.pen}" /><Run Text=" (P)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="{StaticResource Icon.Pencil}" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.highlighter}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.highlighter}" /><Run Text=" (H)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="M18.5,1.15C17.97,1.15 17.46,1.34 17.07,1.73L11.26,7.55L16.91,13.2L22.73,7.39C23.5,6.61 23.5,5.35 22.73,4.56L19.89,1.73C19.5,1.34 19,1.15 18.5,1.15M10.3,8.5L4.34,14.46C3.56,15.24 3.56,16.5 4.36,17.31C3.14,18.54 1.9,19.77 0.67,21H6.33L7.19,20.14C7.97,20.9 9.22,20.89 10,20.12L15.95,14.16" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.arrow}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.arrow}" /><Run Text=" (A)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="M5,17.59L15.59,7H9V5H19V15H17V8.41L6.41,19Z" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.line}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.line}" /><Run Text=" (L)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="M4.4,18.2L18.2,4.4L19.6,5.8L5.8,19.6Z" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.rectangle}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.rectangle}" /><Run Text=" (R)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="M3,5H21V19H3Z M5,7V17H19V7Z" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.ellipse}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.ellipse}" /><Run Text=" (E)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="M12,5A9,7 0 1,0 12,19A9,7 0 1,0 12,5Z M12,7A7,5 0 1,1 12,17A7,5 0 1,1 12,7Z" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.text}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.text}" /><Run Text=" (T)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="M5,4H19V7H13.5V20H10.5V7H5Z" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.number}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.number}" /><Run Text=" (N)" /></TextBlock></ToolTip.Tip>
+          <PathIcon Data="M12,2A10,10 0 1,0 12,22A10,10 0 1,0 12,2Z M11.5,7H13.5V17H11.5V9.6L9.5,10.4V8.4Z" />
+        </ListBoxItem>
+      </ListBox>
+
+      <!-- What the cells' tips don't say: Shift, Enter, a double click. The room for two lines is kept, so the chips below
+           don't jump when another tool is picked. -->
+      <TextBlock Classes="caption" TextWrapping="Wrap" MinHeight="32" Text="{Binding ToolHint}" />
+
+      <!-- Always there, on while a drawing is picked: the Delete key was the only way, and nothing said so. -->
+      <Button x:Name="DeleteButton" HorizontalAlignment="Left" Padding="10,5" Focusable="False" Command="{Binding DeleteSelectionCommand}"
+              ToolTip.Tip="Delete">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Delete}" />
+          <TextBlock Text="{DynamicResource tool.delete_selected}" />
+        </StackPanel>
+      </Button>
+    </StackPanel>
 
     <StackPanel>
       <TextBlock Classes="label" Text="{DynamicResource tool.annotate.color}" />
@@ -70,25 +86,30 @@
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="tools:ColorSwatch">
             <Border Width="22" Height="22" CornerRadius="11" Background="{Binding Brush}" BorderThickness="1"
-                    BorderBrush="{DynamicResource SubtleBorderBrush}" AutomationProperties.Name="{Binding Label}" />
+                    BorderBrush="{DynamicResource SubtleBorderBrush}" ToolTip.Tip="{Binding Label}"
+                    AutomationProperties.Name="{Binding Label}" />
           </DataTemplate>
         </ListBox.ItemTemplate>
       </ListBox>
 
       <TextBlock Classes="caption" Text="{DynamicResource tool.annotate.custom_color}" Margin="0,6,0,4" />
+      <!-- The colour comes after the box and only for a whole code: an empty pill looked like a white swatch, and in front of
+           the box it would push the box aside at the last digit typed. -->
       <StackPanel Orientation="Horizontal" Spacing="6">
-        <Border Classes="ring" Classes.selected="{Binding IsCustomColor}">
+        <TextBox Text="{Binding CustomColorHex}" Width="120" PlaceholderText="{DynamicResource tool.custom_color_placeholder}"
+                 VerticalAlignment="Center" ToolTip.Tip="{DynamicResource tool.custom_color_tip}"
+                 AutomationProperties.Name="{DynamicResource tool.annotate.custom_color}" />
+        <Border Classes="ring" Classes.selected="{Binding IsCustomColor}" IsVisible="{Binding HasCustomColor}">
           <Border Width="22" Height="22" CornerRadius="11" Background="{Binding CustomColorBrush}" BorderThickness="1"
                   BorderBrush="{DynamicResource SubtleBorderBrush}" />
         </Border>
-        <TextBox Text="{Binding CustomColorHex}" Width="120" PlaceholderText="#RRGGBB" VerticalAlignment="Center"
-                 AutomationProperties.Name="{DynamicResource tool.annotate.custom_color}" />
       </StackPanel>
     </StackPanel>
 
     <StackPanel>
       <TextBlock Classes="label" Text="{DynamicResource tool.annotate.width}" />
-      <ListBox x:Name="WidthChips" Classes="chips" ItemsSource="{Binding Widths}" SelectedItem="{Binding SelectedWidth}">
+      <ListBox x:Name="WidthChips" Classes="chips" ItemsSource="{Binding Widths}" SelectedItem="{Binding SelectedWidth}"
+               ToolTip.Tip="{DynamicResource tool.annotate.width_keys}">
         <ListBox.ItemsPanel>
           <ItemsPanelTemplate>
             <WrapPanel />

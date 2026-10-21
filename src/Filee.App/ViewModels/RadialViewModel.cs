@@ -182,7 +182,8 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
                  (sub >= 0 || Items[index].IsEnabled))
             CenterSubtitle = sub >= 0 && sub < children.Count
                 ? children[sub].IsEnabled
-                    ? loc.Format(IsClickMode ? "donut.click_to" : "donut.drop_to", $"{Items[index].Label} · {children[sub].Label}")
+                    // The preset's full name, not "Tools · Background": the ring's short name needs its group's to be understood.
+                    ? loc.Format(IsClickMode ? "donut.click_to" : "donut.drop_to", loc.DisplayName(_subPresets[index][sub]))
                     : children[sub].DisabledReason
                 : loc["donut.pick_in_group"];
         else if (index >= 0 && index < Items.Count)

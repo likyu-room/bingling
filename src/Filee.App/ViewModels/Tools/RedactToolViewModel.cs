@@ -4,6 +4,7 @@
 // until there is a box.
 
 using Avalonia.Input;
+using CommunityToolkit.Mvvm.Input;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
 using Filee.Core.Settings;
@@ -12,7 +13,7 @@ using Microsoft.Extensions.Logging;
 namespace Filee.App.ViewModels.Tools;
 
 /// <summary>The redact tool: boxes and one way of hiding all of them, kept over every file.</summary>
-public sealed class RedactToolViewModel : ImageToolViewModel
+public sealed partial class RedactToolViewModel : ImageToolViewModel
 {
     private RedactEdit _redact; // as set: never changed in place, so an undo step can hold it
     private int _selected = -1;
@@ -74,8 +75,12 @@ public sealed class RedactToolViewModel : ImageToolViewModel
                 return;
             _selected = picked;
             OnPropertyChanged();
+            NotifySelection();
         }
     }
+
+    /// <summary>A box is picked: the "delete the picked one" button is on.</summary>
+    public bool HasSelection => _selected >= 0;
 
     /// <summary>"3 boxes": what the panel says about the boxes.</summary>
     public string BoxCountText => Loc.Format("tool.redact.count", _redact.Boxes.Count);
@@ -132,6 +137,17 @@ public sealed class RedactToolViewModel : ImageToolViewModel
         return true;
     }
 
+    /// <summary>The "delete the picked one" button of the panel: the same as the Delete key.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelection))]
+    private void DeleteSelection() => DeleteSelected();
+
+    /// <summary>Another box is picked, or none: the button that deletes it follows.</summary>
+    private void NotifySelection()
+    {
+        OnPropertyChanged(nameof(HasSelection));
+        DeleteSelectionCommand.NotifyCanExecuteChanged();
+    }
+
     /// <summary>A change by the user: one undo step, unless it changes nothing.</summary>
     private void Change(RedactEdit next, int selected)
     {
@@ -156,6 +172,7 @@ public sealed class RedactToolViewModel : ImageToolViewModel
         OnPropertyChanged(nameof(Redact));
         OnPropertyChanged(nameof(Mode));
         OnPropertyChanged(nameof(SelectedIndex));
+        NotifySelection();
         OnPropertyChanged(nameof(BoxCountText));
         NotifyCanSaveChanged();
     }

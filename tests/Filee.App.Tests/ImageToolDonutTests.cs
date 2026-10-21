@@ -99,6 +99,39 @@ public class ImageToolDonutTests
     }
 
     [AvaloniaFact]
+    public void The_hint_over_a_slice_of_a_group_names_the_tool_in_full_without_a_machine_translated_ending()
+    {
+        var vm = Load(TestImages.Png(1));
+        var tools = vm.Items.ToList().FindIndex(i => i.Id == "tools");
+        int Sub(string id) => vm.Items[tools].Children!.ToList().FindIndex(c => c.Id == id);
+
+        // "Click → Add background", not "Click → Tools · Background(으)로": the full name, and no group in front of it.
+        vm.ShowHint(tools, Sub("add-background"), centerHot: false);
+        Assert.Equal("클릭 → 배경 넣기", vm.CenterSubtitle);
+        vm.ShowHint(tools, Sub("strip-metadata"), centerHot: false);
+        Assert.Equal("클릭 → 사진 정보 지우기", vm.CenterSubtitle);
+
+        vm.Load(TestImages.Png(1), clickMode: false); // dragging files: "Drop" rather than "Click"
+        vm.ShowHint(tools, Sub("redact"), centerHot: false);
+        Assert.Equal("놓기 → 가리기", vm.CenterSubtitle);
+        vm.ShowHint(0, -1, centerHot: false); // a slice of the ring itself
+        Assert.StartsWith("놓기 → ", vm.CenterSubtitle);
+        Assert.DoesNotContain("(으)", vm.CenterSubtitle);
+    }
+
+    [AvaloniaFact]
+    public void The_tools_ring_names_tell_what_the_slice_does()
+    {
+        // "Metadata" is no word for most people: the slice says what it does, and its short name has a space to break at.
+        TestServices.EnsureInitialized("ko");
+        var loc = AppHost.Get<ILocalizer>();
+        var strip = AppHost.Get<Filee.Core.Settings.UserDataStore>().FindPreset("strip-metadata")!;
+        Assert.Equal("사진 정보 지우기", loc.DisplayName(strip));
+        Assert.Equal("정보 지우기", loc.RingName(strip));
+        Assert.DoesNotContain("메타데이터", loc.DisplayName(strip) + loc.RingName(strip));
+    }
+
+    [AvaloniaFact]
     public void The_centre_adds_up_the_files_and_skips_what_is_not_a_file()
     {
         var files = TestImages.Png(2);

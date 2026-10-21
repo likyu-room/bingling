@@ -5,6 +5,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Filee.App.Controls;
 using Filee.App.Services;
 using Filee.App.ViewModels;
@@ -44,7 +45,13 @@ public partial class ImageToolWindow : Window
         Motion.Track(this);
         // Space let go in another window never reaches this one: drags would keep panning.
         Deactivated += (_, _) => _picture?.PanKeyDown = false;
+        // Undo, redo and fit take no focus; a press on them hands it to the picture first, which ends a text half typed (it goes
+        // on, and the undo takes it) and takes a size typed in the panel. Tunnelled and also when handled: the buttons take the press.
+        HistoryButtons.AddHandler(PointerPressedEvent, (_, _) => _picture?.Focus(), RoutingStrategies.Tunnel, handledEventsToo: true);
     }
+
+    /// <summary>The fit button: the whole picture again, after the wheel zoomed it or Space + drag moved it.</summary>
+    private void OnFit(object? sender, RoutedEventArgs e) => _picture?.Fit();
 
     protected override void OnDataContextChanged(EventArgs e)
     {

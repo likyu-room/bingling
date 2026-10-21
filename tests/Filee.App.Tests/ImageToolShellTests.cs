@@ -10,6 +10,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Filee.App.Controls;
 using Filee.App.Services;
 using Filee.App.ViewModels;
@@ -72,6 +73,69 @@ public class ImageToolShellTests
         vm.Dispose();
         Assert.Null(vm.PreviewImage);
         Assert.Equal(IntPtr.Zero, second.Handle);
+    }
+
+    [AvaloniaFact]
+    public void The_window_says_while_the_picture_is_read_and_when_it_cannot_be()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "filee-app-tests", "shell-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+        var broken = Path.Combine(folder, "broken.png");
+        File.WriteAllText(broken, "this is not a picture");
+        using var vm = ImageToolViewModel.Create(ImageToolKind.Redact, [broken, ImageToolWindowTests.TestImages.Png(300, 500)], TestStore(), Loc())!;
+        var changes = new List<string?>();
+        vm.PropertyChanged += (_, e) => changes.Add(e.PropertyName);
+
+        Assert.Equal("불러오는 중…", vm.PreviewStatus); // the read has not come back yet
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (vm.PreviewStatus == "불러오는 중…" && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+        Assert.Equal("미리 볼 수 없는 그림이에요", vm.PreviewStatus); // not a grey blank for ever
+        Assert.Null(vm.Preview);
+        Assert.Contains(nameof(vm.PreviewStatus), changes);
+
+        vm.NextCommand.Execute(null); // another file is read: the mark of the one before goes
+        Assert.Equal("불러오는 중…", vm.PreviewStatus);
+        WaitForPreview(vm);
+        Assert.Equal("", vm.PreviewStatus); // the picture is the answer
+        Assert.Contains(nameof(vm.PreviewStatus), changes);
+
+        vm.PreviousCommand.Execute(null);
+        Assert.Equal("불러오는 중…", vm.PreviewStatus);
+    }
+
+    [AvaloniaFact]
+    public void The_status_is_drawn_in_the_middle_of_the_window_until_there_is_a_picture()
+    {
+        var folder = Path.Combine(Path.GetTempPath(), "filee-app-tests", "shell-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(folder);
+        var broken = Path.Combine(folder, "broken.png");
+        File.WriteAllText(broken, "this is not a picture");
+        var vm = ImageToolViewModel.Create(ImageToolKind.Annotate, [broken], TestStore(), Loc())!;
+        var window = new Filee.App.Views.ImageToolWindow { DataContext = vm, Width = 900, Height = 600 };
+        window.Show();
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (vm.PreviewStatus == "불러오는 중…" && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        var text = window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "미리 볼 수 없는 그림이에요");
+        Assert.True(text.IsEffectivelyVisible);
+        var picture = window.GetVisualDescendants().OfType<PictureView>().Single();
+        var (centre, middle) = (text.TranslatePoint(new Point(text.Bounds.Width / 2, text.Bounds.Height / 2), window)!.Value,
+            picture.TranslatePoint(new Point(picture.Bounds.Width / 2, picture.Bounds.Height / 2), window)!.Value);
+        Assert.True(Math.Abs(centre.X - middle.X) < 3 && Math.Abs(centre.Y - middle.Y) < 3, $"{centre} against {middle}");
+        using (var frame = window.CaptureRenderedFrame()!)
+        using (var stream = File.Create(Path.Combine(TestServices.ScreenshotDirectory, "tool-unreadable-ko.png")))
+            frame.Save(stream, new PngBitmapEncoderOptions());
+        window.Close();
+        vm.Dispose();
     }
 
     [AvaloniaFact]

@@ -141,6 +141,54 @@ public class BackgroundToolTests
     }
 
     [AvaloniaFact]
+    public void The_result_size_in_pixels_follows_the_shape_the_padding_and_the_file_shown()
+    {
+        var vm = Background([ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(300, 300)], TestStore(), Loc("ko"));
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        Assert.Equal("결과 432 × 232px", vm.OutputText); // 8 % of the short side, 16 px, round the 400 × 200
+        vm.Padding = 0;
+        Assert.Equal("결과 400 × 200px", vm.OutputText);
+        Assert.Contains(nameof(BackgroundToolViewModel.OutputText), changed);
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "16:9");
+        Assert.Equal("결과 400 × 225px", vm.OutputText);
+        vm.Padding = 40; // 80 px a side: 560 × 360 holds the picture, and 640 × 360 is the first 16:9 that does
+        Assert.Equal("결과 640 × 360px", vm.OutputText);
+
+        changed.Clear();
+        vm.NextCommand.Execute(null); // 300 × 300 with 120 px of padding: 540 × 540, the 16:9 canvas that holds it
+        Assert.Contains(nameof(BackgroundToolViewModel.OutputText), changed);
+        Assert.Equal("결과 960 × 540px", vm.OutputText);
+        vm.UndoCommand.Execute(null); // the padding back to 0, on this file: the 16:9 canvas that holds 300 × 300
+        Assert.Equal("결과 544 × 306px", vm.OutputText);
+    }
+
+    [AvaloniaFact]
+    public void The_colour_box_says_what_to_type_and_its_swatch_shows_only_for_a_whole_code()
+    {
+        var vm = Background([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        Assert.False(vm.HasCustomColor);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        vm.CustomColorHex = "ff88";
+        Assert.False(vm.HasCustomColor); // half a code: no empty pill that looks like a white swatch
+        vm.CustomColorHex = "ff8800";
+        Assert.True(vm.HasCustomColor);
+        Assert.Contains(nameof(BackgroundToolViewModel.HasCustomColor), changed);
+        vm.CustomColorHex = "";
+        Assert.False(vm.HasCustomColor);
+        vm.Dispose();
+
+        var (window, shown) = Open(TestStore(), ImageToolWindowTests.TestImages.Png(400, 200));
+        var box = window.GetVisualDescendants().OfType<TextBox>().Single(t => Avalonia.Automation.AutomationProperties.GetName(t) == "사용자 색");
+        Assert.Equal("예: #FF7A1A", box.PlaceholderText);
+        Assert.Equal("색 코드를 넣으면 바로 바뀌어요", ToolTip.GetTip(box));
+        window.Close();
+        shown.Dispose();
+    }
+
+    [AvaloniaFact]
     public void Save_returns_a_shared_background_edit_and_remembers_it_without_the_image_path()
     {
         var store = TestStore();

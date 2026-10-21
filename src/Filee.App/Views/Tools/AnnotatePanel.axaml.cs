@@ -16,7 +16,14 @@ public partial class AnnotatePanel : UserControl
         InitializeComponent();
         // Tunnelled and also when handled: the list boxes' own parts take the pointer, and the focus must go back whatever they did.
         foreach (var list in new[] { ToolCells, ColorChips, WidthChips })
+        {
             list.AddHandler(PointerReleasedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
+            // Also at the press, before the chip is picked: a colour or thickness goes to the picked drawing, and a picked text
+            // that is being retyped must have its new words put on first, not dropped under the change.
+            list.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
+        }
+        // The delete button takes no focus of its own; the press hands it to the picture, so the keys are the picture's after it.
+        DeleteButton.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     /// <summary>
