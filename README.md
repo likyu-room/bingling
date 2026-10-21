@@ -49,19 +49,21 @@ For Windows 10 and 11.
 1. Download `Bingling-<version>-win-Setup.exe` from the [latest release](../../releases/latest) and run it.
 2. The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC".
    Choose **More info**, then **Run anyway**.
-3. Setup lets you choose the Explorer menu entry, starting with Windows, the `filee` command and extra engines.
+3. Setup lets you choose the Explorer menu entry, starting with Windows, the `bingling` command (off unless you tick
+   it) and extra engines.
 
 Bingling tells you when a new version is out and updates while keeping your settings and engines.
-If you use 1.1.0 under its former name, Filee Plus, install over it: your settings carry over.
+If you use 1.1.0 under its former name, Filee Plus, just install Bingling: Setup removes Filee Plus and moves its
+settings and downloaded engines over.
 
 ## Command line
 
-If you chose it in Setup, the `filee` command uses the same engines and presets as the app.
+If you chose it in Setup, the `bingling` command uses the same engines and presets as the app.
 
 ```
-filee convert photo.heic --to jpg
-filee convert *.png --to webp --quality 80 -o converted
-filee watch D:\Inbox --to pdf --move-originals
+bingling convert photo.heic --to jpg
+bingling convert *.png --to webp --quality 80 -o converted
+bingling watch D:\Inbox --to pdf --move-originals
 ```
 
 ## Development
@@ -77,8 +79,8 @@ Run the test projects one at a time (`tests/Filee.App.Tests`, `Filee.Platform.Te
 [Architecture](docs/ARCHITECTURE.md) · [Engines](docs/ENGINES.md) · [Adding a converter](docs/ADDING-A-CONVERTER.md) ·
 [Adding a language](docs/ADDING-A-LANGUAGE.md) · [Contributing](CONTRIBUTING.md)
 
-Only the name changed. The projects and executable (`Filee.*`, `Filee.exe`) and the settings folder (`%APPDATA%\FileePlus`)
-keep their names.
+The code projects keep the original names (`Filee.*`). The program is `Bingling.exe` and its settings are in
+`%APPDATA%\Bingling`.
 
 ## Credits
 

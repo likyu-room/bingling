@@ -47,19 +47,19 @@ Windows 10/11용이에요.
 1. [릴리스 페이지](../../releases/latest)에서 `Bingling-<버전>-win-Setup.exe`를 받아 실행해요.
 2. 설치 파일에 아직 코드 서명이 없어서 Windows SmartScreen이 “Windows의 PC 보호” 창을 띄울 수 있어요.
    **추가 정보**를 누른 다음 **실행**을 누르세요.
-3. 설치할 때 탐색기 메뉴, 로그인 시 자동 실행, `filee` 명령, 추가 엔진을 고를 수 있어요.
+3. 설치할 때 탐색기 메뉴, 로그인 시 자동 실행, `bingling` 명령, 추가 엔진을 고를 수 있어요. `bingling` 명령은 기본으로 꺼져 있어요.
 
 새 버전이 나오면 알려 주고, 설정과 엔진은 그대로 둔 채 업데이트돼요.
-이전 이름인 Filee Plus 1.1.0을 쓰고 있다면 그 위에 그대로 설치하세요. 설정이 이어져요.
+이전 이름인 Filee Plus 1.1.0을 쓰고 있다면 빙글링을 설치하세요. 설치 프로그램이 Filee Plus를 지우고, 설정과 내려받은 엔진은 빙글링으로 옮겨요.
 
 ## 명령줄
 
-설치할 때 고르면 `filee` 명령도 써요. 앱과 같은 엔진과 프리셋을 써요.
+설치할 때 고르면 `bingling` 명령도 써요. 앱과 같은 엔진과 프리셋을 써요.
 
 ```
-filee convert photo.heic --to jpg
-filee convert *.png --to webp --quality 80 -o converted
-filee watch D:\Inbox --to pdf --move-originals
+bingling convert photo.heic --to jpg
+bingling convert *.png --to webp --quality 80 -o converted
+bingling watch D:\Inbox --to pdf --move-originals
 ```
 
 ## 개발
@@ -75,7 +75,7 @@ dotnet test tests/Filee.Core.Tests
 [구조](docs/ARCHITECTURE.md) · [엔진](docs/ENGINES.md) · [변환기 추가](docs/ADDING-A-CONVERTER.md) ·
 [언어 추가](docs/ADDING-A-LANGUAGE.md) · [기여 안내](CONTRIBUTING.md)
 
-이름만 빙글링으로 바꿨어요. 프로젝트와 실행 파일 이름(`Filee.*`, `Filee.exe`), 설정 폴더(`%APPDATA%\FileePlus`)는 그대로예요.
+코드의 프로젝트 이름(`Filee.*`)은 원작 그대로예요. 실행 파일은 `Bingling.exe`, 설정 폴더는 `%APPDATA%\Bingling`이에요.
 
 ## 원작
 

@@ -52,7 +52,7 @@ machine that built it. Check a package with
   and hold gestures are not supported. Wayland can use file actions, the drop zone, watch folders and CLI.
   On KDE Plasma 6 the drag gesture can also run there, experimentally and only with `FILEE_WAYLAND_GESTURES=1`. It needs
   the user in the `input` group (libuiohook's libinput back end) and the KWin script in `installer/linux/kwin`, which
-  moves the donut window (titled "Filee Donut") to the cursor. See `installer/linux/INSTALL.txt`.
+  moves the donut window (titled "Bingling Donut") to the cursor. See `installer/linux/INSTALL.txt`.
 - **macOS:** grant Filee Accessibility permission for gestures and Finder Automation permission for selection.
   Keep the development `.app` at a stable path while testing these permissions. Finder integration is a Quick
   Action under Services; auto-start uses a per-user LaunchAgent.

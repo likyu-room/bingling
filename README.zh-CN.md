@@ -47,19 +47,19 @@
 1. 从[最新发布](../../releases/latest)下载 `Bingling-<版本>-win-Setup.exe` 并运行。
 2. 安装程序目前还没有代码签名，Windows SmartScreen 可能会显示“Windows 已保护你的电脑”。
    点击**更多信息**，再点击**仍要运行**。
-3. 安装时可以选择资源管理器菜单、登录时启动、`filee` 命令和额外的引擎。
+3. 安装时可以选择资源管理器菜单、登录时启动、`bingling` 命令（默认不勾选）和额外的引擎。
 
 有新版本时 Bingling 会提示，更新时保留设置和引擎。
-如果你在用旧名称 Filee Plus 的 1.1.0，直接覆盖安装即可，设置会保留。
+如果你在用旧名称 Filee Plus 的 1.1.0，直接安装 Bingling 即可：安装程序会卸载 Filee Plus，并把设置和已下载的引擎转移过来。
 
 ## 命令行
 
-安装时如果勾选了，`filee` 命令和应用使用相同的引擎与预设。
+安装时如果勾选了，`bingling` 命令和应用使用相同的引擎与预设。
 
 ```
-filee convert photo.heic --to jpg
-filee convert *.png --to webp --quality 80 -o converted
-filee watch D:\Inbox --to pdf --move-originals
+bingling convert photo.heic --to jpg
+bingling convert *.png --to webp --quality 80 -o converted
+bingling watch D:\Inbox --to pdf --move-originals
 ```
 
 ## 开发
@@ -75,7 +75,7 @@ dotnet test tests/Filee.Core.Tests
 [架构](docs/ARCHITECTURE.md) · [引擎](docs/ENGINES.md) · [添加转换器](docs/ADDING-A-CONVERTER.md) ·
 [添加语言](docs/ADDING-A-LANGUAGE.md) · [贡献指南](CONTRIBUTING.md)
 
-只是改了名称。项目和可执行文件（`Filee.*`、`Filee.exe`）以及设置文件夹（`%APPDATA%\FileePlus`）保持不变。
+代码项目沿用原作的名称（`Filee.*`）。程序是 `Bingling.exe`，设置在 `%APPDATA%\Bingling` 中。
 
 ## 致谢
 
