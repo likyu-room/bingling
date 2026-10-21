@@ -46,14 +46,6 @@
     <InternalsVisibleTo Include="Filee.App.Tests" />
   </ItemGroup>
 
-  <!-- Native debug symbols from NuGet packages (SkiaSharp, HarfBuzz: ~100 MB) are useless to users. -->
-  <Target Name="FileeRemoveNativeSymbols" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
-    <ItemGroup>
-      <_FileeNativePdb Include="$(PublishDir)lib*.pdb" />
-    </ItemGroup>
-    <Delete Files="@(_FileeNativePdb)" />
-  </Target>
-
   <!-- Repository URL for the updater / About page, taken from Directory.Build.props. -->
   <ItemGroup>
     <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">

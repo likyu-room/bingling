@@ -1,0 +1,10 @@
+<Project>
+  <!-- Native debug symbols from NuGet packages (SkiaSharp, HarfBuzz: ~100 MB) are useless to users. For every project
+       published: the command line goes into the app's folder after the app and would bring them back. -->
+  <Target Name="FileeRemoveNativeSymbols" AfterTargets="Publish" Condition="'$(Configuration)' == 'Release'">
+    <ItemGroup>
+      <_FileeNativePdb Include="$(PublishDir)lib*.pdb" />
+    </ItemGroup>
+    <Delete Files="@(_FileeNativePdb)" />
+  </Target>
+</Project>
