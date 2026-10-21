@@ -3,8 +3,10 @@
 ;   ISCC.exe /DAppVersion=1.2.0 /DPublishDir=<published app> /O<output folder> installer\Filee.iss
 ;
 ; Besides copying files it
-;  - installs for all users into Program Files (administrator rights, one UAC prompt). Bingling itself keeps running
-;    as the signed-in user without elevation: Windows blocks drag and drop from Explorer into elevated windows;
+;  - installs for all users into Program Files (administrator rights, one UAC prompt), or, chosen in the first dialog,
+;    for the current user only into %LocalAppData%\Programs without administrator rights (a work PC whose user is no
+;    administrator). Updates keep the mode of the first install. Bingling itself keeps running as the signed-in user
+;    without elevation: Windows blocks drag and drop from Explorer into elevated windows;
 ;  - removes Filee Plus, what Bingling was called up to 1.1.0 (its own id, folder and Explorer menu): ends it, keeps
 ;    its downloaded engines, runs its uninstaller silently and cleans up what a removal that stopped half way left
 ;    behind (RemoveFileePlus); Bingling moves its settings over at its first start;
@@ -12,8 +14,8 @@
 ;    has it loaded, so updates need no restart;
 ;  - leaves the original Filee alone: settings are in %APPDATA%\Bingling, downloaded engines in
 ;    %LocalAppData%\Bingling\engines;
-;  - on Windows 11 registers the top-level File Explorer menu entry (an unsigned sparse package, which needs the
-;    administrator rights Setup already has);
+;  - on Windows 11 registers the top-level File Explorer menu entry (an unsigned sparse package, which needs
+;    administrator rights: an install for the current user only offers the classic entry under "Show more options");
 ;  - offers the optional conversion engines; Bingling downloads the chosen ones (verified) when Setup starts it;
 ;  - can put the "bingling" command line on PATH ({app}\cli\bingling.cmd runs bingling-cli.exe).
 ; The uninstaller runs "Bingling.exe --uninstall-cleanup" for the per-user parts (UninstallCleanup.cs).
@@ -45,6 +47,7 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
 PrivilegesRequired=admin
+PrivilegesRequiredOverridesAllowed=commandline dialog
 DefaultDirName={autopf}\{#AppName}
 DisableWelcomePage=no
 DisableProgramGroupPage=yes
@@ -73,6 +76,8 @@ SetupLogging=yes
 Name: "en"; MessagesFile: "compiler:Default.isl"
 Name: "ko"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "zhcn"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+Name: "es"; MessagesFile: "compiler:Languages\Spanish.isl"
+Name: "pl"; MessagesFile: "compiler:Languages\Polish.isl"
 
 ; Texts shared with the app (engine names, the two options of the General page) are generated into obj\engines.iss.
 [CustomMessages]
@@ -80,40 +85,62 @@ Name: "zhcn"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 en.ShortcutName=Bingling
 ko.ShortcutName=빙글링
 zhcn.ShortcutName=Bingling
+es.ShortcutName=Bingling
+pl.ShortcutName=Bingling
 en.GroupOptions=Options:
 ko.GroupOptions=옵션:
 zhcn.GroupOptions=选项：
+es.GroupOptions=Opciones:
+pl.GroupOptions=Opcje:
 en.TaskModernMenu=Also show it at the top of the Windows 11 menu, not only under “Show more options”
 ko.TaskModernMenu=Windows 11 기본 메뉴에도 표시 (“추가 옵션 표시”를 누르지 않아도 보여요)
 zhcn.TaskModernMenu=也显示在 Windows 11 主菜单中，而不仅是“显示更多选项”里
+es.TaskModernMenu=Mostrarlo también arriba en el menú de Windows 11, no solo en «Mostrar más opciones»
+pl.TaskModernMenu=Pokazuj też na górze menu Windows 11, nie tylko w „Pokaż więcej opcji”
 en.StatusExplorerMenu=Adding Bingling to the File Explorer menu...
 ko.StatusExplorerMenu=탐색기 메뉴에 빙글링을 추가하는 중...
 zhcn.StatusExplorerMenu=正在将 Bingling 添加到资源管理器菜单...
+es.StatusExplorerMenu=Añadiendo Bingling al menú del Explorador de archivos...
+pl.StatusExplorerMenu=Dodawanie Bingling do menu Eksploratora plików...
 en.StatusFormerVersion=Removing the former version of Bingling...
 ko.StatusFormerVersion=빙글링의 이전 버전을 지우는 중...
 zhcn.StatusFormerVersion=正在卸载 Bingling 的旧版本...
+es.StatusFormerVersion=Quitando la versión anterior de Bingling...
+pl.StatusFormerVersion=Usuwanie poprzedniej wersji Bingling...
 en.DirFormerVersion=Bingling can't be installed in the folder of its former version, which Setup removes:%n%n%1%n%nPlease choose another folder.
 ko.DirFormerVersion=빙글링의 이전 버전이 있던 폴더에는 설치할 수 없어요. 설치 프로그램이 이 폴더를 지워요:%n%n%1%n%n다른 폴더를 고르세요.
 zhcn.DirFormerVersion=不能安装到 Bingling 旧版本所在的文件夹，安装程序会删除该文件夹：%n%n%1%n%n请选择其他文件夹。
+es.DirFormerVersion=Bingling no se puede instalar en la carpeta de su versión anterior, que el instalador elimina:%n%n%1%n%nElige otra carpeta.
+pl.DirFormerVersion=Nie można zainstalować Bingling w folderze jego poprzedniej wersji, który instalator usuwa:%n%n%1%n%nWybierz inny folder.
 en.ExplorerMenuFailed=Windows did not add Bingling to the top of the File Explorer menu:%n%n%1%n%nBingling still appears under “Show more options”. You can try again in Bingling under Settings → General.
 ko.ExplorerMenuFailed=Windows가 탐색기 기본 메뉴에 빙글링을 추가하지 못했어요:%n%n%1%n%n빙글링은 “추가 옵션 표시” 안에는 계속 나타나요. 빙글링의 설정 → 일반에서 다시 시도할 수 있어요.
 zhcn.ExplorerMenuFailed=Windows 未能将 Bingling 添加到资源管理器主菜单：%n%n%1%n%nBingling 仍会出现在“显示更多选项”中。你可以在 Bingling 的 设置 → 常规 中重试。
+es.ExplorerMenuFailed=Windows no añadió Bingling arriba en el menú del Explorador de archivos:%n%n%1%n%nBingling sigue apareciendo en «Mostrar más opciones». Puedes volver a intentarlo en Bingling, en Ajustes → General.
+pl.ExplorerMenuFailed=Windows nie dodał Bingling na górze menu Eksploratora plików:%n%n%1%n%nBingling nadal jest w „Pokaż więcej opcji”. Możesz spróbować ponownie w Bingling: Ustawienia → Ogólne.
 en.ReadyEngines=Conversion engines (Bingling downloads them when it starts):
 ko.ReadyEngines=변환 엔진 (빙글링이 시작하면서 내려받아요):
 zhcn.ReadyEngines=转换引擎（Bingling 启动后下载）：
+es.ReadyEngines=Motores de conversión (Bingling los descarga al iniciarse):
+pl.ReadyEngines=Silniki konwersji (Bingling pobierze je po uruchomieniu):
 en.FinishedRunning=Bingling is installed and running in the notification area of the taskbar.%n%nTo convert files, drag them while holding the trigger key, or right-click them in File Explorer.
 ko.FinishedRunning=빙글링이 설치되어 작업 표시줄 알림 영역에서 실행 중이에요.%n%n파일을 변환하려면 지정한 키를 누른 채 파일을 끌거나, 탐색기에서 파일을 우클릭하세요.
 zhcn.FinishedRunning=Bingling 已安装，正在任务栏通知区域运行。%n%n要转换文件，请按住触发键拖动文件，或在资源管理器中右键单击文件。
+es.FinishedRunning=Bingling está instalado y se ejecuta en el área de notificación de la barra de tareas.%n%nPara convertir archivos, arrástralos mientras mantienes pulsada la tecla de activación, o haz clic derecho sobre ellos en el Explorador de archivos.
+pl.FinishedRunning=Bingling jest zainstalowany i działa w obszarze powiadomień paska zadań.%n%nAby przekonwertować pliki, przeciągnij je, przytrzymując klawisz wyzwalający, albo kliknij je prawym przyciskiem w Eksploratorze plików.
 en.TaskCli=Add the "bingling" command to PATH (convert from the command line)
 ko.TaskCli="bingling" 명령어를 PATH에 추가 (명령줄에서 변환)
 zhcn.TaskCli=将 "bingling" 命令添加到 PATH（在命令行中转换）
+es.TaskCli=Añadir el comando "bingling" al PATH (convertir desde la línea de comandos)
+pl.TaskCli=Dodaj polecenie "bingling" do zmiennej PATH (konwersja z wiersza poleceń)
 en.FinishedEngines=The conversion engines you picked are downloading in the Bingling window.
 ko.FinishedEngines=선택한 변환 엔진은 빙글링 창에서 내려받고 있어요.
 zhcn.FinishedEngines=你选择的转换引擎正在 Bingling 窗口中下载。
+es.FinishedEngines=Los motores de conversión que elegiste se están descargando en la ventana de Bingling.
+pl.FinishedEngines=Wybrane silniki konwersji są pobierane w oknie Bingling.
 
 [Tasks]
 Name: "contextmenu"; Description: "{cm:TaskContextMenu}"; GroupDescription: "{cm:GroupOptions}"; Check: IsFreshInstall
-Name: "contextmenu\top"; Description: "{cm:TaskModernMenu}"; GroupDescription: "{cm:GroupOptions}"; Check: IsFreshInstall and IsExplorerMenuSupported
+Name: "contextmenu\top"; Description: "{cm:TaskModernMenu}"; GroupDescription: "{cm:GroupOptions}"; Check: IsFreshInstall and IsExplorerMenuSupported and IsAdminInstallMode
 Name: "startup"; Description: "{cm:TaskStartup}"; GroupDescription: "{cm:GroupOptions}"; Check: IsFreshInstall
 Name: "cli"; Description: "{cm:TaskCli}"; GroupDescription: "{cm:GroupOptions}"; Flags: unchecked; Check: not IsCliOnPath
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
@@ -262,8 +289,9 @@ begin
     Exit;
   if WasInstalled then
   begin
-    // An update keeps what was chosen in Bingling (Settings > General) and refreshes the registration.
-    if ExplorerMenuWasRegistered then
+    // An update keeps what was chosen in Bingling (Settings > General) and refreshes the registration, which an
+    // unsigned package needs administrator rights for: an install for the current user leaves it as it is.
+    if ExplorerMenuWasRegistered and IsAdminInstallMode then
       RegisterExplorerMenu(False);
   end
   else if WizardIsTaskSelected('contextmenu\top') then
@@ -282,20 +310,41 @@ begin
   if not FileExists(Dll) or DeleteFile(Dll) then
     Exit;
   Aside := AddBackslash(Folder) + ExplorerMenuDll + '.' + GetDateTimeString('yyyymmddhhnnss', #0, #0) + '.old';
+  // Deleting at the next restart needs administrator rights; an install for the current user leaves the file there.
   if RenameFile(Dll, Aside) then
-    RestartReplace(Aside, '')
+  begin
+    if IsAdminInstallMode then
+      RestartReplace(Aside, '');
+  end
   else
     Log('Could not move the loaded ' + Dll + ' aside');
 end;
 
 
 const
-  EnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
+  SystemEnvironmentKey = 'SYSTEM\CurrentControlSet\Control\Session Manager\Environment';
 
-// The folder with bingling.cmd (the command line), which goes on the system PATH.
+// The folder with bingling.cmd (the command line), which goes on PATH.
 function CliFolder: String;
 begin
   Result := ExpandConstant('{app}\cli');
+end;
+
+// PATH of the install mode: the system's for all users, the user's own (HKCU\Environment) for the current user only.
+function EnvironmentRoot: Integer;
+begin
+  if IsAdminInstallMode then
+    Result := HKLM
+  else
+    Result := HKCU;
+end;
+
+function EnvironmentKey: String;
+begin
+  if IsAdminInstallMode then
+    Result := SystemEnvironmentKey
+  else
+    Result := 'Environment';
 end;
 
 function PathHas(const Paths, Folder: String): Boolean;
@@ -307,28 +356,35 @@ function IsCliOnPath: Boolean;
 var
   Paths: String;
 begin
-  Result := RegQueryStringValue(HKLM, EnvironmentKey, 'Path', Paths) and PathHas(Paths, CliFolder);
+  Result := RegQueryStringValue(EnvironmentRoot, EnvironmentKey, 'Path', Paths) and PathHas(Paths, CliFolder);
 end;
 
 procedure AddCliToPath;
 var
   Paths: String;
 begin
-  if not RegQueryStringValue(HKLM, EnvironmentKey, 'Path', Paths) or PathHas(Paths, CliFolder) then
+  if not RegQueryStringValue(EnvironmentRoot, EnvironmentKey, 'Path', Paths) then
+  begin
+    // A system PATH that can't be read is never rewritten; a user may have no PATH of their own yet.
+    if IsAdminInstallMode then
+      Exit;
+    Paths := '';
+  end;
+  if PathHas(Paths, CliFolder) then
     Exit;
   if (Paths <> '') and (Copy(Paths, Length(Paths), 1) <> ';') then
     Paths := Paths + ';';
   // REG_EXPAND_SZ like Windows' own value, so %SystemRoot% entries keep working.
-  RegWriteExpandStringValue(HKLM, EnvironmentKey, 'Path', Paths + CliFolder);
+  RegWriteExpandStringValue(EnvironmentRoot, EnvironmentKey, 'Path', Paths + CliFolder);
 end;
 
-// Takes a command folder off the system PATH: Bingling's when it is uninstalled, Filee Plus's once that is gone.
+// Takes a command folder off PATH: Bingling's when it is uninstalled, Filee Plus's once that is gone.
 procedure RemoveFromPath(const Folder: String);
 var
   Paths, Entry: String;
   At: Integer;
 begin
-  if not RegQueryStringValue(HKLM, EnvironmentKey, 'Path', Paths) then
+  if not RegQueryStringValue(EnvironmentRoot, EnvironmentKey, 'Path', Paths) then
     Exit;
   Entry := ';' + Uppercase(Folder) + ';';
   Paths := ';' + Paths + ';';
@@ -336,7 +392,7 @@ begin
   if At = 0 then
     Exit;
   Delete(Paths, At, Length(Entry) - 1);
-  RegWriteExpandStringValue(HKLM, EnvironmentKey, 'Path', Copy(Paths, 2, Length(Paths) - 2));
+  RegWriteExpandStringValue(EnvironmentRoot, EnvironmentKey, 'Path', Copy(Paths, 2, Length(Paths) - 2));
 end;
 
 // The downloaded engines (EngineEnvironment.DownloadRoot). While Bingling has none of its own yet, those of Filee Plus
@@ -804,8 +860,10 @@ begin
     ssPostInstall:
       begin
         // Once Bingling's files are in place, so cancelling Setup leaves Filee Plus as it was, and before Bingling
-        // starts and moves its settings over.
-        RemoveFileePlus;
+        // starts and moves its settings over. Filee Plus was installed for all users: an install for the current user
+        // only can't remove it.
+        if IsAdminInstallMode then
+          RemoveFileePlus;
         UpdateExplorerMenu;
         if WizardIsTaskSelected('cli') then
           AddCliToPath;
@@ -834,7 +892,7 @@ begin
     usPostUninstall:
     begin
       RemoveFromPath(CliFolder);
-      if DirExists(ExpandConstant('{app}')) and not RemoveDir(ExpandConstant('{app}')) then
+      if DirExists(ExpandConstant('{app}')) and not RemoveDir(ExpandConstant('{app}')) and IsAdminInstallMode then
         RestartReplace(ExpandConstant('{app}'), '');
     end;
   end;

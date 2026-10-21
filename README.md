@@ -50,7 +50,9 @@ For Windows 10 and 11.
 1. Download `Bingling-<version>-win-Setup.exe` from the [latest release](../../releases/latest) and run it.
 2. The installer is not code-signed yet, so Windows SmartScreen may show "Windows protected your PC".
    Choose **More info**, then **Run anyway**.
-3. Setup lets you choose the Explorer menu entry, starting with Windows, the `bingling` command (off unless you tick
+3. Install for all users (administrator rights), or for you only without administrator rights, for example on a work
+   PC.
+4. Setup lets you choose the Explorer menu entry, starting with Windows, the `bingling` command (off unless you tick
    it) and extra engines.
 
 Bingling tells you when a new version is out and updates while keeping your settings and engines.

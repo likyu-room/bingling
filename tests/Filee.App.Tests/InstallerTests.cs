@@ -15,14 +15,16 @@ namespace Filee.App.Tests;
 
 public class InstallerTests
 {
-    private static string Script
+    private static string Script => File.ReadAllText(Path.Combine(RepoRoot, "installer", "Filee.iss"));
+
+    private static string RepoRoot
     {
         get
         {
             var dir = AppContext.BaseDirectory;
             while (!File.Exists(Path.Combine(dir, "Filee.slnx")))
                 dir = Path.GetDirectoryName(dir) ?? throw new InvalidOperationException("Repository root not found.");
-            return File.ReadAllText(Path.Combine(dir, "installer", "Filee.iss"));
+            return dir;
         }
     }
 
@@ -129,9 +131,54 @@ public class InstallerTests
         Assert.Contains(@"Name: ""{autoprograms}\{cm:ShortcutName}""", script);
         Assert.Contains(@"Name: ""{autodesktop}\{cm:ShortcutName}""", script);
         // No text Setup shows names Filee or its command.
-        var messages = script.Split('\n').Where(l => Regex.IsMatch(l, @"^(en|ko|zhcn)\.")).ToList();
+        var messages = script.Split('\n').Where(l => Regex.IsMatch(l, @"^(en|ko|zhcn|es|pl)\.")).ToList();
         Assert.NotEmpty(messages);
         Assert.DoesNotContain(messages, l => l.Contains("filee", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Every_setup_language_has_every_text()
+    {
+        // Setup speaks the app's languages that Inno Setup has a translation for (no Hindi); a text missing in one of
+        // them would stop Setup with "Unknown custom message name" in that language.
+        var script = Script;
+        var languages = Regex.Matches(script, @"(?m)^Name: ""([a-z]+)""; MessagesFile:").Select(m => m.Groups[1].Value).ToList();
+        Assert.Equal(["en", "ko", "zhcn", "es", "pl"], languages);
+        string[] Names(string language) => [.. Regex.Matches(script, $@"(?m)^{language}\.(\w+)=").Select(m => m.Groups[1].Value).Order()];
+        foreach (var language in languages.Skip(1))
+            Assert.Equal(Names("en"), Names(language));
+        // The engine texts come from the app's translations of the same languages.
+        var generator = File.ReadAllText(Path.Combine(RepoRoot, "build", "tools", "make-installer-engines.cs"));
+        Assert.Contains("""[("en", "en"), ("ko", "ko"), ("zhcn", "zh-CN"), ("es", "es"), ("pl", "pl")]""", generator);
+    }
+
+    [Fact]
+    public void Setup_can_install_for_the_current_user_only_without_administrator_rights()
+    {
+        var script = Script;
+        // All users stays the default; the first dialog (or /CURRENTUSER) installs into %LocalAppData%\Programs.
+        Assert.Contains("PrivilegesRequired=admin", script);
+        Assert.Contains("PrivilegesRequiredOverridesAllowed=commandline dialog", script);
+        Assert.Contains(@"DefaultDirName={autopf}\{#AppName}", script);
+        // What needs administrator rights is left out: the unsigned Windows 11 menu package, removing Filee Plus (from
+        // Program Files) and deleting files at the next restart.
+        var top = script.Split('\n').Single(l => l.StartsWith("Name: \"contextmenu\\top\";", StringComparison.Ordinal));
+        Assert.Contains("IsAdminInstallMode", top);
+        Assert.Contains("if ExplorerMenuWasRegistered and IsAdminInstallMode then", Body(script, "procedure UpdateExplorerMenu;"));
+        Assert.Contains("if IsAdminInstallMode then\r\n          RemoveFileePlus;",
+            script[script.IndexOf("ssPostInstall:", StringComparison.Ordinal)..].Replace("\r\n", "\n").Replace("\n", "\r\n"));
+        Assert.Contains("if IsAdminInstallMode then\r\n      RestartReplace(Aside, '');",
+            Body(script, "procedure MoveLoadedDllAside(const Folder: String);").Replace("\r\n", "\n").Replace("\n", "\r\n"));
+        Assert.Contains("and IsAdminInstallMode then\r\n        RestartReplace(ExpandConstant('{app}'), '');",
+            script[script.IndexOf("usPostUninstall:", StringComparison.Ordinal)..].Replace("\r\n", "\n").Replace("\n", "\r\n"));
+        // The command line goes on the user's own PATH, which may not exist yet; the system PATH is never rewritten
+        // from nothing.
+        Assert.Contains("Result := HKCU;", Body(script, "function EnvironmentRoot: Integer;"));
+        Assert.Contains("Result := 'Environment';", Body(script, "function EnvironmentKey: String;"));
+        var add = Body(script, "procedure AddCliToPath;");
+        Assert.True(add.IndexOf("if IsAdminInstallMode then", StringComparison.Ordinal) < add.IndexOf("Paths := '';", StringComparison.Ordinal), add);
+        Assert.DoesNotContain("HKLM, EnvironmentKey", script);
+        Assert.DoesNotContain("HKLM, SystemEnvironmentKey", script);
     }
 
     [Fact]
@@ -262,7 +309,7 @@ public class InstallerTests
         Assert.Contains("MsgBox(FmtMessage(CustomMessage('DirFormerVersion'), [RemoveBackslash(Folder)]), mbError, MB_OK);", next);
         Assert.Contains("Result := False;", next);
         Assert.Contains("Folder := FileePlusDir(Uninstaller);", next);
-        foreach (var language in new[] { "en", "ko", "zhcn" })
+        foreach (var language in new[] { "en", "ko", "zhcn", "es", "pl" })
             Assert.Matches($@"(?m)^{language}\.DirFormerVersion=.*%1", script);
         Assert.Contains("Pos(Uppercase(AddBackslash(Folder)), Uppercase(AddBackslash(Path))) = 1",
             Body(script, "function IsSameOrInside(const Path, Folder: String): Boolean;"));

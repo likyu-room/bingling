@@ -29,16 +29,21 @@ Bingling runs on Windows 10 and 11.
 1. Download `Bingling-<version>-win-Setup.exe` from the [release page](https://github.com/likyu-room/bingling/releases/latest) and run it.
 2. The installer is not code-signed yet, so Windows may show "Windows protected your PC".
    Click **More info**, then **Run anyway**.
-3. Choose the options. Setup shows them on the first install.
+3. Choose the **install mode**.
+   - **Install for all users (recommended)**: the usual choice. It needs administrator rights, so Windows asks once.
+   - **Install for me only**: installs for your account only, without administrator rights. Choose it when Windows asks
+     for an administrator's name and password, as on many work PCs. The Windows 11 menu option is then left out, and
+     Bingling appears under “Show more options”.
+4. Choose the options. Setup shows them on the first install.
 
    | Option | At first | What it does |
    |---|---|---|
    | Show “Convert with Bingling” in the Explorer context menu | On | Right-click files to open Bingling. |
-   | Also show it at the top of the Windows 11 menu | On | Windows 11 only. The entry shows without clicking “Show more options”. |
+   | Also show it at the top of the Windows 11 menu | On | Windows 11, installed for all users only. The entry shows without clicking “Show more options”. |
    | Start Bingling when I sign in | On | Bingling waits in the tray when you turn on the PC. The ring only opens while Bingling runs. |
    | Add the "bingling" command to PATH | Off | Convert with the `bingling` command in a terminal. Turn it on only if you need it. |
 
-4. Choose the **conversion engines**.
+5. Choose the **conversion engines**.
    Pictures, PDF, Word, Excel and PowerPoint, HWP, e-books, archives, fonts, CAD and 3D models convert without any of them.
    The engines below are large, so download only the ones you need. The page shows each download size.
 
@@ -422,6 +427,10 @@ No. Every conversion and edit happens on your PC. Bingling only goes online to d
 **Can it convert old .doc and .ppt files?**
 Yes, with the **LibreOffice** engine. Without it the slot is dimmed, and pointing at it tells you to install it.
 Install it in **Settings → Engines**. DOCX, XLSX, PPTX and HWP convert without LibreOffice.
+
+**Setup asks for an administrator on my work PC.**
+Choose **Install for me only** in Setup's first window. Bingling then installs for your account without administrator rights.
+If your company blocks unsigned programs from running at all, this doesn't help either. Ask your IT department.
 
 **How do I update?**
 When a new version is out, Bingling shows a card such as “Bingling 1.2.0 is available”. Click **Update** and it downloads and installs the new version.
