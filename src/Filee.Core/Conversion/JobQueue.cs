@@ -21,6 +21,9 @@ public sealed class JobQueue : IAsyncDisposable
     private readonly Channel<ConversionJob> _channel = Channel.CreateUnbounded<ConversionJob>();
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _engineGates = new();
     private readonly HashSet<string> _reservedOutputs = new(StringComparer.OrdinalIgnoreCase);
+    // The folders each job's allocators made (by job id), so a skipped output can take its empty folder away again.
+    // Guarded by the _reservedOutputs lock, like the set above.
+    private readonly Dictionary<string, HashSet<string>> _madeFolders = [];
     private readonly Task _worker;
     private int _busy;
 
@@ -121,8 +124,11 @@ public sealed class JobQueue : IAsyncDisposable
         finally
         {
             lock (_reservedOutputs)
+            {
                 foreach (var output in job.Outputs)
                     _reservedOutputs.Remove(output);
+                _madeFolders.Remove(job.Id);
+            }
             TryDelete(workDir);
         }
 
@@ -388,13 +394,16 @@ public sealed class JobQueue : IAsyncDisposable
         try
         {
             IReadOnlyList<string> inputs = [file.SourcePath];
+            FinalAllocator? finalAllocator = null;
             for (var s = 0; s < route.Steps.Count; s++)
             {
                 var step = route.Steps[s];
                 var isLast = s == route.Steps.Count - 1;
-                IOutputAllocator allocator = isLast && finalOutput
-                    ? CreateFinalAllocator(job, file.SourcePath, index)
-                    : new TempAllocator(workDir, FormatRegistry.NameWithoutExtension(file.SourcePath));
+                IOutputAllocator allocator;
+                if (isLast && finalOutput)
+                    allocator = finalAllocator = CreateFinalAllocator(job, file.SourcePath, index);
+                else
+                    allocator = new TempAllocator(workDir, FormatRegistry.NameWithoutExtension(file.SourcePath));
 
                 var outputs = new List<string>();
                 foreach (var input in inputs)
@@ -436,9 +445,9 @@ public sealed class JobQueue : IAsyncDisposable
 
             // "Compress" never hands back a bigger file: one that isn't smaller is deleted, and the original stays the result.
             if (finalOutput && job.Preset.Image.OnlyIfSmaller && inputs.Count > 0 && !IsSmaller(inputs, file.SourcePath)
-                && TryDiscard(inputs))
+                && TryDiscard(inputs, finalAllocator!))
             {
-                file.NoticeKey = "toast.skipped_not_smaller";
+                file.NoticeKey = FileResult.NotSmallerNotice;
                 file.State = FileState.Skipped;
                 file.Progress = 1;
                 Notify(job);
@@ -520,9 +529,15 @@ public sealed class JobQueue : IAsyncDisposable
         }
     }
 
-    /// <summary>Deletes outputs that are of no use and lets go of their names. False (and kept) when one can't be deleted.</summary>
-    private bool TryDiscard(IReadOnlyList<string> outputs)
+    /// <summary>
+    /// Deletes outputs that are of no use, lets go of their names and removes the folders made for them that are empty now.
+    /// False (and everything kept) when an output replaced a file that was there before (the Overwrite policy: that file is
+    /// gone, so the output is all there is) or when one can't be deleted.
+    /// </summary>
+    private bool TryDiscard(IReadOnlyList<string> outputs, FinalAllocator allocator)
     {
+        if (allocator.ReplacedExisting)
+            return false;
         try
         {
             foreach (var output in outputs)
@@ -534,9 +549,36 @@ public sealed class JobQueue : IAsyncDisposable
             return false;
         }
         lock (_reservedOutputs)
+        {
             foreach (var output in outputs)
                 _reservedOutputs.Remove(output);
+            foreach (var output in outputs)
+                RemoveMadeFolders(allocator.MadeFolders, Path.GetDirectoryName(output));
+        }
         return true;
+    }
+
+    /// <summary>
+    /// Removes <paramref name="folder"/> and the folders above it that the job made, as far up as they are empty. Not
+    /// recursive: a folder with anything in it, or one that another output of the job is about to be written to, stays.
+    /// Call with the <c>_reservedOutputs</c> lock held.
+    /// </summary>
+    private void RemoveMadeFolders(HashSet<string> made, string? folder)
+    {
+        while (folder is not null && made.Contains(folder)
+               && !_reservedOutputs.Any(o => string.Equals(Path.GetDirectoryName(o), folder, StringComparison.OrdinalIgnoreCase)))
+        {
+            try
+            {
+                Directory.Delete(folder); // not recursive: fails while anything is in it
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return;
+            }
+            made.Remove(folder);
+            folder = Path.GetDirectoryName(folder);
+        }
     }
 
     private SemaphoreSlim GateFor(IConverter converter) =>
@@ -546,8 +588,16 @@ public sealed class JobQueue : IAsyncDisposable
             return new SemaphoreSlim(max, max);
         });
 
-    private FinalAllocator CreateFinalAllocator(ConversionJob job, string sourcePath, int index) =>
-        new(this, job.Preset.Output, new OutputPathResolver.Tokens(sourcePath, job.PresetDisplayName, index, job.CreatedAt));
+    private FinalAllocator CreateFinalAllocator(ConversionJob job, string sourcePath, int index)
+    {
+        HashSet<string> madeFolders;
+        lock (_reservedOutputs)
+        {
+            if (!_madeFolders.TryGetValue(job.Id, out madeFolders!))
+                _madeFolders[job.Id] = madeFolders = new(StringComparer.OrdinalIgnoreCase);
+        }
+        return new(this, job.Preset.Output, new OutputPathResolver.Tokens(sourcePath, job.PresetDisplayName, index, job.CreatedAt), madeFolders);
+    }
 
     private void Notify(ConversionJob job)
     {
@@ -601,8 +651,15 @@ public sealed class JobQueue : IAsyncDisposable
     }
 
     /// <summary>Allocates final output paths according to the preset's <see cref="OutputRule"/>.</summary>
-    private sealed class FinalAllocator(JobQueue queue, OutputRule rule, OutputPathResolver.Tokens tokens) : IOutputAllocator
+    private sealed class FinalAllocator(JobQueue queue, OutputRule rule, OutputPathResolver.Tokens tokens, HashSet<string> madeFolders)
+        : IOutputAllocator
     {
+        /// <summary>True once a path went to a file that was there already (the Overwrite policy): the output replaces it.</summary>
+        public bool ReplacedExisting { get; private set; }
+
+        /// <summary>The folders the job's allocators made, shared between them. Read and changed under the queue's lock.</summary>
+        public HashSet<string> MadeFolders => madeFolders;
+
         public string? Allocate(string extension, string? suffix = null)
         {
             // Reserve under a lock so two parallel files never pick the same name.
@@ -613,11 +670,22 @@ public sealed class JobQueue : IAsyncDisposable
                 if (path is null)
                     return null;
 
+                ReplacedExisting |= File.Exists(path) || Directory.Exists(path);
                 queue._reservedOutputs.Add(path);
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+                CreateFolder(Path.GetDirectoryName(path)!);
                 // An empty extension asks for a folder (archive extraction): the converter creates it.
                 return path;
             }
+        }
+
+        /// <summary>Creates <paramref name="folder"/>, remembering which of it and the folders above it did not exist yet.</summary>
+        private void CreateFolder(string folder)
+        {
+            var missing = new List<string>();
+            for (var f = folder; !string.IsNullOrEmpty(f) && !Directory.Exists(f); f = Path.GetDirectoryName(f))
+                missing.Add(f);
+            Directory.CreateDirectory(folder);
+            madeFolders.UnionWith(missing);
         }
     }
 

@@ -53,6 +53,99 @@ public class JobQueueTests
     }
 
     [Fact]
+    public async Task Only_if_smaller_never_deletes_a_file_that_was_there_before()
+    {
+        // Overwrite replaced picture.png when the engine wrote it: that file is gone either way, so deleting the new one
+        // would lose both. The result stays, as it did before the check existed.
+        using var dir = new TempDir();
+        var photo = dir.File("photo.jpg", "x");
+        var existing = dir.File("photo.png", "an older picture");
+        await using var queue = new JobQueue(new ConverterCatalog([new FakeConverter("magick", new ConversionEdge("jpg", "png"))]));
+
+        var job = await Run(queue, [photo], new Preset
+        {
+            TargetFormat = "png",
+            Output = { Conflict = ConflictPolicy.Overwrite },
+            Image = { OnlyIfSmaller = true },
+        });
+
+        Assert.Equal(FileState.Done, job.Files.Single().State);
+        Assert.Equal(existing, job.Outputs.Single());
+        Assert.Equal("photo.jpg→png by magick", File.ReadAllText(existing));
+    }
+
+    [Fact]
+    public async Task A_skipped_output_leaves_no_empty_folder()
+    {
+        using var dir = new TempDir();
+        var photo = dir.File("photo.jpg", "x");
+        await using var queue = new JobQueue(new ConverterCatalog([new FakeConverter("magick", new ConversionEdge("jpg", "png"))]));
+
+        var job = await Run(queue, [photo], new Preset
+        {
+            TargetFormat = "png",
+            Output = { Location = OutputLocation.Subfolder, SubfolderName = "compressed" },
+            Image = { OnlyIfSmaller = true },
+        });
+
+        Assert.Equal(FileState.Skipped, job.Files.Single().State);
+        Assert.False(Directory.Exists(Path.Combine(dir.Path, "compressed")));
+        Assert.True(File.Exists(photo)); // the folder the original is in stays
+    }
+
+    [Fact]
+    public async Task A_skipped_output_leaves_a_folder_that_has_other_files_or_was_there_before()
+    {
+        using var dir = new TempDir();
+        var small = dir.File("small.jpg", "x");
+        var large = dir.File("large.jpg", new string('x', 1000));
+        var yours = Directory.CreateDirectory(Path.Combine(dir.Path, "mine")).FullName;
+        await using var queue = new JobQueue(new ConverterCatalog([new FakeConverter("magick", new ConversionEdge("jpg", "png"))]));
+
+        // One file is skipped, the other kept in the same new folder: the folder holds it.
+        var shared = await Run(queue, [small, large], new Preset
+        {
+            TargetFormat = "png",
+            Output = { Location = OutputLocation.Subfolder, SubfolderName = "compressed" },
+            Image = { OnlyIfSmaller = true },
+        });
+        Assert.Equal([FileState.Skipped, FileState.Done], shared.Files.Select(f => f.State));
+        Assert.True(File.Exists(Path.Combine(dir.Path, "compressed", "large.png")));
+
+        // An empty folder the user made is not ours to remove.
+        var kept = await Run(queue, [small], new Preset
+        {
+            TargetFormat = "png",
+            Output = { Location = OutputLocation.Subfolder, SubfolderName = "mine" },
+            Image = { OnlyIfSmaller = true },
+        });
+        Assert.Equal(FileState.Skipped, kept.Files.Single().State);
+        Assert.True(Directory.Exists(yours));
+    }
+
+    [Fact]
+    public async Task Folders_made_below_a_custom_folder_for_a_skipped_output_all_go()
+    {
+        // The watch folder's layout: Inbox\2025\a.jpg → <custom>\2025\a.png. Both new levels are taken away again.
+        using var dir = new TempDir();
+        Directory.CreateDirectory(Path.Combine(dir.Path, "inbox", "2025"));
+        var photo = dir.File(Path.Combine("inbox", "2025", "a.jpg"), "x");
+        var custom = Path.Combine(dir.Path, "out");
+        Directory.CreateDirectory(custom);
+        await using var queue = new JobQueue(new ConverterCatalog([new FakeConverter("magick", new ConversionEdge("jpg", "png"))]));
+
+        var job = await Run(queue, [photo], new Preset
+        {
+            TargetFormat = "png",
+            Output = { Location = OutputLocation.CustomFolder, CustomFolder = Path.Combine(custom, "compressed"), KeepFoldersFrom = Path.Combine(dir.Path, "inbox") },
+            Image = { OnlyIfSmaller = true },
+        });
+
+        Assert.Equal(FileState.Skipped, job.Files.Single().State);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(custom)); // "compressed\2025" and "compressed" are gone, "out" was there
+    }
+
+    [Fact]
     public async Task Is_busy_from_enqueueing_until_the_job_has_finished()
     {
         // The app frees memory only while the queue is idle: a waiting or running job must count.

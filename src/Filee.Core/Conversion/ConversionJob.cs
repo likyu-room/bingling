@@ -43,6 +43,18 @@ public sealed class FileResult
     /// nothing, so the PDF was copied as it is), if any.
     /// </summary>
     public string? NoticeKey { get; set; }
+
+    /// <summary>
+    /// The <see cref="NoticeKey"/> of a file left out because its output was not smaller than the source
+    /// (<see cref="ImageOptions.OnlyIfSmaller"/>): nothing was kept and the original stays the result.
+    /// </summary>
+    public const string NotSmallerNotice = "toast.skipped_not_smaller";
+
+    /// <summary>
+    /// True for a file that needs no second look: converted, or left out because its output was not smaller. A watch
+    /// folder moves the originals of such files away; one left in the folder would be tried again at every start.
+    /// </summary>
+    public bool IsHandled => State == FileState.Done || (State == FileState.Skipped && NoticeKey == NotSmallerNotice);
 }
 
 /// <summary>A batch of files converted with one preset.</summary>
