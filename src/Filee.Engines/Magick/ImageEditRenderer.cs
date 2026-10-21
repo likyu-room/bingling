@@ -2,13 +2,14 @@
 // its preview with it and ImageEncoder draws the saved picture with it, so the window shows what is saved (spec §3,
 // "preview = result"). The order is the spec's: boxes are hidden, then drawn on, then the picture is set on its backdrop.
 
+using System.Globalization;
 using Filee.Core.Formats;
 using Filee.Core.Presets;
 using SkiaSharp;
 
 namespace Filee.Engines.Magick;
 
-/// <summary>Draws an <see cref="ImageEdit"/> (its hidden boxes and its backdrop) onto a picture, at any scale.</summary>
+/// <summary>Draws an <see cref="ImageEdit"/> (its hidden boxes, drawings and backdrop) onto a picture, at any scale.</summary>
 public static class ImageEditRenderer
 {
     /// <summary>The backdrop gradients, in the order the window offers them: id, top left colour, bottom right colour.</summary>
@@ -23,6 +24,10 @@ public static class ImageEditRenderer
         ("lavender", new SKColor(0xFFA18CD1), new SKColor(0xFFFBC2EB)),
         ("night", new SKColor(0xFF232526), new SKColor(0xFF414345)),
     ];
+
+    /// <summary>The colours the annotate window offers first, <c>#RRGGBB</c>: red, orange, yellow, green, blue, purple, black, white.</summary>
+    public static readonly IReadOnlyList<string> AnnotationColors =
+        ["#FF3B30", "#FF9500", "#FFCC00", "#34C759", "#007AFF", "#AF52DE", "#000000", "#FFFFFF"];
 
     private static readonly Lock BackdropLock = new();
 
@@ -98,7 +103,14 @@ public static class ImageEditRenderer
                 canvas.DrawRect(Shown(box), paint);
         }
 
-        // Drawings go here: on the picture, over its hidden boxes and inside its rounded corners.
+        // Drawings go on the picture, over its hidden boxes and inside its rounded corners. Their sizes are fractions of the
+        // short side as drawn, so a small preview draws them in proportion.
+        if (edit.Annotations is { } annotations)
+        {
+            var scaleSide = Math.Min(dest.Width, dest.Height);
+            foreach (var annotation in annotations)
+                DrawAnnotation(canvas, annotation, dest, scaleSide);
+        }
         canvas.Restore();
     }
 
@@ -114,6 +126,145 @@ public static class ImageEditRenderer
         canvas.Clear(SKColors.Transparent);
         Draw(canvas, image, SKRect.Create(size.Width, size.Height), edit, Math.Min(picture.Width, picture.Height));
         return result;
+    }
+
+    /// <summary>Line width, text size and number sticker diameter as fractions of the short side. A level from a newer Filee is thin.</summary>
+    private static (double Line, double Text, double Sticker) Sizes(StrokeLevel level) => level switch
+    {
+        StrokeLevel.Thick => (0.016, 0.070, 0.090),
+        StrokeLevel.Normal => (0.008, 0.045, 0.065),
+        _ => (0.004, 0.030, 0.050),
+    };
+
+    /// <summary>Draws one annotation on the picture shown in <paramref name="dest"/>; <paramref name="shortSide"/> is that rect's short side.</summary>
+    private static void DrawAnnotation(SKCanvas canvas, Annotation note, SKRect dest, float shortSide)
+    {
+        var points = note.Points.Select(p => new SKPoint(dest.Left + (float)p.X * dest.Width, dest.Top + (float)p.Y * dest.Height)).ToList();
+        var (lineSize, textSize, stickerSize) = Sizes(note.Width);
+        var width = (float)lineSize * shortSide;
+        var color = SKColor.TryParse(note.Color, out var parsed) ? parsed : SKColor.Parse(AnnotationColors[0]);
+        using var paint = new SKPaint
+        {
+            IsAntialias = true,
+            Color = color,
+            Style = SKPaintStyle.Stroke,
+            StrokeWidth = width,
+            StrokeCap = SKStrokeCap.Round,
+            StrokeJoin = SKStrokeJoin.Round,
+        };
+
+        switch (note.Kind)
+        {
+            case AnnotationKind.Highlighter when points.Count > 0:
+                paint.StrokeWidth = 3 * width;
+                using (var path = Polyline(points))
+                {
+                    // One layer, laid on at 40 %: where the stroke crosses itself it is no darker than elsewhere.
+                    using var layer = new SKPaint { Color = SKColors.White.WithAlpha(102) };
+                    canvas.SaveLayer(SKRect.Inflate(path.Bounds, paint.StrokeWidth, paint.StrokeWidth), layer);
+                    canvas.DrawPath(path, paint);
+                    canvas.Restore();
+                }
+                break;
+            case AnnotationKind.Arrow when points.Count > 1:
+                DrawArrow(canvas, points[0], points[1], width, paint);
+                break;
+            case AnnotationKind.Line when points.Count > 1:
+                canvas.DrawLine(points[0], points[1], paint);
+                break;
+            case AnnotationKind.Rectangle when points.Count > 1:
+                paint.StrokeJoin = SKStrokeJoin.Miter;
+                canvas.DrawRect(Corners(points[0], points[1]), paint);
+                break;
+            case AnnotationKind.Ellipse when points.Count > 1:
+                canvas.DrawOval(Corners(points[0], points[1]), paint);
+                break;
+            case AnnotationKind.Text when points.Count > 0 && !string.IsNullOrEmpty(note.Text):
+                paint.Style = SKPaintStyle.Fill;
+                DrawText(canvas, note.Text, points[0], (float)textSize * shortSide, paint);
+                break;
+            case AnnotationKind.Number when points.Count > 0:
+                paint.Style = SKPaintStyle.Fill;
+                DrawSticker(canvas, note.Number, points[0], (float)stickerSize * shortSide, paint);
+                break;
+            case AnnotationKind.Pen when points.Count > 0:
+                using (var path = Polyline(points))
+                    canvas.DrawPath(path, paint);
+                break;
+        }
+        // Anything else is a drawing with too few points to show, left out.
+    }
+
+    /// <summary>The points joined by straight lines; one point gives a zero-length line, which a round cap draws as a dot.</summary>
+    private static SKPath Polyline(List<SKPoint> points)
+    {
+        var path = new SKPath();
+        path.MoveTo(points[0]);
+        foreach (var point in points.Skip(1))
+            path.LineTo(point);
+        if (points.Count == 1)
+            path.LineTo(points[0]);
+        return path;
+    }
+
+    /// <summary>The box between two opposite corners given in any order.</summary>
+    private static SKRect Corners(SKPoint a, SKPoint b) => new SKRect(a.X, a.Y, b.X, b.Y).Standardized;
+
+    /// <summary>A line from <paramref name="from"/> to <paramref name="to"/> with a filled head at <paramref name="to"/>, 4 line widths long and 3 wide.</summary>
+    private static void DrawArrow(SKCanvas canvas, SKPoint from, SKPoint to, float width, SKPaint paint)
+    {
+        var length = SKPoint.Distance(from, to);
+        if (length < 1e-3)
+            return;
+        var direction = new SKPoint((to.X - from.X) / length, (to.Y - from.Y) / length);
+        var headLength = 4 * width;
+        var baseCentre = new SKPoint(to.X - direction.X * headLength, to.Y - direction.Y * headLength);
+        var side = new SKPoint(-direction.Y * 1.5f * width, direction.X * 1.5f * width);
+
+        // The line stops where the head begins, so a thick line does not poke out past the tip. A short arrow is all head.
+        if (length > headLength)
+            canvas.DrawLine(from, baseCentre, paint);
+        paint.Style = SKPaintStyle.Fill;
+        using var head = new SKPath();
+        head.MoveTo(to);
+        head.LineTo(baseCentre.X + side.X, baseCentre.Y + side.Y);
+        head.LineTo(baseCentre.X - side.X, baseCentre.Y - side.Y);
+        head.Close();
+        canvas.DrawPath(head, paint);
+    }
+
+    /// <summary>The lines of <paramref name="text"/>, 1.25 sizes apart, in a box whose top left corner is <paramref name="topLeft"/>.</summary>
+    private static void DrawText(SKCanvas canvas, string text, SKPoint topLeft, float size, SKPaint paint)
+    {
+        using var font = AnnotationFonts.Create(size);
+        var metrics = font.Metrics;
+        var lineHeight = 1.25f * size;
+        // The font's own line (ascent to descent) is centred in the line's box, as CSS does with the leading.
+        var baseline = topLeft.Y + (lineHeight - (metrics.Descent - metrics.Ascent)) / 2 - metrics.Ascent;
+        foreach (var line in text.Split('\n'))
+        {
+            canvas.DrawText(line.TrimEnd('\r'), topLeft.X, baseline, font, paint);
+            baseline += lineHeight;
+        }
+    }
+
+    /// <summary>A disc of <paramref name="diameter"/> around <paramref name="centre"/> with the number on it, in white or, on a light disc, black.</summary>
+    private static void DrawSticker(SKCanvas canvas, int number, SKPoint centre, float diameter, SKPaint paint)
+    {
+        canvas.DrawCircle(centre, diameter / 2, paint);
+        var brightness = (0.299 * paint.Color.Red + 0.587 * paint.Color.Green + 0.114 * paint.Color.Blue) / 255;
+        paint.Color = brightness > 0.6 ? SKColors.Black : SKColors.White;
+
+        var digits = number.ToString(CultureInfo.InvariantCulture);
+        using var font = AnnotationFonts.Create(0.6f * diameter);
+        font.MeasureText(digits, out var ink);
+        if (ink.Width > 0.8f * diameter) // a long number is made smaller to stay on the disc
+        {
+            font.Size *= 0.8f * diameter / ink.Width;
+            font.MeasureText(digits, out ink);
+        }
+        // Centred on its ink, not its line box, so the digits sit in the middle of the disc.
+        canvas.DrawText(digits, centre.X - ink.MidX, centre.Y - ink.MidY, font, paint);
     }
 
     /// <summary>Mipmaps when the picture is drawn smaller (the preview); none at full size, where they would only cost memory.</summary>

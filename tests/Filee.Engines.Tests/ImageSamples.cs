@@ -41,11 +41,13 @@ internal static class ImageSamples
 
     /// <summary>
     /// A JPEG as phones save it: stored 40 × 20, shown turned right (EXIF orientation 6), so on screen 20 × 40 with the
-    /// red square at the top right.
+    /// red square at the top right. <paramref name="scale"/> makes it that many times as big.
     /// </summary>
-    public static string WritePhone(this EngineFixture fx, uint quality = 90)
+    public static string WritePhone(this EngineFixture fx, uint quality = 90, uint scale = 1)
     {
         var image = Marked();
+        if (scale > 1)
+            image.Scale(image.Width * scale, image.Height * scale);
         var exif = new ExifProfile();
         exif.SetValue(ExifTag.Orientation, (ushort)OrientationType.RightTop);
         image.SetProfile(exif);

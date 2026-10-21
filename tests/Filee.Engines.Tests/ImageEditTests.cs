@@ -261,27 +261,367 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
             Redact = new RedactEdit { Mode = RedactMode.Mosaic, Boxes = [new EditRect { X = .1, Y = .2, Width = .4, Height = .3 }] },
             Background = new BackgroundEdit { Value = "sky", Padding = .08, Corner = .05, Shadow = 60, Aspect = "1:1" },
         };
-        using var saved = ImageEditRenderer.Render(full, edit);
-        Assert.Equal((896, 896), (saved.Width, saved.Height)); // 800 × 600 and 48 px each side, made square
-        var smaller = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
-        using var expected = saved.Resize(Info(224, 224), smaller);
+        using var quarter = AtQuarterScale(full, edit);
 
-        using var small = full.Resize(Info(200, 150), smaller);
-        using var smallImage = SKImage.FromBitmap(small);
-        using var preview = new SKBitmap(Info(224, 224));
-        using (var canvas = new SKCanvas(preview))
+        Assert.Equal((224, 224), (quarter.Saved.Width, quarter.Saved.Height)); // 800 × 600 and 48 px each side, made square, a quarter
+        Assert.All(MeanDifference(quarter), mean => Assert.True(mean <= 6, $"mean difference {mean:F2}"));
+    }
+
+    [Fact]
+    public void Preview_scale_matches_full_size_with_annotations()
+    {
+        using var full = Scene(800, 600);
+        var plain = new ImageEdit
         {
-            canvas.Clear(SKColors.Transparent);
-            ImageEditRenderer.Draw(canvas, smallImage, SKRect.Create(224, 224), edit, fullShortSide: 600);
-        }
+            Redact = new RedactEdit { Mode = RedactMode.Mosaic, Boxes = [new EditRect { X = .1, Y = .2, Width = .4, Height = .3 }] },
+            Background = new BackgroundEdit { Value = "sky", Padding = .08, Corner = .05, Shadow = 60, Aspect = "1:1" },
+        };
+        var edit = plain.Clone();
+        edit.Annotations =
+        [
+            Note(AnnotationKind.Pen, "#FF3B30", StrokeLevel.Thick, [(.08, .1), (.2, .25), (.15, .4), (.3, .45)]),
+            Note(AnnotationKind.Highlighter, "#FFCC00", StrokeLevel.Normal, [(.4, .1), (.9, .12)]),
+            Note(AnnotationKind.Arrow, "#007AFF", StrokeLevel.Thick, [(.1, .9), (.45, .6)]),
+            Note(AnnotationKind.Line, "#000000", StrokeLevel.Thick, [(.5, .9), (.95, .95)]),
+            Note(AnnotationKind.Rectangle, "#34C759", StrokeLevel.Thick, [(.55, .3), (.9, .55)]),
+            Note(AnnotationKind.Ellipse, "#AF52DE", StrokeLevel.Thick, [(.6, .6), (.85, .85)]),
+            Note(AnnotationKind.Text, "#FF9500", StrokeLevel.Thick, [(.05, .55)], text: "Filee 가나다\nsecond line"),
+            Note(AnnotationKind.Number, "#FFFFFF", StrokeLevel.Thick, [(.92, .08)], number: 3),
+        ];
 
-        var a = expected.GetPixelSpan();
-        var b = preview.GetPixelSpan();
+        using var without = AtQuarterScale(full, plain);
+        using var with = AtQuarterScale(full, edit);
+
+        // Looks the same ...
+        Assert.All(MeanDifference(with), mean => Assert.True(mean <= 6, $"mean difference {mean:F2}"));
+        // ... and the drawings are as big: a mean can hide strokes of the wrong thickness, so count the pixels they changed.
+        var saved = Changed(without.Saved, with.Saved);
+        var drawn = Changed(without.Drawn, with.Drawn);
+        Assert.True(saved > 1500, $"{saved} pixels drawn on"); // not an empty comparison
+        Assert.InRange(drawn, saved * 0.8, saved * 1.2);
+    }
+
+    /// <summary>The result of an edit made a quarter as big, and the edit drawn at that size as the editor's preview does.</summary>
+    private sealed record QuarterScale(SKBitmap Saved, SKBitmap Drawn) : IDisposable
+    {
+        public void Dispose()
+        {
+            Saved.Dispose();
+            Drawn.Dispose();
+        }
+    }
+
+    /// <summary><paramref name="edit"/> saved at full size and then made a quarter as big, and drawn directly from a quarter-size copy.</summary>
+    private static QuarterScale AtQuarterScale(SKBitmap full, ImageEdit edit)
+    {
+        using var saved = ImageEditRenderer.Render(full, edit);
+        var smaller = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
+        var expected = saved.Resize(Info(saved.Width / 4, saved.Height / 4), smaller);
+
+        using var small = full.Resize(Info(full.Width / 4, full.Height / 4), smaller);
+        using var smallImage = SKImage.FromBitmap(small);
+        var preview = new SKBitmap(Info(expected.Width, expected.Height));
+        using var canvas = new SKCanvas(preview);
+        canvas.Clear(SKColors.Transparent);
+        ImageEditRenderer.Draw(canvas, smallImage, SKRect.Create(preview.Width, preview.Height), edit, fullShortSide: Math.Min(full.Width, full.Height));
+        return new QuarterScale(expected, preview);
+    }
+
+    /// <summary>The mean difference per channel between the two pictures.</summary>
+    private static double[] MeanDifference(QuarterScale pair)
+    {
+        var a = pair.Saved.GetPixelSpan();
+        var b = pair.Drawn.GetPixelSpan();
         var sums = new long[4];
         for (var i = 0; i < a.Length; i++)
             sums[i % 4] += Math.Abs(a[i] - b[i]);
         var pixels = a.Length / 4.0;
-        Assert.All(sums, sum => Assert.True(sum / pixels <= 6, $"mean difference {sum / pixels:F2}"));
+        return [.. sums.Select(sum => sum / pixels)];
+    }
+
+    /// <summary>How many pixels differ clearly between two pictures of one size.</summary>
+    private static int Changed(SKBitmap before, SKBitmap after)
+    {
+        var count = 0;
+        for (var y = 0; y < before.Height; y++)
+        {
+            for (var x = 0; x < before.Width; x++)
+            {
+                SKColor a = before.GetPixel(x, y), b = after.GetPixel(x, y);
+                if (Math.Abs(a.Red - b.Red) + Math.Abs(a.Green - b.Green) + Math.Abs(a.Blue - b.Blue) > 90)
+                    count++;
+            }
+        }
+        return count;
+    }
+
+    [Fact]
+    public async Task Red_line_changes_the_pixels_it_crosses()
+    {
+        // 400 × 200: a thick line is 0.016 × 200 = 3.2 px wide, from (40, 100) to (360, 100), so rows 99 and 100 are all red.
+        var source = fx.Write(new MagickImage(MagickColors.White, 400, 200), "plain.png");
+        var line = Note(AnnotationKind.Line, "#FF3B30", StrokeLevel.Thick, [(.1, .5), (.9, .5)]);
+
+        var job = await fx.ConvertAsync([source], Edited("annotate", Drawn(line)));
+
+        Assert.Equal(JobState.Completed, job.State);
+        Assert.Equal("plain Annotated.png", Path.GetFileName(job.Outputs.Single()));
+        using var r = new MagickImage(job.Outputs.Single());
+        foreach (var x in new[] { 60, 200, 340 })
+        {
+            Assert.True(IsRed(r, x, 99), $"({x},99)");
+            Assert.True(IsRed(r, x, 100), $"({x},100)");
+        }
+        var rgb = r.GetPixels().ToByteArray(PixelMapping.RGB)!;
+        int changed = 0, outside = 0;
+        for (var y = 0; y < 200; y++)
+        {
+            for (var x = 0; x < 400; x++)
+            {
+                var i = (y * 400 + x) * 3;
+                if (rgb[i] == 255 && rgb[i + 1] == 255 && rgb[i + 2] == 255)
+                    continue;
+                changed++;
+                if (y < 97 || y > 102 || x < 37 || x > 363)
+                    outside++;
+            }
+        }
+        Assert.True(changed > 900, $"{changed} pixels changed"); // about 320 × 3.2
+        Assert.Equal(0, outside); // nothing but the line itself
+    }
+
+    [Fact]
+    public void Korean_text_draws_glyphs_not_boxes()
+    {
+        // Thick text is 0.07 × 300 = 21 px: three syllables fit well inside x 30 to 130, y 60 to 110.
+        using var picture = Filled(600, 300, SKColors.White);
+        SKColor[] TextRegion(string text)
+        {
+            using var result = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Text, "#000000", StrokeLevel.Thick, [(.05, .2)], text: text)));
+            return Region(result, 30, 60, 100, 50);
+        }
+
+        var hangul = TextRegion("가나다");
+        var boxes = TextRegion("□□□");
+
+        Assert.NotEqual(TextRegion(""), hangul); // something is drawn
+        Assert.NotEqual(boxes, hangul); // and not the missing-glyph box in every place
+    }
+
+    [Fact]
+    public void Arrow_has_a_head_at_its_end()
+    {
+        // 600 × 300, thick: the line is 4.8 px, the head 19.2 long and 14.4 wide, its tip at (540, 150).
+        using var picture = Filled(600, 300, SKColors.White);
+        using var arrow = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Arrow, "#FF3B30", StrokeLevel.Thick, [(.1, .5), (.9, .5)])));
+        using var line = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Line, "#FF3B30", StrokeLevel.Thick, [(.1, .5), (.9, .5)])));
+
+        Assert.True(IsReddish(arrow.GetPixel(300, 150)));
+        // 14 px behind the tip the head is 10.5 px wide: red 4 px off the middle, where the line alone is not.
+        Assert.True(IsReddish(arrow.GetPixel(526, 154)));
+        Assert.True(IsReddish(arrow.GetPixel(526, 145)));
+        Assert.False(IsReddish(arrow.GetPixel(400, 154))); // along the stem the line is only 4.8 px
+        Assert.False(IsReddish(arrow.GetPixel(515, 154))); // the head has not begun
+        Assert.False(IsReddish(arrow.GetPixel(545, 150))); // and does not go past its tip
+        Assert.False(IsReddish(line.GetPixel(526, 154))); // a plain line has no head
+        Assert.True(IsReddish(line.GetPixel(526, 150)));
+    }
+
+    [Fact]
+    public void Number_sticker_uses_black_digits_on_yellow()
+    {
+        // 600 × 600, thick: a sticker of 0.09 × 600 = 54 px (radius 27) around (300, 300).
+        using var picture = Filled(600, 600, SKColors.White);
+        using var yellow = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Number, "#FFCC00", StrokeLevel.Thick, [(.5, .5)], number: 8)));
+        using var red = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Number, "#FF3B30", StrokeLevel.Thick, [(.5, .5)], number: 8)));
+
+        AssertNear(new SKColor(0xFF, 0xCC, 0x00), yellow.GetPixel(300 - 20, 300)); // the disc, off the digit
+        AssertNear(new SKColor(0xFF, 0x3B, 0x30), red.GetPixel(300 - 20, 300));
+        // Inside the disc: yellow has dark ink and no white; red has white ink and no dark.
+        Assert.True(Count(yellow, 300, 300, 24, c => c.Red < 100 && c.Green < 100 && c.Blue < 100) > 30);
+        Assert.Equal(0, Count(yellow, 300, 300, 24, c => c.Red > 235 && c.Green > 235 && c.Blue > 235));
+        Assert.True(Count(red, 300, 300, 24, c => c.Red > 235 && c.Green > 235 && c.Blue > 235) > 30);
+        Assert.Equal(0, Count(red, 300, 300, 24, c => c.Green < 30 && c.Blue < 30));
+    }
+
+    [Fact]
+    public void Highlighter_overlap_inside_one_stroke_does_not_darken()
+    {
+        // A cross made of one stroke: the middle is drawn twice but must look like the arms.
+        using var picture = Filled(600, 600, SKColors.White);
+        var cross = Note(AnnotationKind.Highlighter, "#FF3B30", StrokeLevel.Normal, [(.2, .5), (.8, .5), (.5, .2), (.5, .8)]);
+        using var one = ImageEditRenderer.Render(picture, Drawn(cross));
+        var overlap = Note(AnnotationKind.Highlighter, "#FF3B30", StrokeLevel.Normal, [(.2, .5), (.8, .5)]);
+        using var two = ImageEditRenderer.Render(picture, Drawn(overlap, overlap.Clone()));
+
+        // 40 % of red over white: (255, 255 - 0.4 × 196, 255 - 0.4 × 207) ≈ (255, 177, 172).
+        var arm = one.GetPixel(200, 300);
+        AssertNear(new SKColor(255, 177, 172), arm);
+        Assert.Equal(arm, one.GetPixel(300, 300)); // where the stroke crosses itself
+        Assert.Equal(arm, one.GetPixel(300, 250)); // and on the arm that comes back over it
+        // Two strokes on top of each other are two layers, and do darken: that is what the single layer avoids.
+        Assert.True(two.GetPixel(200, 300).Green < arm.Green - 30);
+    }
+
+    [Fact]
+    public void Highlighter_is_three_times_as_thick_as_a_pen()
+    {
+        // Normal is 0.008 × 1000 = 8 px, so 24 px for the highlighter, aligned to whole pixels around the middle.
+        using var picture = Filled(1000, 1000, SKColors.White);
+        using var pen = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Pen, "#000000", StrokeLevel.Normal, [(.2, .5), (.8, .5)])));
+        using var marker = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Highlighter, "#000000", StrokeLevel.Normal, [(.2, .5), (.8, .5)])));
+
+        Assert.Equal(8, Column(pen, 500).Count(c => !IsWhite(c)));
+        Assert.Equal(24, Column(marker, 500).Count(c => !IsWhite(c)));
+    }
+
+    [Theory]
+    [InlineData(StrokeLevel.Thin, 4, 50)]
+    [InlineData(StrokeLevel.Normal, 8, 65)]
+    [InlineData(StrokeLevel.Thick, 16, 90)]
+    public void Sizes_follow_the_stroke_level(StrokeLevel level, int line, int sticker)
+    {
+        // On a 1000 × 1000 picture the fractions are whole pixels: 0.004, 0.008 and 0.016 for lines, 0.05, 0.065 and 0.09 for stickers.
+        using var picture = Filled(1000, 1000, SKColors.White);
+        using var pen = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Pen, "#000000", level, [(.2, .5), (.8, .5)])));
+        using var number = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Number, "#FFCC00", level, [(.5, .5)], number: 1)));
+
+        Assert.Equal(line, Column(pen, 500).Count(c => !IsWhite(c)));
+        Assert.InRange(Column(number, 500).Count(c => !IsWhite(c)), sticker - 1, sticker + 1);
+    }
+
+    [Fact]
+    public void Text_follows_the_stroke_level_and_lines_are_one_and_a_quarter_sizes_apart()
+    {
+        using var picture = Filled(1000, 1000, SKColors.White);
+        SKRectI Ink(AnnotationKind kind, StrokeLevel level, string text)
+        {
+            using var result = ImageEditRenderer.Render(picture, Drawn(Note(kind, "#000000", level, [(.1, .1)], text: text)));
+            return Bounds(result);
+        }
+
+        var thin = Ink(AnnotationKind.Text, StrokeLevel.Thin, "가");
+        var normal = Ink(AnnotationKind.Text, StrokeLevel.Normal, "가");
+        var thick = Ink(AnnotationKind.Text, StrokeLevel.Thick, "가");
+        Assert.True(thin.Height < normal.Height && normal.Height < thick.Height, $"{thin.Height} {normal.Height} {thick.Height}");
+        // A syllable is about as tall as its font size (45 px at Normal), a little less.
+        Assert.InRange(normal.Height, 30, 45);
+
+        var two = Ink(AnnotationKind.Text, StrokeLevel.Normal, "가\n가");
+        Assert.InRange(two.Height - normal.Height, 45 * 1.25 - 1.5, 45 * 1.25 + 1.5); // the second line is 56.25 px lower
+        Assert.Equal(normal.Top, two.Top);
+        Assert.Equal(normal.Left, two.Left);
+    }
+
+    [Fact]
+    public void A_tap_with_the_pen_leaves_a_dot()
+    {
+        using var picture = Filled(600, 600, SKColors.White);
+        using var result = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Pen, "#000000", StrokeLevel.Thick, [(.5, .5)])));
+
+        Assert.False(IsWhite(result.GetPixel(300, 300)));
+        Assert.True(IsWhite(result.GetPixel(300, 290)));
+    }
+
+    [Fact]
+    public void Rectangle_and_ellipse_are_outlines_only()
+    {
+        using var picture = Filled(600, 600, SKColors.White);
+        using var rectangle = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Rectangle, "#000000", StrokeLevel.Thick, [(.8, .8), (.2, .2)])));
+        using var ellipse = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Ellipse, "#000000", StrokeLevel.Thick, [(.2, .2), (.8, .8)])));
+
+        Assert.False(IsWhite(rectangle.GetPixel(300, 120))); // corners may come in any order: the top edge
+        Assert.False(IsWhite(rectangle.GetPixel(120, 300)));
+        Assert.True(IsWhite(rectangle.GetPixel(300, 300))); // inside is the picture
+        Assert.False(IsWhite(ellipse.GetPixel(300, 120)));
+        Assert.False(IsWhite(ellipse.GetPixel(480, 300)));
+        Assert.True(IsWhite(ellipse.GetPixel(300, 300)));
+        Assert.True(IsWhite(ellipse.GetPixel(125, 125))); // the box's corner is outside the ellipse
+    }
+
+    [Fact]
+    public void A_colour_that_cannot_be_read_draws_red()
+    {
+        using var picture = Filled(600, 300, SKColors.White);
+        using var result = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Pen, "not a colour", StrokeLevel.Thick, [(.2, .5), (.8, .5)])));
+
+        AssertNear(new SKColor(0xFF, 0x3B, 0x30), result.GetPixel(300, 150));
+    }
+
+    [Fact]
+    public void Default_colours_draw_as_themselves()
+    {
+        Assert.Equal("#FF3B30 #FF9500 #FFCC00 #34C759 #007AFF #AF52DE #000000 #FFFFFF", string.Join(' ', ImageEditRenderer.AnnotationColors));
+        using var picture = Filled(400, 400, SKColors.Gray);
+        foreach (var color in ImageEditRenderer.AnnotationColors)
+        {
+            // A sticker of 0.09 × 400 = 36 px: its disc, left of the digit, is the colour.
+            using var result = ImageEditRenderer.Render(picture, Drawn(Note(AnnotationKind.Number, color, StrokeLevel.Thick, [(.5, .5)], number: 1)));
+            AssertNear(SKColor.Parse(color), result.GetPixel(200 - 13, 200));
+        }
+    }
+
+    [Fact]
+    public async Task Annotation_on_a_turned_phone_photo_lands_where_drawn()
+    {
+        // Stored 400 × 200 with orientation 6: shown 200 × 400 with the red square at the top right (x 100-200, y 0-100).
+        // A thick sticker is 0.09 × 200 = 18 px: blue around (50, 60), the visible upper left.
+        var sticker = Note(AnnotationKind.Number, "#007AFF", StrokeLevel.Thick, [(.25, .15)], number: 1);
+
+        using var r = await RunAsync(fx.WritePhone(scale: 10), Edited("annotate", Drawn(sticker)));
+
+        Assert.Equal((200u, 400u), (r.Width, r.Height));
+        bool IsBlue(int x, int y) => Rgba(r, x, y) is var (red, _, blue, _) && blue > 200 && red < 70;
+        Assert.True(IsBlue(44, 60));
+        Assert.True(IsBlue(56, 60));
+        Assert.False(IsBlue(170, 100)); // where it would be if it were drawn on the picture before it is turned
+        Assert.True(IsRed(r, 150, 50)); // the red square is still there
+    }
+
+    private static ImageEdit Drawn(params Annotation[] notes) => new() { Annotations = [.. notes] };
+
+    /// <summary>One drawing; <paramref name="points"/> are fractions of the picture as it is shown.</summary>
+    private static Annotation Note(AnnotationKind kind, string color, StrokeLevel width, (double X, double Y)[] points,
+        string? text = null, int number = 0) =>
+        new() { Kind = kind, Color = color, Width = width, Points = [.. points.Select(p => new EditPoint { X = p.X, Y = p.Y })], Text = text, Number = number };
+
+    private static bool IsWhite(SKColor c) => c.Red > 250 && c.Green > 250 && c.Blue > 250;
+
+    private static bool IsReddish(SKColor c) => c.Red > 200 && c.Green < 80 && c.Blue < 80;
+
+    private static SKColor[] Region(SKBitmap bitmap, int left, int top, int width, int height) =>
+        [.. Enumerable.Range(0, width * height).Select(i => bitmap.GetPixel(left + i % width, top + i / width))];
+
+    private static SKColor[] Column(SKBitmap bitmap, int x) => Region(bitmap, x, 0, 1, bitmap.Height);
+
+    /// <summary>How many pixels in the disc of <paramref name="radius"/> around (<paramref name="cx"/>, <paramref name="cy"/>) satisfy <paramref name="match"/>.</summary>
+    private static int Count(SKBitmap bitmap, int cx, int cy, int radius, Func<SKColor, bool> match)
+    {
+        var count = 0;
+        for (var y = cy - radius; y <= cy + radius; y++)
+        {
+            for (var x = cx - radius; x <= cx + radius; x++)
+            {
+                if ((x - cx) * (x - cx) + (y - cy) * (y - cy) <= radius * radius && match(bitmap.GetPixel(x, y)))
+                    count++;
+            }
+        }
+        return count;
+    }
+
+    /// <summary>The smallest box around everything that is not white.</summary>
+    private static SKRectI Bounds(SKBitmap bitmap)
+    {
+        var box = SKRectI.Empty;
+        for (var y = 0; y < bitmap.Height; y++)
+        {
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                if (!IsWhite(bitmap.GetPixel(x, y)))
+                    box = box.IsEmpty ? new SKRectI(x, y, x + 1, y + 1) : SKRectI.Union(box, new SKRectI(x, y, x + 1, y + 1));
+            }
+        }
+        return box;
     }
 
     private static SKImageInfo Info(int width, int height) => new(width, height, SKColorType.Rgba8888, SKAlphaType.Unpremul);
