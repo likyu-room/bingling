@@ -23,7 +23,7 @@ public sealed class EngineInstallerTests : IDisposable
     public void A_separate_data_folder_keeps_its_own_engines()
     {
         Assert.Equal(Path.Combine(_root, "engines"), EngineEnvironment.DefaultDownloadRoot(_root));
-        Assert.Equal(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FileePlus", "engines"),
+        Assert.Equal(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bingling", "engines"),
             EngineEnvironment.DefaultDownloadRoot(null));
     }
 

@@ -19,7 +19,7 @@ public class DataDirectoryTests
 
             Environment.SetEnvironmentVariable(UserDataStore.DirectoryVariable, null);
             Assert.Null(UserDataStore.OverrideDirectory);
-            Assert.Equal(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "FileePlus"),
+            Assert.Equal(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Bingling"),
                 UserDataStore.DefaultDirectory);
         }
         finally

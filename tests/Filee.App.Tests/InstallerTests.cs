@@ -89,9 +89,9 @@ public class InstallerTests
         var marker = typeof(EngineInstaller).GetField("MarkerName", BindingFlags.NonPublic | BindingFlags.Static)?.GetRawConstantValue();
         Assert.Contains($"EngineMarker = '{marker}';", Script);
         Assert.Equal(
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FileePlus", "engines"),
+            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Bingling", "engines"),
             EngineEnvironment.DownloadRoot);
-        Assert.Contains(@"ExpandConstant('{localappdata}\FileePlus\engines\')", Script);
+        Assert.Contains(@"ExpandConstant('{localappdata}\Bingling\engines\')", Script);
     }
 
     [Fact]
@@ -136,8 +136,8 @@ public class InstallerTests
     [Fact]
     public void Update_over_1_1_0_keeps_the_settings_folder_and_the_install_id()
     {
-        // Same id: Setup updates the installed copy in place. Same folder name: settings, engines and the lock carry over.
-        Assert.Equal("FileePlus", AppIdentity.Folder);
+        // Same id: Setup updates the installed copy in place. The settings and engines move to the new folders.
+        Assert.Equal("Bingling", AppIdentity.Folder);
         Assert.Contains("#define AppGuid \"A10409B5-6A21-4C67-9A0C-84B49B4629AF\"", Script);
         Assert.Equal("Bingling", AppIdentity.Name);
         Assert.Equal("Bingling", AppIdentity.FilePrefix);

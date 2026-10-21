@@ -23,9 +23,12 @@ internal sealed class CliHost : IAsyncDisposable
     public JobQueue Queue { get; }
     public ILocalizer Texts { get; } = new EnglishTexts();
 
-    /// <param name="dataDirectory">Settings folder; the app's (%APPDATA%\FileePlus) when null.</param>
+    /// <param name="dataDirectory">Settings folder; the app's (%APPDATA%\Bingling) when null.</param>
     public static CliHost Create(string? dataDirectory = null)
     {
+        // Run before the app ever started, the command line moves the settings of Filee Plus over just like the app.
+        if (dataDirectory is null)
+            LegacyDataMigration.RunForCurrentUser();
         var store = new UserDataStore(dataDirectory ?? UserDataStore.DefaultDirectory);
         store.Load();
         EngineEnvironment.OwnCopies = new Dictionary<string, string>(store.Settings.EngineOwnCopies);

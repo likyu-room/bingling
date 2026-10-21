@@ -24,11 +24,11 @@ static const IID kIidExplorerCommand = {0xa08ce4d0, 0xfa25, 0x44ab, {0xb5, 0x7c,
 static const KNOWNFOLDERID kFolderRoamingAppData = {0x3eb685db, 0x65f9, 0x4cf6, {0xa0, 0x3a, 0xe3, 0xef, 0x65, 0x72, 0x9f, 0x3d}};
 
 #define DEFAULT_TITLE L"Convert with Bingling"
-// Written by the app into its data folder (%APPDATA%\FileePlus, which survives app updates) while the Explorer menu
+// Written by the app into its data folder (%APPDATA%\Bingling, which survives app updates) while the Explorer menu
 // setting is on; first line = the title in the UI language. No file = the entry is hidden, so the setting can switch
 // the entry off and on again without re-registering the package (which needs administrator rights).
 // Must match ExplorerMenuPackage.TitleFileName.
-#define TITLE_FILE L"FileePlus\\explorer-menu.txt"
+#define TITLE_FILE L"Bingling\\explorer-menu.txt"
 #define APP_EXE L"Filee.exe"
 #define LIST_PREFIX L"Filee-convert-"       // CommandLine.ListFilePrefix in the app
 // CreateProcess accepts at most 32767 characters; longer selections go through a list file.

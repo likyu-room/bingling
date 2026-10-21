@@ -1,6 +1,7 @@
 // Entry point. Order matters:
-//  0. The log and the handlers for unhandled exceptions, so even a start that fails leaves a line; then one line
-//     describing this launch (version, path, rights, OS).
+//  0. The data folders of Filee Plus (1.1.0) are renamed to Bingling's (LegacyDataMigration), before anything creates
+//     the new ones. Then the log and the handlers for unhandled exceptions, so even a start that fails leaves a line;
+//     then one line describing this launch (version, path, rights, OS).
 //  1. Single instance: a second launch (e.g. from the Explorer context menu) forwards its arguments
 //     to the running instance and exits. When it can't (the running Filee is elevated, or hung) it says so.
 //  2. Installer commands (--quit, --uninstall-cleanup) run without any window.
@@ -45,7 +46,11 @@ internal static class Program
     public static int Main(string[] args)
     {
         Options = CommandLine.Parse(args);
+        // Before the log creates the new data folder: settings and engines of Filee Plus (1.1.0) move over first.
+        var migration = LegacyDataMigration.RunForCurrentUser();
         Log = StartupDiagnostics.CreateEarlyLogger(Path.Combine(UserDataStore.DefaultDirectory, "logs"));
+        foreach (var line in migration)
+            Log.LogInformation("Filee Plus data: {Result}", line);
         StartupDiagnostics.LogUnhandledExceptions(Log);
         Elevation = Filee.Platform.Windows.Elevation.Probe();
         var startup = StartupDiagnostics.Describe(UpdateService.CurrentVersion, Environment.ProcessPath,

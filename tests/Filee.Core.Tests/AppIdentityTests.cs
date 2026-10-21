@@ -1,4 +1,5 @@
-// The display name changed with the rename to Bingling; everything the settings of 1.1.0 hang on did not.
+// Bingling's names: what Windows shows and what its folders, lock and registry entries are called. The names of 1.1.0
+// (Filee Plus) are only kept to move its data over and clean up after it; the original Filee's are never used.
 
 namespace Filee.Core.Tests;
 
@@ -13,9 +14,12 @@ public class AppIdentityTests
     }
 
     [Fact]
-    public void The_folder_name_stays_so_an_update_finds_the_settings_engines_and_lock_of_1_1_0()
+    public void Folders_are_named_Bingling_and_differ_from_Filee_Plus_and_the_original_Filee()
     {
-        Assert.Equal("FileePlus", AppIdentity.Folder);
+        Assert.Equal("Bingling", AppIdentity.Folder);
+        Assert.Equal("FileePlus", AppIdentity.LegacyFolder);
+        Assert.NotEqual("Filee", AppIdentity.Folder);
+        Assert.NotEqual("Filee", AppIdentity.LegacyFolder);
         Assert.DoesNotContain(' ', AppIdentity.Folder);
     }
 }

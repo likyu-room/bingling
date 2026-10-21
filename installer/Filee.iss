@@ -7,8 +7,8 @@
 ;    the signed-in user without elevation: Windows blocks drag and drop from Explorer into elevated windows;
 ;  - closes a running Filee first ("Filee.exe --quit") and moves FileeExplorerMenu.dll aside when Explorer has it
 ;    loaded, so updates need no restart;
-;  - leaves the original Filee alone: settings are in %APPDATA%\FileePlus, downloaded engines in
-;    %LocalAppData%\FileePlus\engines;
+;  - leaves the original Filee alone: settings are in %APPDATA%\Bingling, downloaded engines in
+;    %LocalAppData%\Bingling\engines;
 ;  - on Windows 11 registers the top-level File Explorer menu entry (an unsigned sparse package, which needs the
 ;    administrator rights Setup already has);
 ;  - offers the optional conversion engines; Filee downloads the chosen ones (verified) when Setup starts it;
@@ -127,8 +127,8 @@ Filename: "{app}\{#AppExe}"; Parameters: "--uninstall-cleanup"; Flags: runhidden
 [Code]
 const
   // ExplorerMenuPackage in src/Filee.Platform.Windows (InstallerScriptTests keeps these in sync).
-  ExplorerMenuName = 'FileePlus.ExplorerMenu';
-  ExplorerMenuFamily = 'FileePlus.ExplorerMenu_c73vxh346rtay';
+  ExplorerMenuName = 'Bingling.ExplorerMenu';
+  ExplorerMenuFamily = 'Bingling.ExplorerMenu_c73vxh346rtay';
   ExplorerMenuDll = 'FileeExplorerMenu.dll';
   ExplorerMenuPackageFile = 'FileeExplorerMenu.msix';
   ExplorerMenuMinimumBuild = 22000;
@@ -342,7 +342,7 @@ begin
       Folder := Copy(Rest, 1, Comma - 1);
       Rest := Copy(Rest, Comma + 1, MaxInt);
     end;
-    if not FileExists(ExpandConstant('{localappdata}\FileePlus\engines\') + Folder + '\' + EngineMarker) then
+    if not FileExists(ExpandConstant('{localappdata}\Bingling\engines\') + Folder + '\' + EngineMarker) then
     begin
       Result := False;
       Exit;

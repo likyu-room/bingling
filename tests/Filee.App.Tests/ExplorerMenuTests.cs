@@ -88,7 +88,7 @@ public class ExplorerMenuTests
     [Fact]
     public void The_package_and_class_id_differ_from_the_original_Filee_so_both_can_be_installed()
     {
-        Assert.Equal("FileePlus.ExplorerMenu", ExplorerMenuPackage.PackageName);
+        Assert.Equal("Bingling.ExplorerMenu", ExplorerMenuPackage.PackageName);
         Assert.StartsWith(ExplorerMenuPackage.PackageName + "_", ExplorerMenuPackage.FamilyName);
         Assert.NotEqual(new Guid("6DB0E670-807F-4D22-BE3F-20492D0F4AB1"), ExplorerMenuPackage.ClassId);
         Assert.Equal(new Guid("27B50CD9-598E-4AB1-8BBD-AC36085FB4DE"), ExplorerMenuPackage.ClassId);
@@ -149,7 +149,7 @@ public class ExplorerMenuTests
         Assert.DoesNotContain("\"", script);
 
         var remove = ExplorerMenuRegistration.BuildRemoveScript(@"C:\Temp\err.txt");
-        Assert.Contains("Get-AppxPackage -Name 'FileePlus.ExplorerMenu' | Remove-AppxPackage", remove);
+        Assert.Contains("Get-AppxPackage -Name 'Bingling.ExplorerMenu' | Remove-AppxPackage", remove);
     }
 
     [Fact]

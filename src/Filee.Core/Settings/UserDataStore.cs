@@ -37,7 +37,7 @@ public sealed class UserDataStore
     public static string? OverrideDirectory => DirectoryFrom(Environment.GetEnvironmentVariable(DirectoryVariable));
 
     /// <summary>
-    /// Default data directory: %APPDATA%\FileePlus on Windows, ~/Library/Application Support/FileePlus on macOS, or the
+    /// Default data directory: %APPDATA%\Bingling on Windows, ~/Library/Application Support/Bingling on macOS, or the
     /// folder in <see cref="DirectoryVariable"/>.
     /// </summary>
     public static string DefaultDirectory =>

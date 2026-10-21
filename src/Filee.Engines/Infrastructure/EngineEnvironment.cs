@@ -19,7 +19,7 @@ public sealed class EngineEnvironment(string dataDirectory)
 
     /// <summary>
     /// Per-user folder for engines downloaded on demand (see <see cref="EngineInstaller"/>):
-    /// %LOCALAPPDATA%\FileePlus\engines. It is outside the app folder, so app updates keep it, and inside Filee's
+    /// %LOCALAPPDATA%\Bingling\engines. It is outside the app folder, so app updates keep it, and inside Filee's
     /// install root, so uninstalling removes it. With FILEE_DATA_DIR set (<see cref="UserDataStore.DirectoryVariable"/>)
     /// it is the engines folder in there.
     /// </summary>
