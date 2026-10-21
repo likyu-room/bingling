@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Avalonia;
 using Avalonia.Media;
+using CommunityToolkit.Mvvm.Input;
 using Filee.Core.Formats;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
@@ -59,6 +60,12 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
                 BackgroundKind.Solid, s.Hex)),
         ];
         Aspects = AspectIds.Select(id => new Choice<string>(id, id == "auto" ? loc["tool.background.auto"] : id)).ToList();
+        // The picture comes and goes (it is read on a worker, and again for each file): "Photo color" follows it.
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(PreviewImage))
+                UsePictureColorCommand.NotifyCanExecuteChanged();
+        };
         // A copy: the settings hand out the object they keep, which only Save may change.
         _edit = Normalised(store.Settings.ImageTools.Background);
         if (IsCustomColor)
@@ -121,6 +128,23 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
                 Change(e => (e.Kind, e.Value, e.ImagePath) = (BackgroundKind.Solid, hex, null));
         }
     }
+
+    /// <summary>
+    /// "Photo color": the backdrop becomes a pastel of the file shown, its average colour mixed half and half with white. It
+    /// goes the way of a typed colour (the box shows it) and is one undo step. Off until the picture is read.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanUsePictureColor))]
+    private void UsePictureColor()
+    {
+        if (PreviewImage is not { } picture)
+            return;
+        var hex = PastelOf(picture);
+        // Not through CustomColorHex: the box may still show this very colour from before a chip was picked, and a text that
+        // does not change takes no step.
+        Change(e => (e.Kind, e.Value, e.ImagePath) = (BackgroundKind.Solid, hex, null));
+    }
+
+    private bool CanUsePictureColor => PreviewImage is not null;
 
     /// <summary>The typed colour as a chip's paint; nothing while it is not a whole code.</summary>
     public IBrush CustomColorBrush => HexColor(_hex) is { } hex ? new SolidColorBrush(Color.Parse(hex)) : Brushes.Transparent;
@@ -301,6 +325,7 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
             _hex = _edit.Value;
             OnPropertyChanged(nameof(CustomColorHex));
             OnPropertyChanged(nameof(CustomColorBrush));
+            OnPropertyChanged(nameof(HasCustomColor)); // the colour beside the box shows with a whole code
         }
         _previewEdit = BuildPreview();
         foreach (var name in new[]
@@ -369,6 +394,28 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
         {
             // Left in the temp folder, which the system clears.
         }
+    }
+
+    /// <summary>
+    /// The average colour of what can be seen of <paramref name="picture"/> (a see-through part counts for nothing), mixed
+    /// half and half with white, as <c>#RRGGBB</c>. White for a picture with nothing to see.
+    /// </summary>
+    internal static string PastelOf(SKImage picture)
+    {
+        // Shrunk to 32 × 32 by the sampler, which averages the pixels it folds together; the rest is a sum over 1024 pixels.
+        using var small = new SKBitmap(new SKImageInfo(32, 32, SKColorType.Rgba8888, SKAlphaType.Premul));
+        using var pixels = small.PeekPixels();
+        if (!picture.ScalePixels(pixels, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear)))
+            return "#FFFFFF";
+        // Premultiplied pixels: a clear pixel adds nothing to the colours, as it adds nothing to the alpha they are divided by.
+        long red = 0, green = 0, blue = 0, alpha = 0;
+        var bytes = pixels.GetPixelSpan();
+        for (var i = 0; i + 3 < bytes.Length; i += 4)
+            (red, green, blue, alpha) = (red + bytes[i], green + bytes[i + 1], blue + bytes[i + 2], alpha + bytes[i + 3]);
+        if (alpha == 0)
+            return "#FFFFFF";
+        static int Pastel(long sum, long alpha) => (int)Math.Round((Math.Min(255.0, sum * 255.0 / alpha) + 255) / 2, MidpointRounding.AwayFromZero);
+        return $"#{Pastel(red, alpha):X2}{Pastel(green, alpha):X2}{Pastel(blue, alpha):X2}";
     }
 
     /// <summary><paramref name="text"/> as <c>#RRGGBB</c> in capitals when it is six hex digits (the <c>#</c> optional); otherwise null.</summary>

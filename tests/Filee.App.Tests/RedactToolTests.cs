@@ -569,6 +569,51 @@ public class RedactToolTests
         vm.Dispose();
     }
 
+    /// <summary>
+    /// The window in the other looks and modes (the light classic look is the screenshots above): the mode chips, the delete
+    /// button (on, with a box picked), the count and the note on dark and on peach glass, with two boxes drawn.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData(ThemeStyle.Classic, ThemeMode.Dark)]
+    [InlineData(ThemeStyle.PeachGlass, ThemeMode.Light)]
+    [InlineData(ThemeStyle.PeachGlass, ThemeMode.Dark)]
+    public void The_window_looks_right_in_every_look_and_mode(ThemeStyle style, ThemeMode mode)
+    {
+        Loc("ko");
+        var store = AppHost.Get<UserDataStore>();
+        var themes = AppHost.Get<ThemeService>();
+        var before = store.Settings.Theme.Clone();
+        ImageToolWindow? window = null;
+        RedactToolViewModel? vm = null;
+        try
+        {
+            // In the store: every Loc() of the tests applies the stored look again.
+            store.Settings.Theme.Style = style;
+            store.Settings.Theme.Mode = mode;
+            themes.Apply(store.Settings.Theme, "ko");
+            (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Png(1000, 700));
+            var size = new Size(1000, 700);
+            Drag(window, At(window, size, .1, .15), At(window, size, .4, .5));
+            Drag(window, At(window, size, .5, .4), At(window, size, .85, .8)); // the picked one
+            Assert.Equal(2, vm.Redact.Boxes.Count);
+            Assert.True(vm.DeleteSelectionCommand.CanExecute(null));
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+
+            using (var frame = window.CaptureRenderedFrame()!)
+                Assert.Equal(Avalonia.Media.Colors.Black, PixelAt(frame, At(window, size, .1, .15) + new Point(8, 8))); // black in every look
+            Screenshot(window, $"tool-redact-{style}-{mode}.png".ToLowerInvariant());
+        }
+        finally
+        {
+            window?.Close();
+            vm?.Dispose();
+            store.Settings.Theme.Style = before.Style;
+            store.Settings.Theme.Mode = before.Mode;
+            themes.Apply(store.Settings.Theme, "ko");
+        }
+    }
+
     private static void Screenshot(Window window, string name)
     {
         using var frame = window.CaptureRenderedFrame()!;

@@ -372,6 +372,224 @@ public class BackgroundToolTests
         Assert.Equal("peach", vm.SelectedSwatch!.Id);
     }
 
+    [AvaloniaFact]
+    public void The_photo_colour_is_the_average_of_the_picture_mixed_half_and_half_with_white_as_one_undo_step()
+    {
+        // Steel blue is (70, 130, 180); half of it and half of white is (162.5, 192.5, 217.5), rounded up: A3 C1 DA.
+        var vm = Background([ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.SteelBlue)], TestStore(), Loc("ko"));
+        Assert.False(vm.UsePictureColorCommand.CanExecute(null)); // the picture is still being read: nothing to take a colour from
+        WaitForPreview(vm);
+        Assert.True(vm.UsePictureColorCommand.CanExecute(null));
+        Assert.Equal("peach", vm.SelectedSwatch!.Id);
+        var changed = new List<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.UsePictureColorCommand.Execute(null);
+
+        Assert.True(vm.IsCustomColor);
+        Assert.Equal("#A3C1DA", vm.CustomColorHex); // in the box, as a typed colour is
+        Assert.True(vm.HasCustomColor);
+        // The panel is told, or the box would hold the code and the colour beside it would stay out.
+        Assert.Contains(nameof(BackgroundToolViewModel.HasCustomColor), changed);
+        Assert.Contains(nameof(BackgroundToolViewModel.CustomColorBrush), changed);
+        Assert.Equal((BackgroundKind.Solid, "#A3C1DA"), (vm.PreviewEdit.Background!.Kind, vm.PreviewEdit.Background.Value)); // and it is the backdrop
+        vm.UndoCommand.Execute(null); // one step
+        Assert.Equal("peach", vm.SelectedSwatch!.Id);
+        vm.RedoCommand.Execute(null);
+        Assert.Equal("#A3C1DA", vm.PreviewEdit.Background.Value);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_photo_colour_counts_only_what_can_be_seen_of_a_see_through_picture()
+    {
+        // The left half is see-through (black, as far as its pixels say): it must not darken the red of the right half.
+        var path = Path.Combine(Path.GetDirectoryName(ImageToolWindowTests.TestImages.Png(10, 10))!, "half.png");
+        using (var image = new MagickImage(MagickColors.Transparent, 400, 200))
+        {
+            image.Composite(new MagickImage(MagickColors.Red, 200, 200), 200, 0, CompositeOperator.Over);
+            image.Write(path, MagickFormat.Png32);
+        }
+        var vm = Background([path], TestStore(), Loc("ko"));
+        WaitForPreview(vm);
+
+        vm.UsePictureColorCommand.Execute(null);
+
+        // Red and white, half each: FF 80 80. The sampler's rounding may put a channel one off.
+        var colour = Avalonia.Media.Color.Parse(vm.CustomColorHex);
+        Assert.InRange(colour.R, 0xFE, 0xFF);
+        Assert.InRange(colour.G, 0x7F, 0x81);
+        Assert.InRange(colour.B, 0x7F, 0x81);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_photo_colour_averages_the_whole_picture_and_not_a_few_pixels_of_it()
+    {
+        // Black and white columns, one pixel each, over a picture 64 times wider than the 32 the colour is taken from: any
+        // pixel picked alone is black or white, and only an average is grey (half of grey and half of white: BF).
+        var path = Path.Combine(Path.GetDirectoryName(ImageToolWindowTests.TestImages.Png(10, 10))!, "stripes.png");
+        var rgba = new byte[2048 * 64 * 4];
+        for (var pixel = 0; pixel < 2048 * 64; pixel++)
+        {
+            var value = (byte)(pixel % 2 == 0 ? 255 : 0); // 2048 is even: every row starts white
+            (rgba[pixel * 4], rgba[pixel * 4 + 1], rgba[pixel * 4 + 2], rgba[pixel * 4 + 3]) = (value, value, value, (byte)255);
+        }
+        using (var image = new MagickImage(MagickColors.Black, 2048, 64))
+        {
+            image.ImportPixels(rgba, new PixelImportSettings(2048, 64, StorageType.Char, "RGBA"));
+            image.Write(path, MagickFormat.Png);
+        }
+        var vm = Background([path], TestStore(), Loc("ko"));
+        WaitForPreview(vm);
+
+        vm.UsePictureColorCommand.Execute(null);
+
+        var colour = Avalonia.Media.Color.Parse(vm.CustomColorHex);
+        Assert.InRange(colour.R, 0xBB, 0xC3);
+        Assert.Equal((colour.R, colour.R), (colour.G, colour.B)); // grey
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_photo_colour_works_when_the_box_still_shows_the_same_colour_from_before()
+    {
+        // The box keeps its text while a chip is the backdrop, so the colour is "the same" as the box and must still be taken.
+        var vm = Background([ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.SteelBlue)], TestStore(), Loc("ko"));
+        WaitForPreview(vm);
+        vm.CustomColorHex = "#A3C1DA";
+        vm.SelectedSwatch = vm.Swatches.Single(s => s.Id == "solid-black");
+        Assert.False(vm.IsCustomColor);
+        Assert.Equal("#A3C1DA", vm.CustomColorHex);
+
+        vm.UsePictureColorCommand.Execute(null);
+
+        Assert.True(vm.IsCustomColor);
+        Assert.Equal("#A3C1DA", vm.PreviewEdit.Background!.Value);
+        vm.UndoCommand.Execute(null);
+        Assert.Equal("solid-black", vm.SelectedSwatch!.Id);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_photo_colour_is_that_of_the_file_shown_and_replaces_a_half_typed_code()
+    {
+        var vm = Background(
+            [ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.Red), ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.Blue)],
+            TestStore(), Loc("ko"));
+        WaitForPreview(vm);
+        vm.CustomColorHex = "#12"; // half a code, typed and left
+
+        vm.UsePictureColorCommand.Execute(null);
+        Assert.Equal("#FF8080", vm.CustomColorHex);
+
+        vm.NextCommand.Execute(null);
+        Assert.False(vm.UsePictureColorCommand.CanExecute(null)); // the second picture is being read
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (!vm.UsePictureColorCommand.CanExecute(null) && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+        vm.UsePictureColorCommand.Execute(null);
+        Assert.Equal("#8080FF", vm.CustomColorHex);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Photo_colour_button_takes_the_colour_and_gives_the_keys_back_to_the_picture()
+    {
+        var (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.SteelBlue));
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.UsePictureColorCommand);
+        Assert.True(button.IsEffectivelyEnabled);
+        Assert.Contains(button.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "사진 색");
+        Assert.Equal("사진의 평균색을 흰색과 섞은 옅은 색으로 배경을 채워요", ToolTip.GetTip(button));
+        // The focus is in the colour box, as when its code was being typed.
+        var box = window.GetVisualDescendants().OfType<TextBox>().Single(t => Avalonia.Automation.AutomationProperties.GetName(t) == "사용자 색");
+        Assert.True(box.Focus());
+        Assert.Same(box, window.FocusManager!.GetFocusedElement());
+
+        var at = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+
+        Assert.Equal("#A3C1DA", vm.CustomColorHex);
+        Assert.Equal("#A3C1DA", box.Text);
+        // The colour is shown beside the box in the accent ring, as a typed colour is.
+        Assert.Contains(window.GetVisualDescendants().OfType<Border>(), b => b.Classes.Contains("ring") && b.Classes.Contains("selected") && b.IsEffectivelyVisible);
+        // The keys are the picture's again: ← / → go to the files, Enter saves.
+        Assert.IsType<BackgroundCanvas>(window.FocusManager.GetFocusedElement());
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Photo_colour_button_is_off_until_the_picture_is_there()
+    {
+        var vm = Background([ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.SteelBlue)], TestStore(), Loc("ko"));
+        var window = new ImageToolWindow { DataContext = vm, Width = 900, Height = 760 };
+        window.Show(); // the picture is read on another thread: until it arrives there is nothing to take a colour from
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.UsePictureColorCommand);
+        Assert.False(button.IsEffectivelyEnabled);
+
+        WaitForPreview(vm);
+        Assert.True(button.IsEffectivelyEnabled);
+        window.Close();
+        vm.Dispose();
+    }
+
+    /// <summary>
+    /// The window in the other looks and modes (the light classic look is the screenshot above): the chips, the typed colour
+    /// and its ring, the buttons and the sliders on dark and on peach glass, with the photo colour taken.
+    /// </summary>
+    [AvaloniaTheory]
+    [InlineData(ThemeStyle.Classic, ThemeMode.Dark)]
+    [InlineData(ThemeStyle.PeachGlass, ThemeMode.Light)]
+    [InlineData(ThemeStyle.PeachGlass, ThemeMode.Dark)]
+    public void The_window_looks_right_in_every_look_and_mode(ThemeStyle style, ThemeMode mode)
+    {
+        Loc("ko");
+        var store = AppHost.Get<UserDataStore>();
+        var themes = AppHost.Get<ThemeService>();
+        var before = store.Settings.Theme.Clone();
+        ImageToolWindow? window = null;
+        BackgroundToolViewModel? vm = null;
+        try
+        {
+            // In the store: every Loc() of the tests applies the stored look again.
+            store.Settings.Theme.Style = style;
+            store.Settings.Theme.Mode = mode;
+            themes.Apply(store.Settings.Theme, "ko");
+            (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.Png(1000, 700), ImageToolWindowTests.TestImages.Png(1000, 700));
+            vm.UsePictureColorCommand.Execute(null);
+            Assert.True(vm.IsCustomColor);
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Screenshot(window, $"tool-background-{style}-{mode}.png".ToLowerInvariant());
+
+            // The same with a picture of the user's as the backdrop: its name beside the buttons.
+            UseImage(vm, ImageToolWindowTests.TestImages.Png(300, 300, "a-long-backdrop-picture-name.png"));
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            Screenshot(window, $"tool-background-image-{style}-{mode}.png".ToLowerInvariant());
+        }
+        finally
+        {
+            window?.Close();
+            vm?.Dispose();
+            store.Settings.Theme.Style = before.Style;
+            store.Settings.Theme.Mode = before.Mode;
+            themes.Apply(store.Settings.Theme, "ko");
+        }
+    }
+
+    private static void Screenshot(Window window, string name)
+    {
+        using var frame = window.CaptureRenderedFrame()!;
+        using var stream = File.Create(Path.Combine(TestServices.ScreenshotDirectory, name));
+        frame.Save(stream, new PngBitmapEncoderOptions());
+    }
+
     /// <summary>Picks a picture as the panel's button does, and waits for it to be prepared.</summary>
     private static void UseImage(BackgroundToolViewModel vm, string path)
     {

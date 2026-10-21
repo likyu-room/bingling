@@ -1,6 +1,6 @@
 // The add background tool's panel: the chips and sliders are in BackgroundPanel.axaml, bound to the image tool window's view
 // model. The code here is what a binding can't say: a slider drag as one undo step (and the keys going back to the files
-// after it), and the picture picker.
+// after it), the keys going back after "Photo color", and the picture picker.
 
 using Avalonia.Controls;
 using Avalonia.Interactivity;
@@ -26,6 +26,9 @@ public partial class BackgroundPanel : UserControl
             slider.AddHandler(PointerCaptureLostEvent, (_, _) => EndPointerUse(), RoutingStrategies.Direct | RoutingStrategies.Bubble | RoutingStrategies.Tunnel,
                 handledEventsToo: true);
         }
+        // "Photo color" takes no focus of its own; the press hands it to the picture, so the keys are the picture's after it
+        // (and a colour code half typed in the box is let go of, which the new colour then replaces).
+        PictureColorButton.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     private BackgroundToolViewModel? Vm => DataContext as BackgroundToolViewModel;
@@ -37,8 +40,10 @@ public partial class BackgroundPanel : UserControl
     private void EndPointerUse()
     {
         Vm?.EndAdjust();
-        TopLevel.GetTopLevel(this)?.GetVisualDescendants().OfType<PictureView>().FirstOrDefault()?.Focus();
+        FocusPicture();
     }
+
+    private void FocusPicture() => TopLevel.GetTopLevel(this)?.GetVisualDescendants().OfType<PictureView>().FirstOrDefault()?.Focus();
 
     private async void OnPickImage(object? sender, RoutedEventArgs e)
     {

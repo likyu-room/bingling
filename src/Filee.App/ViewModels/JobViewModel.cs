@@ -1,5 +1,6 @@
 // One running / finished conversion as shown in the toast window.
 
+using System.Diagnostics;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
@@ -30,11 +31,16 @@ public sealed partial class JobViewModel : ObservableObject
     /// </summary>
     private const uint ThumbnailMaxAspect = 4;
 
+    /// <summary>How long the Copy button says "Copied".</summary>
+    private static readonly TimeSpan CopiedFor = TimeSpan.FromSeconds(1.6);
+
     private readonly ILocalizer _loc;
     private readonly IPlatformServices _platform;
     private readonly Action<JobViewModel> _dismiss;
     private readonly Action<JobViewModel>? _retry;
+    private readonly Action<string> _open;
     private int _refreshPending;
+    private int _copiedRound;
     private bool _detailsRequested;
 
     /// <summary>
@@ -43,14 +49,16 @@ public sealed partial class JobViewModel : ObservableObject
     /// </summary>
     private readonly long[] _sourceSizes;
 
+    /// <param name="open">Opens a file in the app the system has for it; null for the system's own way (tests see what was opened).</param>
     public JobViewModel(ConversionJob job, ILocalizer loc, IPlatformServices platform, Action<JobViewModel> dismiss,
-        Action<JobViewModel>? retry = null)
+        Action<JobViewModel>? retry = null, Action<string>? open = null)
     {
         Job = job;
         _loc = loc;
         _platform = platform;
         _dismiss = dismiss;
         _retry = retry;
+        _open = open ?? OpenWithSystemApp;
         _sourceSizes = [.. job.Sources.Select(SizeOf)];
         var what = job.Sources.Count == 1 ? Path.GetFileName(job.Sources[0]) : loc.Format("home.files", job.Sources.Count);
         Title = loc.Format("toast.converting", what, job.PresetDisplayName);
@@ -93,6 +101,9 @@ public sealed partial class JobViewModel : ObservableObject
     /// still image Filee can read; null otherwise and the card shows <see cref="FormatIcon"/> in a circle instead.
     /// </summary>
     [ObservableProperty] private Bitmap? _thumbnail;
+
+    /// <summary>True for a moment after the results were copied: the Copy button says "Copied" and then goes back.</summary>
+    [ObservableProperty] private bool _justCopied;
 
     /// <summary>"1.2 MB → 340.5 KB · 72% smaller" once the job is over; null when the sizes can't be told.</summary>
     [ObservableProperty]
@@ -267,6 +278,37 @@ public sealed partial class JobViewModel : ObservableObject
         var first = Job.Outputs.FirstOrDefault();
         if (first is not null)
             _platform.RevealInFileManager(first);
+    }
+
+    /// <summary>Opens the first result in the app the system has for it: the card's thumbnail is the button.</summary>
+    [RelayCommand]
+    private void OpenResult()
+    {
+        if (Job.Outputs.FirstOrDefault() is not { } first)
+            return;
+        try
+        {
+            _open(first);
+        }
+        catch (Exception)
+        {
+            // The file is gone, or no app takes it: the card stays as it is, and "Show" still leads to the folder.
+        }
+    }
+
+    private static void OpenWithSystemApp(string path) => Process.Start(new ProcessStartInfo(path) { UseShellExecute = true })?.Dispose();
+
+    /// <summary>
+    /// Makes <see cref="JustCopied"/> true for <paramref name="hold"/> (a moment by default). Copying again meanwhile gives
+    /// the new copy its own full moment: the earlier one does not cut it short. UI thread only.
+    /// </summary>
+    public async Task ShowCopiedAsync(TimeSpan? hold = null)
+    {
+        var round = ++_copiedRound;
+        JustCopied = true;
+        await Task.Delay(hold ?? CopiedFor);
+        if (round == _copiedRound)
+            JustCopied = false;
     }
 
     [RelayCommand]

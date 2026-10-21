@@ -1,8 +1,10 @@
 // The bottom-right progress cards: one card per job.
 
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input.Platform;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -348,6 +350,9 @@ public class ToastWindowTests
             Assert.True(Contrast(glyph, disc) >= 4.5, $"{style} {mode}: {glyph} on {disc} is {Contrast(glyph, disc):0.0}:1");
             Assert.Contains(toast.GetVisualDescendants().OfType<Image>(), i => ReferenceEquals(i.Source, vm.Thumbnail) && i.IsEffectivelyVisible);
             Assert.Contains(toast.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == vm.SizeChange && t.IsEffectivelyVisible);
+            // The card's buttons are in the screenshot: Copy beside Show, and the thumbnail is the one to press.
+            Assert.Contains(toast.GetVisualDescendants().OfType<Button>(), b => b.Classes.Contains("copy") && b.IsEffectivelyVisible);
+            Assert.Contains(toast.GetVisualDescendants().OfType<Button>(), b => b.Classes.Contains("thumbnail") && b.IsEffectivelyVisible);
             Save(toast, $"toast-finished-{style}-{mode}.png".ToLowerInvariant());
         }
         finally
@@ -402,13 +407,228 @@ public class ToastWindowTests
         }
     }
 
+    /// <summary>The thumbnail is a button: the hand over it, the open-in-new mark on it, "Open result" for a tip, and a press opens the first result.</summary>
+    [AvaloniaFact]
+    public async Task Pressing_the_thumbnail_opens_the_result_in_the_app_the_system_has_for_it()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var source = dir.NoisyPicture("photo.png", 600, 400);
+        var output = dir.Reencoded(source, "photo.jpg", quality: 30);
+        var other = dir.Reencoded(source, "second.jpg", quality: 50);
+        var opened = new List<string>();
+        var vm = Finished(source, [output, other], open: opened.Add);
+        await vm.LoadFinishDetailsAsync();
+        using var shown = new ShownCard(vm);
+
+        var thumbnail = shown.Toast.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("thumbnail"));
+        Assert.True(thumbnail.IsEffectivelyVisible);
+        Assert.Equal("결과 열기", ToolTip.GetTip(thumbnail));
+        Assert.Equal("결과 열기", Avalonia.Automation.AutomationProperties.GetName(thumbnail));
+        Assert.Equal(new Avalonia.Input.Cursor(Avalonia.Input.StandardCursorType.Hand).ToString(), thumbnail.Cursor?.ToString());
+        Assert.Same(vm.Thumbnail, thumbnail.GetVisualDescendants().OfType<Image>().Single().Source);
+
+        // Nothing is opened by looking, however long the pointer stays.
+        Assert.Empty(opened);
+        shown.Click(thumbnail);
+        Assert.Equal([output], opened); // the first result, not all of them
+    }
+
+    /// <summary>The mark that tells a thumbnail can be pressed is there while the pointer is on it and only then.</summary>
+    [AvaloniaFact]
+    public async Task The_thumbnail_shows_it_can_be_pressed_while_the_pointer_is_on_it()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var vm = await RunToTheEnd(dir.NoisyPicture("photo.png", 600, 400), "to-jpg");
+        using var shown = new ShownCard(vm);
+        var thumbnail = shown.Toast.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("thumbnail"));
+        var mark = thumbnail.GetVisualDescendants().OfType<Border>().Single(b => b.Classes.Contains("open-mark"));
+
+        Assert.Equal(0, mark.Opacity);
+        shown.Toast.MouseMove(shown.CentreOf(thumbnail));
+        Pump();
+        Assert.Equal(1, mark.Opacity);
+        Assert.False(mark.IsHitTestVisible); // a press goes to the button, not to the mark
+        Assert.Contains(mark.GetVisualDescendants().OfType<Avalonia.Controls.PathIcon>(), i => i.IsEffectivelyVisible);
+        shown.Save("toast-thumbnail-hover.png");
+
+        shown.Toast.MouseMove(new Avalonia.Point(2, 2)); // the corner of the window, off the card's picture
+        Pump();
+        Assert.Equal(0, mark.Opacity);
+    }
+
+    /// <summary>A result that has gone (moved, deleted) or has no app: pressing does nothing and nothing is thrown.</summary>
+    [AvaloniaFact]
+    public async Task Pressing_the_thumbnail_of_a_result_that_cannot_be_opened_does_nothing()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var source = dir.NoisyPicture("photo.png", 600, 400);
+        var output = dir.Reencoded(source, "photo.jpg", quality: 30);
+        var vm = Finished(source, [output], open: _ => throw new InvalidOperationException("no app for this"));
+        await vm.LoadFinishDetailsAsync();
+
+        vm.OpenResultCommand.Execute(null); // would throw on the UI thread if the failure were not swallowed
+
+        Assert.NotNull(vm.Thumbnail); // the card is as it was
+    }
+
+    /// <summary>Copy is a button of the picture's card: next to "Show", with its own tip, and not on a card that has no picture.</summary>
+    [AvaloniaFact]
+    public async Task The_copy_button_is_on_a_card_with_a_picture_and_not_on_one_without()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var source = dir.NoisyPicture("photo.png", 600, 400);
+        var picture = Finished(source, [dir.Reencoded(source, "photo.jpg", quality: 30)]);
+        await picture.LoadFinishDetailsAsync();
+        using (var shown = new ShownCard(picture))
+        {
+            var copy = shown.Toast.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("copy"));
+            Assert.True(copy.IsEffectivelyVisible);
+            Assert.Contains(copy.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "복사" && t.IsEffectivelyVisible);
+            Assert.DoesNotContain(copy.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "복사됨" && t.IsEffectivelyVisible);
+            Assert.Equal("결과를 복사해요. 대화창이나 문서에 붙여 넣을 수 있어요", ToolTip.GetTip(copy));
+        }
+
+        // A document: the circle with the format's icon, and nothing to copy as a picture.
+        var document = Finished(dir.Bytes("note.txt", 4096), [dir.Bytes("note.pdf", 2048)]);
+        await document.LoadFinishDetailsAsync();
+        using (var shown = new ShownCard(document))
+            Assert.False(shown.Toast.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("copy")).IsEffectivelyVisible);
+    }
+
+    /// <summary>Pressing Copy: the picture is on the clipboard, and the button says "Copied" for a moment and then goes back.</summary>
+    [AvaloniaFact]
+    public async Task Pressing_copy_puts_the_picture_on_the_clipboard_and_says_so_for_a_moment()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var vm = await RunToTheEnd(dir.NoisyPicture("photo.png", 600, 400), "to-jpg");
+        using var shown = new ShownCard(vm);
+        var copy = shown.Toast.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("copy"));
+
+        shown.Click(copy);
+        await Until(() => vm.JustCopied);
+        Pump();
+
+        Assert.Contains(copy.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "복사됨" && t.IsEffectivelyVisible);
+        Assert.DoesNotContain(copy.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "복사" && t.IsEffectivelyVisible);
+        using var bitmap = await shown.Toast.Clipboard!.TryGetBitmapAsync();
+        Assert.Equal((600, 400), (bitmap!.PixelSize.Width, bitmap.PixelSize.Height));
+        shown.Save("toast-copied.png");
+
+        await Until(() => !vm.JustCopied, seconds: 5); // back to "Copy" by itself
+        Pump();
+        Assert.Contains(copy.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "복사" && t.IsEffectivelyVisible);
+    }
+
+    /// <summary>The result is gone: the button does not claim to have copied, and the clipboard keeps what it had.</summary>
+    [AvaloniaFact]
+    public async Task Pressing_copy_on_a_result_that_is_gone_does_not_say_copied()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var source = dir.NoisyPicture("photo.png", 600, 400);
+        var output = dir.Reencoded(source, "photo.jpg", quality: 30);
+        var vm = Finished(source, [output]);
+        await vm.LoadFinishDetailsAsync();
+        using var shown = new ShownCard(vm);
+        await shown.Toast.Clipboard!.SetTextAsync("what was there before");
+        File.Delete(output); // moved away after the card had its picture
+
+        shown.Click(shown.Toast.GetVisualDescendants().OfType<Button>().Single(b => b.Classes.Contains("copy")));
+        await Task.Delay(300);
+        Pump();
+
+        Assert.False(vm.JustCopied);
+        Assert.Equal("what was there before", await shown.Toast.Clipboard.TryGetTextAsync());
+    }
+
+    /// <summary>Copy pressed again while it still says "Copied" gives it a full moment again instead of cutting it short.</summary>
+    [AvaloniaFact]
+    public async Task Copying_again_keeps_the_label_for_another_full_moment()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var dir = new TempFolder();
+        var source = dir.NoisyPicture("photo.png", 100, 100);
+        var vm = Finished(source, [dir.Reencoded(source, "photo.jpg", quality: 30)]);
+
+        var first = vm.ShowCopiedAsync(TimeSpan.FromMilliseconds(250));
+        await Task.Delay(150);
+        var second = vm.ShowCopiedAsync(TimeSpan.FromMilliseconds(250));
+        await first; // the first moment is over: the second one has 150 ms more
+        Assert.True(vm.JustCopied);
+        await second;
+        Assert.False(vm.JustCopied);
+    }
+
     /// <summary>A job for <paramref name="source"/> that is done and wrote <paramref name="outputs"/>.</summary>
-    private static JobViewModel Finished(string source, params string[] outputs)
+    private static JobViewModel Finished(string source, params string[] outputs) => Finished(source, outputs, null);
+
+    /// <summary>The same, with what opens a file in place of the system's (so a test sees what was opened).</summary>
+    private static JobViewModel Finished(string source, string[] outputs, Action<string>? open)
     {
         var conversion = new ConversionJob([source], new Preset { TargetFormat = "jpg" }, "JPG");
         conversion.Files[0].State = FileState.Done;
         conversion.Files[0].Outputs.AddRange(outputs);
-        return new JobViewModel(conversion, AppHost.Get<ILocalizer>(), AppHost.Get<IPlatformServices>(), _ => { });
+        return new JobViewModel(conversion, AppHost.Get<ILocalizer>(), AppHost.Get<IPlatformServices>(), _ => { }, open: open);
+    }
+
+    /// <summary>
+    /// The toast window with one job's card shown at rest (no slide-in half done in the screenshot), and the toast's list
+    /// emptied again when it goes.
+    /// </summary>
+    private sealed class ShownCard : IDisposable
+    {
+        private readonly ConversionService _service = AppHost.Get<ConversionService>();
+
+        public ShownCard(JobViewModel job)
+        {
+            _service.ToastJobs.Clear();
+            Toast = new ToastWindow { DataContext = _service };
+            foreach (var slide in Toast.Styles.OfType<Avalonia.Styling.Style>().Where(s => s.Animations.Count > 0).ToList())
+                Toast.Styles.Remove(slide);
+            if (!_service.Jobs.Contains(job))
+                _service.Jobs.Insert(0, job);
+            _service.ShowInToast(job);
+            Pump();
+        }
+
+        public ToastWindow Toast { get; }
+
+        /// <summary>The middle of <paramref name="control"/>, in the toast's own points.</summary>
+        public Avalonia.Point CentreOf(Control control) => control.TranslatePoint(new Avalonia.Point(control.Bounds.Width / 2, control.Bounds.Height / 2), Toast)!.Value;
+
+        /// <summary>A left click on the middle of <paramref name="control"/>.</summary>
+        public void Click(Control control)
+        {
+            var at = CentreOf(control);
+            Toast.MouseDown(at, Avalonia.Input.MouseButton.Left);
+            Toast.MouseUp(at, Avalonia.Input.MouseButton.Left);
+        }
+
+        public void Save(string name) => ToastWindowTests.Save(Toast, name);
+
+        public void Dispose()
+        {
+            _service.ToastJobs.Clear();
+            _service.Jobs.Clear();
+            Toast.Close();
+        }
+    }
+
+    /// <summary>Runs the UI thread until <paramref name="done"/> holds.</summary>
+    private static async Task Until(Func<bool> done, int seconds = 10)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        while (!done() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(10);
+            Pump();
+        }
+        Assert.True(done());
     }
 
     /// <summary>Converts <paramref name="source"/> with a real job and waits until its card has the size.</summary>

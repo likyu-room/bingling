@@ -41,6 +41,29 @@
         </Animation>
       </Style.Animations>
     </Style>
+    <!-- The thumbnail button: the picture itself, without a button's own surface. -->
+    <Style Selector="Button.thumbnail">
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="VerticalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Stretch" />
+    </Style>
+    <!-- The theme greys a button's surface on hover and press; the picture needs none. -->
+    <Style Selector="Button.thumbnail:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.thumbnail:pressed /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.thumbnail Border.open-mark">
+      <Setter Property="Opacity" Value="0" />
+    </Style>
+    <Style Selector="Button.thumbnail:pointerover Border.open-mark">
+      <Setter Property="Opacity" Value="1" />
+    </Style>
     <Style Selector="ProgressBar">
       <Setter Property="CornerRadius" Value="999" />
       <Setter Property="MinHeight" Value="6" />
@@ -64,10 +87,20 @@
                       IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNull}}">
                 <PathIcon Width="24" Height="24" Data="{Binding FormatIcon}" />
               </Border>
-              <Border CornerRadius="12" ClipToBounds="True"
+              <!-- The picture is a button: a press opens the result in the app the system has for it. While the pointer is on
+                   it a dark veil with the open mark says so (the hand cursor and the tip say it too). -->
+              <Button Classes="ghost thumbnail" Command="{Binding OpenResultCommand}"
+                      ToolTip.Tip="{DynamicResource toast.open_result}" AutomationProperties.Name="{DynamicResource toast.open_result}"
                       IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
-              </Border>
+                <Panel>
+                  <Border CornerRadius="12" ClipToBounds="True">
+                    <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                  </Border>
+                  <Border Classes="open-mark" CornerRadius="12" Background="#66000000" IsHitTestVisible="False">
+                    <PathIcon Width="20" Height="20" Data="{StaticResource Icon.OpenInNew}" Foreground="White" />
+                  </Border>
+                </Panel>
+              </Button>
             </Panel>
             <StackPanel Grid.Column="1" Spacing="8">
               <DockPanel>
@@ -93,6 +126,21 @@
                       <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Refresh}" />
                       <TextBlock Text="{DynamicResource common.retry}" />
                     </StackPanel>
+                  </Button>
+                  <!-- Only for a card with a picture (the thumbnail): the picture goes on the clipboard, several results as files.
+                       The label turns to "Copied" for a moment; the click is handled in ToastWindow.axaml.cs, which has the clipboard. -->
+                  <Button Classes="copy" Click="OnCopyResult" Padding="10,4" ToolTip.Tip="{DynamicResource toast.copy_tip}"
+                          IsVisible="{Binding Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <Panel>
+                      <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding !JustCopied}">
+                        <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Copy}" />
+                        <TextBlock Text="{DynamicResource toast.copy}" />
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="6" IsVisible="{Binding JustCopied}">
+                        <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Check}" />
+                        <TextBlock Text="{DynamicResource toast.copied}" />
+                      </StackPanel>
+                    </Panel>
                   </Button>
                   <Button Classes="accent" Command="{Binding OpenFolderCommand}" IsVisible="{Binding HasOutputs}" Padding="10,4">
                     <StackPanel Orientation="Horizontal" Spacing="6">

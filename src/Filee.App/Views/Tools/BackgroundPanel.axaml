@@ -37,13 +37,21 @@
         </Border>
       </StackPanel>
 
-      <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,6,0,0">
+      <!-- Both buttons take the backdrop from the picture: one asks for a picture of the user's, the other takes the picture's own
+           colour (a pastel of it; the colour then shows in the box and the ring above, as a typed one does). The row wraps, so a
+           longer label (other languages) or the picture's name drops to the next line instead of being cut off. The ring around
+           each only keeps them level; it is lit for the picture alone. -->
+      <WrapPanel Margin="0,6,0,0" ItemSpacing="6" LineSpacing="2">
         <Border Classes="ring" Classes.selected="{Binding IsCustomImage}" CornerRadius="8">
           <Button Content="{DynamicResource tool.background.custom_image}" Click="OnPickImage" Focusable="False" />
         </Border>
+        <Border Classes="ring" CornerRadius="8">
+          <Button x:Name="PictureColorButton" Command="{Binding UsePictureColorCommand}" Focusable="False"
+                  Content="{DynamicResource tool.background.picture_color}" ToolTip.Tip="{DynamicResource tool.background.picture_color_tip}" />
+        </Border>
         <TextBlock Classes="caption" Text="{Binding CustomImageName}" IsVisible="{Binding IsCustomImage}"
-                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" MaxWidth="90" />
-      </StackPanel>
+                   TextTrimming="CharacterEllipsis" VerticalAlignment="Center" MaxWidth="215" />
+      </WrapPanel>
     </StackPanel>
 
     <StackPanel>
