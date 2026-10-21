@@ -1,4 +1,5 @@
 using Filee.Core.Conversion;
+using Filee.Core.Platform;
 using Filee.Core.Presets;
 
 namespace Filee.Core.Tests;
@@ -252,8 +253,8 @@ public class JobQueueTests
         var preset = new Preset { Kind = PresetKind.Tool, Tool = ImageToolKind.Annotate, TargetFormat = BuiltInData.SameAsSource };
         var arrow = new ImageEdit { Annotations = [new Annotation { Kind = AnnotationKind.Arrow }] };
         var black = new ImageEdit { Redact = new RedactEdit { Boxes = [new EditRect { X = .25, Width = .5, Height = .5 }] } };
-        // Keys are the full paths of the sources, in any case.
-        var edits = new Dictionary<string, ImageEdit> { [a.ToUpperInvariant()] = arrow, [b] = black };
+        // Keys are the full paths of the sources, told apart as the file system does: in any case on Windows.
+        var edits = new Dictionary<string, ImageEdit> { [OperatingSystem.IsWindows() ? a.ToUpperInvariant() : a] = arrow, [b] = black };
 
         var job = new ConversionJob([a, b], preset, "Test", edits);
         await queue.RunAsync(job);
@@ -270,6 +271,16 @@ public class JobQueueTests
         // The job keeps its own copy: an editor that goes on changing its edit does not change a job that was started.
         arrow.Annotations![0].Kind = AnnotationKind.Line;
         Assert.Equal(AnnotationKind.Arrow, job.EditsByFile![a].Annotations!.Single().Kind);
+    }
+
+    [Fact]
+    public void Per_file_edits_tell_paths_apart_as_the_file_system_does()
+    {
+        // On a case-sensitive volume photo.png and PHOTO.png are two pictures, each with its own drawings: compared in any
+        // case, one would get the other's. That needs such a volume, so this checks the comparer the job keeps them by.
+        var job = new ConversionJob(["photo.png"], new Preset(), "Test", new Dictionary<string, ImageEdit> { ["photo.png"] = new() });
+
+        Assert.Same(FileSystemPaths.Comparer, Assert.IsType<Dictionary<string, ImageEdit>>(job.EditsByFile).Comparer);
     }
 
     [Fact]

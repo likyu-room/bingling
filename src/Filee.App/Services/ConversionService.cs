@@ -68,7 +68,7 @@ public sealed class ConversionService
     {
         if (perFile is not null)
         {
-            var edited = new HashSet<string>(perFile.Keys, StringComparer.OrdinalIgnoreCase);
+            var edited = new HashSet<string>(perFile.Keys, FileSystemPaths.Comparer); // as the job looks them up
             files = files.Where(edited.Contains).ToList();
         }
         // A tool preset runs with the edit its tool made (the crop box, or one per file); without one it would only copy the files.
