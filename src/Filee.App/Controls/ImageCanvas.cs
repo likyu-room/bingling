@@ -51,6 +51,9 @@ public sealed class ImageCanvas : PictureView
 
     private Press? _press;
     private CropRect? _live; // the box while it is dragged; the Crop property gets it on release
+
+    internal override bool Pressed => _press is not null || base.Pressed;
+
     private Grip? _hover;
 
     static ImageCanvas() => AffectsRender<ImageCanvas>(SourceProperty, CropProperty);

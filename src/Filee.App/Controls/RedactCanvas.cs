@@ -41,6 +41,9 @@ public sealed class RedactCanvas : PictureView
 
     private Press? _press;
     private CropRect? _live; // the box while it is dragged; the Redact property gets it on release
+
+    internal override bool Pressed => _press is not null || base.Pressed;
+
     private ImageCanvas.Grip? _hover;
 
     static RedactCanvas() => AffectsRender<RedactCanvas>(RedactProperty, SelectedIndexProperty);

@@ -80,6 +80,9 @@ public sealed class AnnotateCanvas : PictureView
     private readonly TextBox _editor;
     private Press? _press;
     private Annotation? _live; // the drawing as dragged now; the Annotations property gets it on release
+
+    internal override bool Pressed => _press is not null || base.Pressed;
+
     private Typing? _typing;
     private StandardCursorType? _cursor;
 

@@ -310,6 +310,36 @@ public class ImageToolWindowTests
     }
 
     [AvaloniaFact]
+    public void Enter_and_Ctrl_C_wait_for_a_box_being_dragged()
+    {
+        // The box reaches the view model when it is let go: saved or copied before, it would be where it was.
+        var (window, vm) = Open(TestImages.Png(400, 200));
+        vm.Aspect = vm.Aspects.Single(a => a.Value == "free");
+        vm.CopiedHold = TimeSpan.Zero;
+        var copied = new List<CropRect>();
+        vm.CopyPicture = (_, edit) =>
+        {
+            copied.Add(edit.Crop!);
+            return Task.FromResult(true);
+        };
+        var canvas = window.GetVisualDescendants().OfType<ImageCanvas>().Single();
+        var image = ImageCanvas.ImageRect(canvas.Bounds.Size, new Size(400, 200), 1, default);
+        Point At(double x, double y) => canvas.TranslatePoint(new Point(image.X + x * image.Width, image.Y + y * image.Height), window)!.Value;
+
+        window.MouseDown(At(.1, .2), MouseButton.Left);
+        window.MouseMove(At(.6, .8));
+        window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.Empty(copied);
+        Assert.Null(vm.Result);
+
+        window.MouseUp(At(.6, .8), MouseButton.Left);
+        window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(.5, Assert.Single(copied).Width, 2);
+    }
+
+    [AvaloniaFact]
     public void The_window_takes_no_clicks_or_keys_while_it_copies()
     {
         // Nothing edited meanwhile would be in the copy, and closing after it would throw that away.

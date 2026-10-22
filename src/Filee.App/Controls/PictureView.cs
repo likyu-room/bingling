@@ -101,6 +101,12 @@ public class PictureView : Control
     {
     }
 
+    /// <summary>
+    /// A button is held on the picture: a pan, or a tool's box or drawing being dragged, which reaches the view model only
+    /// when it is let go. Enter and Ctrl+C wait for that, or they would save or copy it where it was (ImageToolWindow).
+    /// </summary>
+    internal virtual bool Pressed => _panning is not null;
+
     /// <summary>Shows the whole picture again (Ctrl+0).</summary>
     public void Fit()
     {

@@ -208,6 +208,10 @@ public partial class ImageToolWindow : Window
         e.Handled = true;
         switch (e.Key)
         {
+            // A box or drawing being dragged reaches the view model when it is let go (PictureView.Pressed).
+            case Key.Enter when _picture?.Pressed == true:
+            case Key.C when ctrl && _picture?.Pressed == true:
+                break;
             case Key.Enter when typing is not null:
                 // A typed size is taken first; the next Enter saves.
                 BindingOperations.GetBindingExpressionBase(typing, TextBox.TextProperty)?.UpdateSource();
