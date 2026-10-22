@@ -29,6 +29,12 @@ public sealed partial class RedactToolViewModel
     /// </summary>
     public Func<string, CancellationToken, Task<RecognitionResult>> Recognize { get; set; } = (_, _) => Task.FromResult(RecognitionResult.Empty);
 
+    /// <summary>
+    /// The platform can read text and faces (Windows): the panel's "find what to hide" shows only there. Elsewhere it would
+    /// read the picture whole and then say there is no text language (<see cref="IPlatformServices.RecognizeAsync"/>).
+    /// </summary>
+    [ObservableProperty] private bool _findAvailable = OperatingSystem.IsWindows();
+
     /// <summary>What was found, as the panel lists it; empty before a find, and once the chosen ones are hidden.</summary>
     [ObservableProperty, NotifyPropertyChangedFor(nameof(ChosenSpots), nameof(HasSpots)), NotifyCanExecuteChangedFor(nameof(HideChosenCommand))]
     private IReadOnlyList<FoundSpot> _spots = [];

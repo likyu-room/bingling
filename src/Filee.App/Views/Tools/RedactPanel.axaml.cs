@@ -18,8 +18,11 @@ public partial class RedactPanel : UserControl
         ModeChips.AddHandler(PointerReleasedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
         // The buttons take no focus of their own; a press hands it to the picture, so the keys are the picture's after it.
         DeleteButton.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
-        FindButton.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
-        HideChosenButton.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
+        // The find buttons and the list's boxes can be focused (Tab, then Space or Enter), so a click, which focuses them, hands the
+        // focus back after the release: the keys after a click are the picture's, as after any other press here. Bubbling, so the
+        // click is done by then: a control that loses the focus between its press and its release does not click.
+        foreach (Control control in new Control[] { FindButton, HideChosenButton, SpotList })
+            control.AddHandler(PointerReleasedEvent, (_, _) => FocusPicture(), RoutingStrategies.Bubble, handledEventsToo: true);
     }
 
     /// <summary>

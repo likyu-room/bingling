@@ -908,6 +908,92 @@ public class RedactToolTests
     }
 
     [AvaloniaFact]
+    public void Find_what_to_hide_is_offered_only_where_the_platform_reads_text()
+    {
+        var (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Png(400, 200));
+        var find = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.FindCommand);
+        Assert.Equal(OperatingSystem.IsWindows(), vm.FindAvailable); // macOS and Linux read no text, and not even faces
+        Assert.Equal(OperatingSystem.IsWindows(), find.IsEffectivelyVisible);
+
+        vm.FindAvailable = false;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(find.IsEffectivelyVisible);
+        Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), t => t.IsEffectivelyVisible && t.Text == "가릴 곳 찾기");
+
+        vm.FindAvailable = true;
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(find.IsEffectivelyVisible);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_find_and_hide_buttons_and_the_list_are_reached_and_used_with_the_keyboard()
+    {
+        var (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.White));
+        vm.Recognize = new FakeRecognizer(Read).RecognizeAsync;
+        var find = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.FindCommand);
+        Assert.True(find.Focusable);
+
+        Assert.True(find.Focus());
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None); // the button's, not the window's "save"
+        window.KeyReleaseQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        WaitForFind(vm);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Assert.Equal(3, vm.Spots.Count);
+        Assert.True(window.IsVisible);
+
+        var boxes = window.GetVisualDescendants().OfType<CheckBox>().ToList();
+        Assert.All(boxes, b => Assert.True(b.Focusable));
+        Assert.True(boxes[1].Focus());
+        window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        window.KeyReleaseQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        Assert.Equal([true, false, true], vm.Spots.Select(s => s.IsChosen)); // the e-mail address may stay
+
+        var hide = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.HideChosenCommand);
+        Assert.True(hide.Focusable);
+        Assert.True(hide.Focus());
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        window.KeyReleaseQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.Equal(2, vm.Redact.Boxes.Count);
+        Assert.Empty(vm.Spots);
+        Assert.True(window.IsVisible); // it did not save either
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_click_on_a_spot_or_the_buttons_still_hands_the_keys_back_to_the_picture()
+    {
+        var (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.White));
+        vm.Recognize = new FakeRecognizer(Read).RecognizeAsync;
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        var box = window.GetVisualDescendants().OfType<CheckBox>().First();
+        var centre = box.TranslatePoint(new Point(10, box.Bounds.Height / 2), window)!.Value;
+
+        window.FocusManager!.Focus(null);
+        window.MouseDown(centre, MouseButton.Left);
+        window.MouseUp(centre, MouseButton.Left);
+
+        Assert.False(vm.Spots[0].IsChosen);
+        Assert.IsType<RedactCanvas>(window.FocusManager.GetFocusedElement()); // as after any other press in the panel
+
+        var hide = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.HideChosenCommand);
+        centre = hide.TranslatePoint(new Point(hide.Bounds.Width / 2, hide.Bounds.Height / 2), window)!.Value;
+        window.FocusManager.Focus(null);
+        window.MouseDown(centre, MouseButton.Left);
+        window.MouseUp(centre, MouseButton.Left);
+        Assert.Equal(2, vm.Redact.Boxes.Count);
+        Assert.IsType<RedactCanvas>(window.FocusManager.GetFocusedElement());
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
     public void Closing_the_window_while_it_looks_stops_it_and_nothing_is_listed()
     {
         var vm = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));

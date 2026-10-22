@@ -41,9 +41,10 @@
 
     <!-- Find what to hide: on for one file only, and its tip says why when it is off. What was found is listed, each one
          chosen at first and outlined on the picture in its kind's colour; "Hide selected" makes boxes of them. It sits above
-         the list, which scrolls on its own, so a long list never pushes it out of sight. -->
-    <StackPanel Spacing="8">
-      <Button x:Name="FindButton" HorizontalAlignment="Left" Padding="10,5" Focusable="False" Command="{Binding FindCommand}"
+         the list, which scrolls on its own, so a long list never pushes it out of sight. The buttons and the boxes of the list
+         take the keyboard (Tab, Space, Enter), unlike the rest of the panel; a click hands the focus back to the picture. -->
+    <StackPanel Spacing="8" IsVisible="{Binding FindAvailable}">
+      <Button x:Name="FindButton" HorizontalAlignment="Left" Padding="10,5" Command="{Binding FindCommand}"
               ToolTip.Tip="{Binding FindTip}" ToolTip.ShowOnDisabled="True">
         <StackPanel Orientation="Horizontal" Spacing="6">
           <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Search}" />
@@ -52,13 +53,13 @@
       </Button>
       <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding FindStatus}"
                  IsVisible="{Binding FindStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-      <Button x:Name="HideChosenButton" HorizontalAlignment="Left" Padding="10,5" Focusable="False" Command="{Binding HideChosenCommand}"
+      <Button x:Name="HideChosenButton" HorizontalAlignment="Left" Padding="10,5" Command="{Binding HideChosenCommand}"
               IsVisible="{Binding HasSpots}" Content="{DynamicResource tool.redact.hide_chosen}" />
       <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasSpots}">
-        <ItemsControl ItemsSource="{Binding Spots}">
+        <ItemsControl x:Name="SpotList" ItemsSource="{Binding Spots}">
           <ItemsControl.ItemTemplate>
             <DataTemplate x:DataType="tools:FoundSpot">
-              <CheckBox Focusable="False" IsChecked="{Binding IsChosen}" AutomationProperties.Name="{Binding AccessibleName}">
+              <CheckBox IsChecked="{Binding IsChosen}" AutomationProperties.Name="{Binding AccessibleName}">
                 <DockPanel>
                   <Border DockPanel.Dock="Left" CornerRadius="999" Padding="7,1" Margin="0,0,6,0" VerticalAlignment="Center"
                           Background="{Binding KindBrush}">
