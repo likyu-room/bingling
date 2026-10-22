@@ -1,7 +1,8 @@
 <!--
-  The instant eyedropper (ScreenTools.StartColorPick): covers the screen the cursor is on with a window that is all but
-  invisible (#01000000 still takes the clicks), so the screen shows as it is and only the magnifier beside the cursor is
-  new. A left click picks the colour under it; Esc or a right click closes it.
+  The instant eyedropper (ScreenTools.StartColorPick): covers the screen the cursor is on with the picture taken of it,
+  frozen but not dimmed, so the screen looks as it was and only the magnifier beside the cursor is new; what shows is what
+  a click picks (a video playing on beneath would show other colours). A left click picks the colour under it; Esc or a
+  right click closes it.
 -->
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -9,13 +10,15 @@
         x:Class="Filee.App.Views.PickColorWindow"
         Title="{DynamicResource tray.pick_color}"
         WindowDecorations="None"
-        Background="Transparent"
-        TransparencyLevelHint="Transparent"
+        Background="Black"
         Topmost="True"
         ShowInTaskbar="False"
         CanResize="False"
         Cursor="Cross">
-  <Canvas Background="#01000000">
-    <c:Magnifier x:Name="Lens" />
-  </Canvas>
+  <Panel>
+    <Image x:Name="Frozen" Stretch="Fill" />
+    <Canvas>
+      <c:Magnifier x:Name="Lens" />
+    </Canvas>
+  </Panel>
 </Window>

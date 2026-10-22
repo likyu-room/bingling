@@ -154,6 +154,29 @@ public sealed class TriggerServiceLifecycleTests
     }
 
     [AvaloniaFact]
+    public void AltGr_typing_a_letter_is_no_Ctrl_Alt_shortcut()
+    {
+        // Windows reports AltGr as Ctrl + right Alt: AltGr+S types ś on a Polish keyboard, and must not capture the screen.
+        var provider = new DelayedProvider();
+        provider.AllowExit.Set();
+        using var service = Create(provider, () => { });
+        service.Apply(new AppSettings { Triggers = [Chord("Space", TriggerAction.Donut), Chord("S", TriggerAction.Capture), Chord("C", TriggerAction.PickColor)] });
+        var raised = new List<string>();
+        service.SelectionGesture += (_, e) => raised.Add("ring " + e.Gesture!.Key);
+        service.CaptureRequested += (_, e) => raised.Add("capture " + e.Gesture!.Key);
+        service.ColorPickRequested += (_, e) => raised.Add("pick " + e.Gesture!.Key);
+        service.Start();
+        Assert.True(SpinWait.SpinUntil(() => provider.Runs == 1, 2000));
+
+        foreach (var key in new[] { KeyCode.VcS, KeyCode.VcC, KeyCode.VcSpace })
+            provider.PressKey(key, EventMask.LeftCtrl | EventMask.RightAlt);
+        provider.PressKey(KeyCode.VcS, EventMask.LeftCtrl | EventMask.LeftAlt); // the left Alt still makes the shortcut
+
+        Assert.True(SpinWait.SpinUntil(() => { Dispatcher.UIThread.RunJobs(); return raised.Count >= 1; }, 2000));
+        Assert.Equal(["capture S"], raised); // in order: the AltGr presses before it raised nothing
+    }
+
+    [AvaloniaFact]
     public void A_screen_shortcut_does_not_open_the_ring()
     {
         var provider = new DelayedProvider();

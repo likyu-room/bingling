@@ -404,6 +404,7 @@
   "capture.edit": "Edytuj",
   "capture.copied": "Skopiowano",
   "capture.saves_to": "Zapisuje się w folderze Obrazy\\Bingling",
+  "capture.save_failed": "Nie udało się zapisać zrzutu: {0}",
   "triggers.modifiers": "Klawisze modyfikujące",
   "triggers.button": "Przycisk myszy",
   "triggers.button.None": "Brak",

@@ -175,6 +175,24 @@ public class ColorPickTests
     }
 
     [AvaloniaFact]
+    public void The_eyedropper_shows_the_picture_it_picks_from_as_it_is()
+    {
+        // What shows is what is picked: the screen frozen as it was taken (a video playing on beneath would show other
+        // colours), not dimmed.
+        TestServices.EnsureInitialized("en");
+        using var shot = ScreenGrab.Grab(new FakeScreen(), new PixelRect(0, 0, 400, 300), 1)!;
+        var picker = new PickColorWindow();
+        picker.Open(shot, new PixelPoint(200, 220));
+        Dispatcher.UIThread.RunJobs();
+
+        using var frame = picker.CaptureRenderedFrame()!;
+
+        Assert.Equal(ScreenColor(20, 280), Pixel(frame, new Point(20, 280))); // well away from the magnifier
+        Assert.Equal(ScreenColor(380, 10), Pixel(frame, new Point(380, 10)));
+        picker.Close();
+    }
+
+    [AvaloniaFact]
     public void A_black_or_missing_screen_picture_starts_nothing_and_says_why_in_the_log()
     {
         TestServices.EnsureInitialized("en");

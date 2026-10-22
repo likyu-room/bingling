@@ -392,6 +392,7 @@
   "capture.edit": "Editar",
   "capture.copied": "Copiado",
   "capture.saves_to": "Se guarda en la carpeta Imágenes\\Bingling",
+  "capture.save_failed": "No se pudo guardar la captura: {0}",
   "triggers.modifiers": "Teclas modificadoras",
   "triggers.button": "Botón del ratón",
   "triggers.button.None": "Ninguno",

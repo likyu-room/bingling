@@ -404,6 +404,7 @@
   "capture.edit": "编辑",
   "capture.copied": "已复制",
   "capture.saves_to": "保存到“图片\\Bingling”文件夹",
+  "capture.save_failed": "无法保存截图：{0}",
   "triggers.modifiers": "修饰键",
   "triggers.button": "鼠标按键",
   "triggers.button.None": "无",

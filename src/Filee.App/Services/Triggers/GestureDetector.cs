@@ -171,7 +171,11 @@ public sealed class GestureDetector
     }
 
     /// <summary>A key went down. <paramref name="key"/> is the key name without the "Vc" prefix, e.g. "Space".</summary>
-    public void KeyDown(string key, ModifierKeys modifiers)
+    /// <param name="altGr">
+    /// The right Alt is down. Windows reports AltGr as Ctrl + Alt, and AltGr types letters (ś, ć on a Polish keyboard): a
+    /// key with it is no chord that needs both Ctrl and Alt.
+    /// </param>
+    public void KeyDown(string key, ModifierKeys modifiers, bool altGr = false)
     {
         TriggerGesture? fire;
         TriggerGesture? lateDrag = null;
@@ -193,7 +197,8 @@ public sealed class GestureDetector
             fire = lateDrag is not null ? null : _gestures.FirstOrDefault(g =>
                 g.Kind == TriggerKind.KeyChord &&
                 string.Equals(g.Key, key, StringComparison.OrdinalIgnoreCase) &&
-                g.Modifiers == modifiers);
+                g.Modifiers == modifiers &&
+                !(altGr && g.Modifiers.HasFlag(ModifierKeys.Ctrl | ModifierKeys.Alt)));
             if (fire is not null && !ScopeFilter(fire, x, y))
                 fire = null;
         }

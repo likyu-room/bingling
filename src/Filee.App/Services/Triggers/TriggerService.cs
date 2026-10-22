@@ -147,7 +147,8 @@ public sealed class TriggerService : IDisposable
             _hook.MouseMoved += (_, e) => OnMove(e);
             _hook.MouseDraggedRelative += (_, e) => OnRelativeMove(e);
             _hook.MouseMovedRelative += (_, e) => OnRelativeMove(e);
-            _hook.KeyPressed += (_, e) => _detector.KeyDown(KeyName(e.Data.KeyCode), Map(e.RawEvent.Mask) | KeyModifier(e.Data.KeyCode));
+            _hook.KeyPressed += (_, e) => _detector.KeyDown(KeyName(e.Data.KeyCode), Map(e.RawEvent.Mask) | KeyModifier(e.Data.KeyCode),
+                altGr: e.RawEvent.Mask.HasFlag(EventMask.RightAlt));
             // Own the actual Run thread. SharpHook's RunAsync task completes BEFORE its finally
             // clears the native callback, so awaiting that task alone is not a safe restart barrier.
             var hook = _hook;

@@ -1,6 +1,6 @@
 // A window over one whole screen, with the picture of it taken before the window showed: the instant eyedropper's and the
-// capture window's. It covers the screen's pixels exactly, tells which of the picture's pixels a point of it is on, picks
-// a colour there, and closes on Esc or a right click.
+// capture window's. It covers the screen's pixels exactly with that picture, tells which of the picture's pixels a point
+// of it is on, picks a colour there, and closes on Esc or a right click.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -18,10 +18,20 @@ public class ScreenCoverWindow : Window
     /// <summary>A colour was picked: the desktop's pixel (physical) and its colour. The window has closed by then.</summary>
     public event Action<PixelPoint, Color>? Picked;
 
-    /// <summary>Shows the window over the screen of <paramref name="shot"/> and takes the focus (for Esc).</summary>
-    protected void Cover(ScreenShot shot)
+    /// <summary>
+    /// Shows the window over the screen of <paramref name="shot"/>, the picture in <paramref name="frozen"/> (the screen
+    /// frozen: what shows is what a pick reads), and takes the focus (for Esc).
+    /// </summary>
+    protected void Cover(ScreenShot shot, Image frozen)
     {
         Shot = shot;
+        var picture = ResultClipboard.ToBitmap(shot.Image);
+        frozen.Source = picture;
+        Closed += (_, _) =>
+        {
+            frozen.Source = null;
+            picture.Dispose();
+        };
         (Width, Height) = (shot.Bounds.Width / shot.Scaling, shot.Bounds.Height / shot.Scaling);
         Position = shot.Bounds.Position;
         Show();

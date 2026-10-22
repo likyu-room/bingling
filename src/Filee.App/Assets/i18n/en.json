@@ -404,6 +404,7 @@
   "capture.edit": "Edit",
   "capture.copied": "Copied",
   "capture.saves_to": "Saves in your Pictures\\Bingling folder",
+  "capture.save_failed": "Couldn't save the capture: {0}",
   "triggers.modifiers": "Modifier keys",
   "triggers.button": "Mouse button",
   "triggers.button.None": "None",

@@ -14,6 +14,7 @@ using Avalonia.Threading;
 using Filee.App.Services;
 using Filee.App.ViewModels;
 using Filee.App.Views;
+using Filee.Core.Conversion;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
 using ImageMagick;
@@ -50,7 +51,7 @@ public class CaptureWindowTests
     private static void Drag(Window window, Point from, Point to)
     {
         window.MouseDown(from, MouseButton.Left);
-        window.MouseMove(to);
+        window.MouseMove(to, RawInputModifiers.LeftMouseButton);
         window.MouseUp(to, MouseButton.Left);
     }
 
@@ -131,6 +132,33 @@ public class CaptureWindowTests
     }
 
     [AvaloniaFact]
+    public void The_buttons_wait_for_the_release_and_only_a_move_with_the_button_down_drags()
+    {
+        var (tools, _, _) = Start("en");
+        var window = Open(tools);
+        var vm = window.ViewModel;
+
+        window.MouseDown(new Point(100, 100), MouseButton.Left);
+        window.MouseMove(new Point(300, 200), RawInputModifiers.LeftMouseButton);
+        Assert.Equal(new PixelRect(100, 100, 201, 101), vm.Selection);
+        Assert.False(window.Actions.IsVisible); // not while dragging
+        window.MouseUp(new Point(300, 200), MouseButton.Left);
+        Assert.True(window.Actions.IsVisible);
+
+        window.MouseMove(new Point(500, 400)); // no button down: no drag
+        Assert.Equal(new PixelRect(100, 100, 201, 101), vm.Selection);
+
+        // A release that never came (it went to another window): the next move without the button ends the drag where it was.
+        window.MouseDown(new Point(600, 600), MouseButton.Left);
+        window.MouseMove(new Point(700, 650), RawInputModifiers.LeftMouseButton);
+        Assert.False(window.Actions.IsVisible);
+        window.MouseMove(new Point(900, 900));
+        Assert.Equal(new PixelRect(600, 600, 101, 51), vm.Selection);
+        Assert.True(window.Actions.IsVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public void The_buttons_go_below_the_area_above_it_where_the_screen_ends_and_inside_it_when_it_fills_the_screen()
     {
         var screen = new Size(1920, 1080);
@@ -193,6 +221,66 @@ public class CaptureWindowTests
             Assert.Equal((100u, 50u), (image.Width, image.Height));
         Assert.False(Directory.Exists(Path.GetDirectoryName(temp)));
         job.DismissCommand.Execute(null);
+    }
+
+    [AvaloniaFact]
+    public async Task A_save_that_fails_keeps_the_capture_for_its_retry()
+    {
+        var (_, output, _) = Start("en");
+        var conversions = AppHost.Get<ConversionService>();
+        // A file where the save folder would be: the job cannot make the folder, and fails.
+        Directory.CreateDirectory(Path.GetDirectoryName(output.Folder)!);
+        File.WriteAllText(output.Folder, "in the way");
+        using var shot = ScreenGrab.Grab(new FakeScreen(), new PixelRect(0, 0, 100, 50), 1)!;
+
+        await output.SaveAsync(shot.Crop(new PixelRect(0, 0, 100, 50)));
+
+        var job = conversions.ToastJobs.First(j => j.Job.Sources[0].StartsWith(CaptureOutput.TempRoot));
+        Assert.NotEqual(JobState.Completed, job.Job.State);
+        var temp = job.Job.Sources[0];
+        Assert.True(File.Exists(temp)); // the only copy of the capture
+        Assert.True(job.CanRetry);
+
+        File.Delete(output.Folder);
+        job.RetryCommand.Execute(null);
+        var again = conversions.ToastJobs[0];
+        Assert.Equal([temp], again.Job.Sources);
+        await conversions.FinishedAsync(again);
+        Assert.Equal(JobState.Completed, again.Job.State);
+        Assert.Equal([Assert.Single(Directory.GetFiles(output.Folder))], again.Job.Outputs); // the capture, saved after all
+        again.DismissCommand.Execute(null);
+        Directory.Delete(Path.GetDirectoryName(temp)!, recursive: true);
+    }
+
+    [AvaloniaFact]
+    public async Task A_capture_that_cannot_be_handed_on_says_so()
+    {
+        var (_, output, windows) = Start("ko", _ => throw new IOException("disk full"));
+        using var shot = ScreenGrab.Grab(new FakeScreen(), new PixelRect(0, 0, 100, 50), 1)!;
+
+        await output.EditAsync(shot.Crop(new PixelRect(0, 0, 100, 50)), new PixelPoint(50, 25));
+
+        Assert.Equal(["캡처를 저장하지 못했어요: disk full"], windows.Messages);
+        Assert.False(Directory.Exists(Path.GetDirectoryName(Assert.Single(windows.Opened).Files[0]))); // nothing to retry: it goes
+    }
+
+    [AvaloniaFact]
+    public void Only_temporary_captures_over_a_day_old_are_cleared_away()
+    {
+        var root = NewFolder();
+        var now = new DateTime(2026, 10, 22, 12, 0, 0, DateTimeKind.Utc);
+        foreach (var (name, age) in new[] { ("old", TimeSpan.FromHours(25)), ("recent", TimeSpan.FromHours(23)) })
+        {
+            var folder = Directory.CreateDirectory(Path.Combine(root, name)).FullName;
+            File.WriteAllText(Path.Combine(folder, "Capture.png"), "");
+            Directory.SetLastWriteTimeUtc(folder, now - age);
+        }
+
+        CaptureOutput.DeleteOld(root, now);
+
+        Assert.Equal(["recent"], Directory.GetDirectories(root).Select(Path.GetFileName));
+        CaptureOutput.DeleteOld(Path.Combine(root, "none"), now); // no folder: nothing to do, and no error
+        Directory.Delete(root, recursive: true);
     }
 
     [AvaloniaFact]
@@ -372,6 +460,13 @@ public class CaptureWindowTests
         : WindowService(AppHost.Get<ILocalizer>(), AppHost.Get<IServiceProvider>(), AppHost.Get<MemoryTrimmer>())
     {
         public List<(ImageToolKind Tool, string[] Files, PixelPoint Cursor, string? Footer)> Opened { get; } = [];
+        public List<string> Messages { get; } = [];
+
+        public override Task MessageAsync(Window? owner, string message)
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
 
         public override Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor, string? footer = null)
         {

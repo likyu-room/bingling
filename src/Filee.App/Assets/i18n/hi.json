@@ -392,6 +392,7 @@
   "capture.edit": "संपादित करें",
   "capture.copied": "कॉपी हो गया",
   "capture.saves_to": "चित्र\\Bingling फ़ोल्डर में सहेजा जाता है",
+  "capture.save_failed": "कैप्चर सहेजा नहीं जा सका: {0}",
   "triggers.modifiers": "मॉडिफ़ायर कुंजियाँ",
   "triggers.button": "माउस बटन",
   "triggers.button.None": "कोई नहीं",

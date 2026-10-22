@@ -404,6 +404,7 @@
   "capture.edit": "편집",
   "capture.copied": "복사했어요",
   "capture.saves_to": "사진\\Bingling 폴더에 저장해요",
+  "capture.save_failed": "캡처를 저장하지 못했어요: {0}",
   "triggers.modifiers": "수정키",
   "triggers.button": "마우스 버튼",
   "triggers.button.None": "없음",

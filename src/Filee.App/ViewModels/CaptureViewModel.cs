@@ -44,6 +44,11 @@ public sealed partial class CaptureViewModel(ScreenShot shot, CaptureOutput outp
     [NotifyPropertyChangedFor(nameof(ShowsActions))]
     private bool _saysCopied;
 
+    /// <summary>A drag is picking the area: its buttons wait for the release.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowsActions))]
+    private bool _dragging;
+
     /// <summary><see cref="Mode"/> for the toolbar's chips.</summary>
     public int ModeIndex
     {
@@ -57,7 +62,7 @@ public sealed partial class CaptureViewModel(ScreenShot shot, CaptureOutput outp
     public string SizeText => Selection is { } area ? $"{area.Width} × {area.Height}" : "";
 
     /// <summary>Edit / Copy / Save beside the area.</summary>
-    public bool ShowsActions => HasSelection && !SaysCopied;
+    public bool ShowsActions => HasSelection && !Dragging && !SaysCopied;
 
     /// <summary>"Drag over what to capture", until there is an area.</summary>
     public bool ShowsHint => Mode == CaptureMode.Region && !HasSelection;
@@ -78,14 +83,16 @@ public sealed partial class CaptureViewModel(ScreenShot shot, CaptureOutput outp
     public void DragTo(PixelPoint from, PixelPoint to)
     {
         Mode = CaptureMode.Region;
+        Dragging = true;
         Selection = new PixelRect(Math.Min(from.X, to.X), Math.Min(from.Y, to.Y), Math.Abs(to.X - from.X) + 1, Math.Abs(to.Y - from.Y) + 1);
     }
 
-    /// <summary>The drag is over: an area under <see cref="MinSide"/> across was a click, and goes.</summary>
+    /// <summary>The drag is over: an area under <see cref="MinSide"/> across was a click, and goes; one that stays shows its buttons.</summary>
     public void EndDrag()
     {
         if (Selection is { } area && (area.Width < MinSide || area.Height < MinSide))
             Selection = null;
+        Dragging = false;
     }
 
     /// <summary>Copies the area as a picture, says so for a moment and closes; a busy clipboard leaves the window open.</summary>

@@ -3,7 +3,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
-using Avalonia.Media.Imaging;
 using Filee.App.Services;
 using Filee.App.ViewModels;
 
@@ -15,18 +14,12 @@ public partial class CaptureWindow : ScreenCoverWindow
     /// <summary>Between the area and its buttons, and between the size tag and the area (DIPs).</summary>
     private const double Gap = 8, TagGap = 4;
 
-    private Bitmap? _frozen;
     private PixelPoint? _dragFrom;
     private Point _pointer;
 
     public CaptureWindow()
     {
         InitializeComponent();
-        Closed += (_, _) =>
-        {
-            Frozen.Source = null;
-            _frozen?.Dispose();
-        };
     }
 
     internal CaptureViewModel ViewModel => (CaptureViewModel)DataContext!;
@@ -35,13 +28,15 @@ public partial class CaptureWindow : ScreenCoverWindow
     public void Open(CaptureViewModel vm, PixelPoint cursor)
     {
         DataContext = vm;
-        _frozen = ResultClipboard.ToBitmap(vm.Shot.Image);
-        Frozen.Source = _frozen;
         Lens.Shot = vm.Shot;
-        vm.Done += (_, _) => Close();
+        vm.Done += OnDone;
         vm.PropertyChanged += OnChanged;
-        Closed += (_, _) => vm.PropertyChanged -= OnChanged;
-        Cover(vm.Shot);
+        Closed += (_, _) =>
+        {
+            vm.Done -= OnDone;
+            vm.PropertyChanged -= OnChanged;
+        };
+        Cover(vm.Shot, Frozen);
         _pointer = this.PointToClient(cursor);
         ShowArea();
     }
@@ -70,7 +65,12 @@ public partial class CaptureWindow : ScreenCoverWindow
         base.OnPointerMoved(e);
         _pointer = e.GetPosition(this);
         if (_dragFrom is { } from)
-            ViewModel.DragTo(from, PixelAt(_pointer));
+        {
+            if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+                ViewModel.DragTo(from, PixelAt(_pointer));
+            else
+                EndDrag(); // its release went elsewhere: the area stays as it was
+        }
         else if (ViewModel.PicksColor)
             Lens.Follow(_pointer, PixelAt(_pointer), new Size(Width, Height));
     }
@@ -78,12 +78,19 @@ public partial class CaptureWindow : ScreenCoverWindow
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (e.InitialPressMouseButton == MouseButton.Left && _dragFrom is not null)
-        {
-            _dragFrom = null;
-            ViewModel.EndDrag();
-        }
+        if (e.InitialPressMouseButton == MouseButton.Left)
+            EndDrag();
     }
+
+    private void EndDrag()
+    {
+        if (_dragFrom is null)
+            return;
+        _dragFrom = null;
+        ViewModel.EndDrag();
+    }
+
+    private void OnDone(object? sender, EventArgs e) => Close();
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
@@ -104,7 +111,7 @@ public partial class CaptureWindow : ScreenCoverWindow
     /// <summary>What the area looks like follows these; the rest are worked out from them.</summary>
     private void OnChanged(object? sender, PropertyChangedEventArgs e)
     {
-        if (e.PropertyName is nameof(CaptureViewModel.Selection) or nameof(CaptureViewModel.Mode) or nameof(CaptureViewModel.SaysCopied))
+        if (e.PropertyName is nameof(CaptureViewModel.Selection) or nameof(CaptureViewModel.Mode) or nameof(CaptureViewModel.ShowsActions))
             ShowArea();
     }
 

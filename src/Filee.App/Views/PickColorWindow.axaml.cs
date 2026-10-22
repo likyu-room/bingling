@@ -16,7 +16,7 @@ public partial class PickColorWindow : ScreenCoverWindow
     public void Open(ScreenShot shot, PixelPoint cursor)
     {
         Lens.Shot = shot;
-        Cover(shot);
+        Cover(shot, Frozen);
         MoveLens(this.PointToClient(cursor));
     }
 
