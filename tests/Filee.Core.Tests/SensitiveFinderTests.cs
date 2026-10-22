@@ -1,7 +1,8 @@
 // What the redact tool's "find what to hide" picks from the text and faces the OCR read: phone numbers, e-mail addresses,
-// resident registration numbers, card numbers, addresses and faces, each one only once where the rules overlap, with a box
-// over the words it covers, a little larger than they are, as fractions of the picture.
+// resident registration numbers, card numbers, addresses and faces, each one only once where the rules overlap, two numbers
+// side by side as two, with a box over the words it covers, a little larger than they are, as fractions of the picture.
 
+using System.Diagnostics;
 using Filee.Core.Platform;
 using Filee.Core.Privacy;
 
@@ -25,8 +26,8 @@ public class SensitiveFinderTests
     [InlineData(SensitiveKind.Email, "kim.minsu@example.com")]
     [InlineData(SensitiveKind.ResidentNumber, "900101-1234567")]
     [InlineData(SensitiveKind.ResidentNumber, "9001011234567")]
-    [InlineData(SensitiveKind.CardNumber, "1234-5678-9012-3456")]
-    [InlineData(SensitiveKind.CardNumber, "1234567890123456")]
+    [InlineData(SensitiveKind.CardNumber, "4111-1111-1111-1111")]
+    [InlineData(SensitiveKind.CardNumber, "5500000000000004")]
     public void A_line_of_one_word_is_found_as_its_kind(SensitiveKind kind, string word)
     {
         var spot = Assert.Single(Find(Line(word)));
@@ -49,26 +50,69 @@ public class SensitiveFinderTests
     [Fact]
     public void A_number_the_OCR_split_into_words_is_one_spot_over_all_of_them()
     {
-        // As Windows reads "Tel 02 123 4567" and "Card 1234 5678 9012 3456": a word for each group of digits.
+        // As Windows reads "Tel 02 123 4567" and "Card 4111 1111 1111 1111": a word for each group of digits.
         var phone = Assert.Single(Find(Line("Tel", "02", "123", "4567")));
         Assert.Equal(SensitiveKind.Phone, phone.Kind);
         Assert.Equal("02 123 4567", phone.Text);
         Assert.Equal(147.0 / 1000, phone.Box.X, 6); // from the first group's left edge…
         Assert.Equal((290 + 3 - 147.0) / 1000, phone.Box.Width, 6); // …to the last one's right edge
 
-        var card = Assert.Single(Find(Line("Card", "1234", "5678", "9012", "3456")));
+        var card = Assert.Single(Find(Line("Card", "4111", "1111", "1111", "1111")));
         Assert.Equal(SensitiveKind.CardNumber, card.Kind);
-        Assert.Equal("1234 5678 9012 3456", card.Text);
+        Assert.Equal("4111 1111 1111 1111", card.Text);
 
-        // A hyphen read as a word of its own, and a group cut off at it.
+        // A hyphen read as a word of its own, a group cut off at it, a number cut anywhere.
         Assert.Equal(SensitiveKind.Phone, Assert.Single(Find(Line("010", "-", "1234-", "5678"))).Kind);
+        Assert.Equal("01 0-1234 -5678", Assert.Single(Find(Line("01", "0-1234", "-5678")), s => s.Kind == SensitiveKind.Phone).Text);
+    }
+
+    [Theory]
+    [InlineData("010 1234 5678 010 9876 5432", "010 1234 5678", "010 9876 5432")] // once read as a card number
+    [InlineData("010 123 4567 010 987 6543", "010 123 4567", "010 987 6543")]
+    [InlineData("02 123 4567 02 765 4321", "02 123 4567", "02 765 4321")]
+    [InlineData("10 010 1234 5678", "010 1234 5678")] // a number before it is not part of it
+    public void Numbers_side_by_side_are_each_their_own_spot_over_all_of_their_words(string line, params string[] phones)
+    {
+        var spots = Find(Line(line.Split(' ')));
+        Assert.All(spots, s => Assert.Equal(SensitiveKind.Phone, s.Kind));
+        Assert.Equal(phones, spots.Select(s => s.Text));
+        // The second one's box reaches its last word: nothing of it is left to read.
+        var last = Line(line.Split(' ')).Words[^1];
+        Assert.Equal((last.X + last.Width + 3) / 1000, spots[^1].Box.X + spots[^1].Box.Width, 6);
+    }
+
+    [Theory]
+    [InlineData("010-1234-5678로 연락 주세요", SensitiveKind.Phone, "010-1234-5678로")] // the particle is written on to it
+    [InlineData("Tel:010-1234-5678", SensitiveKind.Phone, "Tel:010-1234-5678")]
+    [InlineData("kim@example.com으로 보내 주세요", SensitiveKind.Email, "kim@example.com으로")]
+    [InlineData("주민번호:900101-1234567", SensitiveKind.ResidentNumber, "주민번호:900101-1234567")]
+    public void A_number_with_a_label_or_a_particle_written_on_to_it_is_found_with_that_word(string line, SensitiveKind kind, string text)
+    {
+        var spot = Assert.Single(Find(Line(line.Split(' '))));
+        Assert.Equal(kind, spot.Kind);
+        Assert.Equal(text, spot.Text);
+    }
+
+    [Theory]
+    [InlineData("4111 1111 1111 1111", true)] // a Visa test number
+    [InlineData("5105 1051 0510 5100", true)] // a Mastercard one
+    [InlineData("4000 0566 5566 5556", true)]
+    [InlineData("4111 1111 1111 1112", false)] // the check digit is wrong
+    [InlineData("2023 2024 2025 2026", false)] // its check digit fits, but no card begins 2023
+    [InlineData("1234 5678 9012 3456", false)]
+    public void A_card_number_has_a_right_check_digit_and_a_card_s_first_digits(string number, bool card)
+    {
+        var spots = Find(Line(number.Split(' ')));
+        if (card)
+            Assert.Equal(SensitiveKind.CardNumber, Assert.Single(spots).Kind);
+        else
+            Assert.Empty(spots); // nor anything else in its digits
     }
 
     [Theory]
     [InlineData("900101-1234567", SensitiveKind.ResidentNumber)] // holds "01-1234567", which reads as a phone number
-    [InlineData("4000 0123 4567 8901", SensitiveKind.CardNumber)] // holds "00123456789" and "0123 4567 8901"
-    [InlineData("1234 5678 9012 3456", SensitiveKind.CardNumber)] // holds "123456-7890123", which reads as an ID number
     [InlineData("801231-2345678", SensitiveKind.ResidentNumber)]
+    [InlineData("4000056655665556", SensitiveKind.CardNumber)] // holds "00056655665", "056655665556" and "400005-6655665"
     public void Where_two_rules_match_the_same_digits_only_the_longer_is_kept(string text, SensitiveKind kind)
     {
         var spot = Assert.Single(Find(Line(text.Split(' '))));
@@ -112,7 +156,28 @@ public class SensitiveFinderTests
     [InlineData("서울 강남 맛집")]
     [InlineData("Page 12 of 30")]
     [InlineData("1234 5678")]
+    [InlineData("합계 150000 120000 30000")] // a row of amounts
+    [InlineData("주문번호 20261022-0001234")]
+    [InlineData("송장번호 6012 3456 7890")]
     public void Ordinary_text_is_not_found(string text) => Assert.Empty(Find(Line(text.Split(' '))));
+
+    [Fact]
+    public void Long_lines_of_ordinary_Korean_are_looked_through_at_once()
+    {
+        // "…도" and "…구" with no road and number after them: the address rule once took seconds on a line like this, and
+        // twice as long for every few more letters.
+        var words = "저도 친구와 함께 학교로 가는 길에 맛있는 음식을 먹었어요 서울시 강남구 가가가 정말 즐거운 하루였습니다".Split(' ');
+        var line = Line([.. Enumerable.Repeat(words, 5).SelectMany(w => w)]);
+        Assert.True(line.Text.Length >= 200, $"{line.Text.Length} letters");
+        SensitiveFinder.Find(Text(Line("서울시 강남구")), 1000, 500); // the rules are made on first use
+
+        var clock = Stopwatch.StartNew();
+        var spots = SensitiveFinder.Find(Text([.. Enumerable.Repeat(line, 10)]), 1000, 500);
+        clock.Stop();
+
+        Assert.Empty(spots);
+        Assert.True(clock.ElapsedMilliseconds < 100, $"took {clock.ElapsedMilliseconds} ms");
+    }
 
     [Fact]
     public void Faces_are_found_with_their_box_a_little_larger()
@@ -135,6 +200,25 @@ public class SensitiveFinderTests
         Assert.Equal(1, box.Y + box.Height, 6);
         Assert.Equal(107.5 / 1000, box.Width, 6);
         Assert.Equal(57.5 / 500, box.Height, 6);
+    }
+
+    [Fact]
+    public void A_box_that_cannot_be_is_left_out()
+    {
+        var result = new RecognitionResult(
+            [new RecognizedLine("010-1234-5678", [new RecognizedWord("010-1234-5678", double.PositiveInfinity, 50, 40, 20)])],
+            [
+                new PixelBox(100, 100, -50, 20), // a negative width
+                new PixelBox(100, 100, 50, 0), // no height
+                new PixelBox(double.NaN, 100, 50, 50),
+                new PixelBox(-500, 100, 10, 10), // off the picture altogether
+                new PixelBox(100, 100, double.PositiveInfinity, 50),
+                new PixelBox(900, 400, 300, 300), // partly off it: cut to the picture
+            ],
+            TextAvailable: true);
+        var box = Assert.Single(SensitiveFinder.Find(result, 1000, 500)).Box;
+        Assert.Equal(1, box.X + box.Width, 6);
+        Assert.Equal(1, box.Y + box.Height, 6);
     }
 
     [Fact]

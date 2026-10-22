@@ -154,7 +154,7 @@
   "tool.redact.found_none": "No se encontró nada que ocultar",
   "tool.redact.no_text_language": "Este PC no tiene ningún idioma para leer texto",
   "tool.redact.find_failed": "Esta vez no se pudo buscar. Inténtalo de nuevo",
-  "tool.redact.hide_chosen": "Ocultar lo elegido",
+  "tool.redact.hide_chosen": "Ocultar lo seleccionado",
   "tool.redact.kind.phone": "Teléfono",
   "tool.redact.kind.email": "Correo",
   "tool.redact.kind.residentnumber": "N.º de identidad",

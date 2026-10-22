@@ -40,7 +40,8 @@
     </Button>
 
     <!-- Find what to hide: on for one file only, and its tip says why when it is off. What was found is listed, each one
-         chosen at first and outlined on the picture in its kind's colour; "Hide the chosen" makes boxes of them. -->
+         chosen at first and outlined on the picture in its kind's colour; "Hide selected" makes boxes of them. It sits above
+         the list, which scrolls on its own, so a long list never pushes it out of sight. -->
     <StackPanel Spacing="8">
       <Button x:Name="FindButton" HorizontalAlignment="Left" Padding="10,5" Focusable="False" Command="{Binding FindCommand}"
               ToolTip.Tip="{Binding FindTip}" ToolTip.ShowOnDisabled="True">
@@ -51,23 +52,25 @@
       </Button>
       <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding FindStatus}"
                  IsVisible="{Binding FindStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-      <ItemsControl ItemsSource="{Binding Spots}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate x:DataType="tools:FoundSpot">
-            <CheckBox Focusable="False" IsChecked="{Binding IsChosen}">
-              <DockPanel>
-                <Border DockPanel.Dock="Left" CornerRadius="999" Padding="7,1" Margin="0,0,6,0" VerticalAlignment="Center"
-                        Background="{Binding KindBrush}">
-                  <TextBlock Text="{Binding KindText}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
-                </Border>
-                <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-              </DockPanel>
-            </CheckBox>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
       <Button x:Name="HideChosenButton" HorizontalAlignment="Left" Padding="10,5" Focusable="False" Command="{Binding HideChosenCommand}"
               IsVisible="{Binding HasSpots}" Content="{DynamicResource tool.redact.hide_chosen}" />
+      <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto" IsVisible="{Binding HasSpots}">
+        <ItemsControl ItemsSource="{Binding Spots}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="tools:FoundSpot">
+              <CheckBox Focusable="False" IsChecked="{Binding IsChosen}" AutomationProperties.Name="{Binding AccessibleName}">
+                <DockPanel>
+                  <Border DockPanel.Dock="Left" CornerRadius="999" Padding="7,1" Margin="0,0,6,0" VerticalAlignment="Center"
+                          Background="{Binding KindBrush}">
+                    <TextBlock Text="{Binding KindText}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                  </Border>
+                  <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </DockPanel>
+              </CheckBox>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
     </StackPanel>
 
     <!-- Always there, set apart as the last word of the panel: the saved picture never keeps the photo's own info, which

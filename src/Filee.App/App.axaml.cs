@@ -72,6 +72,8 @@ public partial class App : Application
         _ = AppHost.Get<ConverterCatalog>().CheckInBackgroundAsync();
         // Captures a failed save kept for its Retry, or an annotate window open as Bingling ended, a day on.
         _ = Task.Run(() => CaptureOutput.DeleteOld(CaptureOutput.TempRoot, DateTime.UtcNow));
+        // A copy of a picture to hide parts of, and what was read on it, left by a Bingling that ended in the middle of a find.
+        _ = Task.Run(() => Filee.App.ViewModels.Tools.RedactToolViewModel.DeleteLeftovers(RecognitionResult.TempFolder));
 
         // Global gestures → donut toolbar
         var triggers = AppHost.Get<TriggerService>();

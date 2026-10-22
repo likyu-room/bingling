@@ -5,6 +5,7 @@
 
 using System.Runtime.InteropServices;
 using Avalonia;
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
@@ -25,6 +26,7 @@ using Filee.Core.Presets;
 using Filee.Core.Privacy;
 using Filee.Core.Settings;
 using ImageMagick;
+using SkiaSharp;
 
 namespace Filee.App.Tests;
 
@@ -659,9 +661,15 @@ public class RedactToolTests
 
     // ───────── Find what to hide ─────────
 
-    /// <summary>A platform that reads <paramref name="read"/> on any picture, and keeps what picture it was given.</summary>
-    private sealed class FakeRecognizer(RecognitionResult read) : IPlatformServices
+    /// <summary>A platform that reads what <paramref name="read"/> says on the picture it is given, and keeps what picture that was.</summary>
+    private sealed class FakeRecognizer(Func<string, RecognitionResult> read) : IPlatformServices
     {
+        /// <summary>Reads <paramref name="read"/> on any picture.</summary>
+        public FakeRecognizer(RecognitionResult read)
+            : this(_ => read)
+        {
+        }
+
         /// <summary>The picture's path, its size and format, as it was when it came.</summary>
         public (string Path, int Width, int Height, MagickFormat Format)? Given { get; private set; }
 
@@ -669,7 +677,7 @@ public class RedactToolTests
         {
             var info = new MagickImageInfo(imagePath);
             Given = (imagePath, (int)info.Width, (int)info.Height, info.Format);
-            return Task.FromResult(read);
+            return Task.FromResult(read(imagePath));
         }
 
         public bool IsFileManagerAt(int x, int y) => false;
@@ -829,7 +837,7 @@ public class RedactToolTests
     {
         var read = new RecognitionResult(
             [Line(("010-1234-5678", 0, 0, 10, 10)), Line(("a@b.co", 0, 20, 10, 10)), Line(("900101-1234567", 0, 40, 10, 10)),
-                Line(("1234-5678-9012-3456", 0, 60, 10, 10)), Line(("서울시", 0, 80, 10, 10), ("강남구", 20, 80, 10, 10), ("테헤란로", 40, 80, 10, 10), ("1", 60, 80, 10, 10))],
+                Line(("4111-1111-1111-1111", 0, 60, 10, 10)), Line(("서울시", 0, 80, 10, 10), ("강남구", 20, 80, 10, 10), ("테헤란로", 40, 80, 10, 10), ("1", 60, 80, 10, 10))],
             [new PixelBox(100, 100, 50, 50)], TextAvailable: true);
         var vm = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
         vm.Recognize = new FakeRecognizer(read).RecognizeAsync;
@@ -895,6 +903,181 @@ public class RedactToolTests
         vm.SaveCommand.Execute(null);
         Assert.Equal(3, vm.Result!.Shared!.Redact!.Boxes.Count); // the boxes, and nothing of the outlines
         Assert.Null(vm.Result.Shared.Annotations);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Closing_the_window_while_it_looks_stops_it_and_nothing_is_listed()
+    {
+        var vm = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        var answer = new TaskCompletionSource<RecognitionResult>();
+        CancellationToken? token = null;
+        vm.Recognize = (_, ct) =>
+        {
+            token = ct;
+            return answer.Task; // a platform that answers late, whatever it is told
+        };
+        vm.FindCommand.Execute(null);
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (token is null && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+
+        vm.Dispose(); // the window closed
+        Assert.True(token!.Value.IsCancellationRequested);
+        answer.SetResult(Read);
+        WaitForFind(vm);
+        Assert.Empty(vm.Spots);
+        Assert.Empty(vm.ChosenSpots);
+    }
+
+    [AvaloniaFact]
+    public void What_a_find_left_behind_is_deleted_when_Bingling_starts()
+    {
+        // A copy of the picture and what was read on it, left by a Bingling that ended in the middle of a find.
+        var root = Path.Combine(Path.GetTempPath(), "filee-app-tests", "find-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(Path.Combine(root, "1a2b3c4d"));
+        File.WriteAllText(Path.Combine(root, "1a2b3c4d", "picture.png"), "a picture");
+        File.WriteAllText(Path.Combine(root, "0123456789abcdef.json"), "{}");
+
+        RedactToolViewModel.DeleteLeftovers(root);
+
+        Assert.False(Directory.Exists(root) && Directory.EnumerateFileSystemEntries(root).Any());
+        RedactToolViewModel.DeleteLeftovers(root); // nothing there: nothing to do, no error
+    }
+
+    /// <summary>A picture stored 300 × 200 with EXIF orientation 6: upright, 200 wide and 300 tall, red from (20, 40) to (120, 70).</summary>
+    private static string TurnedWithRed()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "filee-app-tests", "turned-" + Guid.NewGuid().ToString("N")[..8], "phone.jpg");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        using var image = new MagickImage(MagickColors.White, 200, 300);
+        using (var red = new MagickImage(MagickColors.Red, 100, 30))
+            image.Composite(red, 20, 40, CompositeOperator.Over);
+        image.Rotate(-90); // stored a quarter turn back, as a phone held upright stores it
+        image.Orientation = OrientationType.RightTop;
+        var exif = new ExifProfile();
+        exif.SetValue(ExifTag.Orientation, (ushort)6);
+        image.SetProfile(exif);
+        image.Quality = 100;
+        image.Write(path, MagickFormat.Jpeg);
+        return path;
+    }
+
+    /// <summary>"Reads" a phone number where the picture it is given is red.</summary>
+    private static RecognitionResult RedIsAPhoneNumber(string path)
+    {
+        using var image = new MagickImage(path);
+        var (w, h) = ((int)image.Width, (int)image.Height);
+        var rgb = image.GetPixels().ToByteArray(PixelMapping.RGB)!;
+        var red = (from y in Enumerable.Range(0, h) from x in Enumerable.Range(0, w)
+                   let i = (y * w + x) * 3 where rgb[i] > 200 && rgb[i + 1] < 80 && rgb[i + 2] < 80 select (x, y)).ToList();
+        var (left, top) = (red.Min(p => p.x), red.Min(p => p.y));
+        return new RecognitionResult(
+            [Line(("010-1234-5678", left, top, red.Max(p => p.x) + 1 - left, red.Max(p => p.y) + 1 - top))], [], TextAvailable: true);
+    }
+
+    [AvaloniaFact]
+    public void A_spot_found_on_a_turned_photo_is_where_the_preview_shows_it()
+    {
+        var vm = Redact([TurnedWithRed()], TestStore(), Loc("ko"));
+        vm.Recognize = new FakeRecognizer(RedIsAPhoneNumber).RecognizeAsync;
+        WaitForPreview(vm);
+        Assert.Equal((200, 300), (vm.ImageWidth, vm.ImageHeight));
+
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+
+        var box = Assert.Single(vm.Spots).Spot.Box;
+        Assert.Equal((20 / 200.0, 40 / 300.0, 100 / 200.0, 30 / 300.0), (box.X + 4.5 / 200, box.Y + 4.5 / 300, box.Width - 9 / 200.0, box.Height - 9 / 300.0), new BoxComparer());
+        // The box's middle on the picture the window shows (and saves the boxes on) is red; beside the box, it is not.
+        using var preview = SKBitmap.FromImage(vm.PreviewImage!);
+        SKColor At(double x, double y) => preview.GetPixel((int)(x * preview.Width), (int)(y * preview.Height));
+        var middle = At(box.X + box.Width / 2, box.Y + box.Height / 2);
+        Assert.True(middle.Red > 200 && middle.Green < 80 && middle.Blue < 80, $"{middle} in the middle of the box");
+        Assert.True(At(box.X + box.Width / 2, box.Y + box.Height + 0.1).Green > 200);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_very_large_picture_is_read_smaller_and_its_spots_are_still_where_they_show()
+    {
+        // As a 48-megapixel photo: read whole, PowerShell took over 600 MB for it.
+        var platform = new FakeRecognizer(path =>
+        {
+            var info = new MagickImageInfo(path);
+            // The phone number across the middle fifth of the picture, in the pixels of the copy it was given.
+            return new RecognitionResult([Line(("010-1234-5678", info.Width * .4, info.Height * .4, info.Width * .2, info.Height * .2))], [], TextAvailable: true);
+        });
+        var vm = Redact([ImageToolWindowTests.TestImages.Png(5000, 1000)], TestStore(), Loc("ko"));
+        vm.Recognize = platform.RecognizeAsync;
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+
+        Assert.Equal(RedactToolViewModel.ReadEdge, platform.Given!.Value.Width); // the long side, the shape kept
+        Assert.InRange(platform.Given.Value.Height, 818, 820);
+        // As fractions, the same on the picture itself: the middle fifth, grown by 15 % of its height (0.03 of the picture's,
+        // a fifth of that across, as it is five times as wide as tall).
+        var box = Assert.Single(vm.Spots).Spot.Box;
+        Assert.Equal((.4 - .006, .4 - .03, .2 + .012, .2 + .06), Tuple(box), new BoxComparer());
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Many_spots_scroll_in_their_list_and_hide_selected_stays_in_sight()
+    {
+        var many = new RecognitionResult(
+            [.. Enumerable.Range(0, 30).Select(i => Line(($"010-1234-{1000 + i}", 20, 5 + i * 6, 150, 5)))], [], TextAvailable: true);
+        var vm = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        vm.Recognize = new FakeRecognizer(many).RecognizeAsync;
+        var window = new ImageToolWindow { DataContext = vm, Width = 900, Height = 600 };
+        window.Show();
+        WaitForPreview(vm);
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+
+        Assert.Equal(30, vm.Spots.Count);
+        var panel = window.FindControl<ContentControl>("ToolPanel")!.FindAncestorOfType<ScrollViewer>()!;
+        var hide = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.HideChosenCommand);
+        var bottom = hide.TranslatePoint(new Point(0, hide.Bounds.Height), panel)!.Value.Y;
+        Assert.True(bottom <= panel.Viewport.Height, $"the button ends at {bottom}, the panel shows {panel.Viewport.Height}");
+        var list = window.GetVisualDescendants().OfType<CheckBox>().First().FindAncestorOfType<ScrollViewer>()!;
+        Assert.NotSame(panel, list);
+        Assert.True(list.Extent.Height > list.Viewport.Height); // the list scrolls on its own
+
+        // A screen reader says what each one is.
+        var first = window.GetVisualDescendants().OfType<CheckBox>().First();
+        Assert.Equal("전화번호 010-1234-1000", AutomationProperties.GetName(first));
+        Screenshot(window, "tool-redact-find-many-ko.png");
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_spot_s_outline_shows_on_a_dark_picture_too()
+    {
+        var vm = Redact([ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.Black)], TestStore(), Loc("ko"));
+        vm.Recognize = new FakeRecognizer(Read).RecognizeAsync;
+        var window = new ImageToolWindow { DataContext = vm, Width = 900, Height = 600 };
+        window.Show();
+        WaitForPreview(vm);
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+
+        var phone = vm.Spots[0].Spot.Box;
+        using var frame = window.CaptureRenderedFrame()!;
+        var top = At(window, new Size(400, 200), phone.X + phone.Width / 2, phone.Y);
+        var edge = (from dy in Enumerable.Range(-4, 9) select PixelAt(frame, top + new Point(0, dy))).ToList();
+        Assert.Contains(edge, c => c.R > 200 && c.G > 200 && c.B > 200); // a light line around it
+        Assert.Contains(edge, c => c.R > 140 && c.G is > 60 and < 130 && c.B < 60); // in the phone number's orange
+        Screenshot(window, "tool-redact-find-dark-ko.png");
         window.Close();
         vm.Dispose();
     }

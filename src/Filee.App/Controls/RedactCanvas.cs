@@ -40,6 +40,11 @@ public sealed class RedactCanvas : PictureView
     private static readonly IPen OutlinePen = new Pen(Brushes.White, 1.5);
     private static readonly IPen OutlineShadowPen = new Pen(new SolidColorBrush(Color.FromArgb(150, 0, 0, 0)), 1);
 
+    // A spot found to hide: its kind's colour, two DIPs, on a white line one and a half DIPs wider on each side.
+    private static readonly IPen SpotRimPen = new ImmutablePen(Colors.White.ToUInt32(), 5);
+    private static readonly Dictionary<SensitiveKind, IPen> SpotPens =
+        Enum.GetValues<SensitiveKind>().ToDictionary(k => k, k => (IPen)new ImmutablePen(SpotColor(k).ToUInt32(), 2));
+
     // A box that is not picked: dark under white dashes, one DIP thick, lighter than the picked box's.
     private static readonly IPen DimShadowPen = new Pen(new SolidColorBrush(Color.FromArgb(120, 0, 0, 0)), 2);
     private static readonly IPen DimPen = new Pen(Brushes.White, 1, new DashStyle([4, 3], 0));
@@ -278,7 +283,12 @@ public sealed class RedactCanvas : PictureView
             context.DrawRectangle(null, DimPen, outline);
         }
         foreach (var spot in Spots ?? [])
-            context.DrawRectangle(null, new ImmutablePen(SpotColor(spot.Kind).ToUInt32(), 2), ImageCanvas.ToScreen(AsCrop(spot.Box), PictureRect));
+        {
+            // The kind's colour on a wider light line: the colour shows on a bright picture, the light rim on a dark one.
+            var outline = ImageCanvas.ToScreen(AsCrop(spot.Box), PictureRect);
+            context.DrawRectangle(null, SpotRimPen, outline);
+            context.DrawRectangle(null, SpotPens[spot.Kind], outline);
+        }
         if (selected < 0)
             return;
         var box = ImageCanvas.ToScreen(AsCrop(redact.Boxes[selected]), PictureRect);

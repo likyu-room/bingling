@@ -21,4 +21,10 @@ public sealed record RecognitionResult(IReadOnlyList<RecognizedLine> Lines, IRea
 {
     /// <summary>Nothing read, and no text recognition: what a platform without one answers.</summary>
     public static RecognitionResult Empty { get; } = new([], [], false);
+
+    /// <summary>
+    /// Where the copy of a picture to read and what was read on it are kept while it is read (<c>%TEMP%\Bingling\find</c>).
+    /// They are private, so Bingling empties it when it starts, in case it ended in the middle of one.
+    /// </summary>
+    public static string TempFolder => Path.Combine(Path.GetTempPath(), AppIdentity.Folder, "find");
 }

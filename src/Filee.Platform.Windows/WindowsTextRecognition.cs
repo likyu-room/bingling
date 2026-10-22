@@ -1,15 +1,17 @@
 // The redact tool's "find what to hide" on Windows: the text (Windows.Media.Ocr, in the languages of the user's profile)
 // and the faces (Windows.Media.FaceAnalysis) on a picture, read on this PC. .NET 10 reaches these WinRT APIs only through
 // the Windows SDK projection, which Bingling does not ship; Windows PowerShell 5.1 runs on .NET Framework, which reaches
-// them as they are. So a short script is written to a temporary .ps1 and run with -File, the picture and the result file
-// as its arguments (never typed into the script, so no character of a path can change what it runs). It writes what it
-// read to a UTF-8 JSON file, which the console's code page can't garble.
+// them as they are. So a short script goes to PowerShell's standard input (-Command -), the picture and the result file in
+// environment variables of that process only (never typed into the script, so no character of a path can change what it
+// runs). Commands typed in are not scripts, so an execution policy that a company's group policy forces (AllSigned,
+// Restricted) does not stop them, as it stops -File; and no script file is written anywhere. What was read comes back in a
+// UTF-8 JSON file, which the console's code page can't garble.
 
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using System.Text;
 using System.Text.Json;
-using Filee.Core;
 using Filee.Core.Platform;
 
 namespace Filee.Platform.Windows;
@@ -23,43 +25,50 @@ internal static class WindowsTextRecognition
 
     private static readonly RecognitionResult Failed = RecognitionResult.Empty with { Failed = true };
 
-    /// <summary>Where the script and its result go while it runs; both are deleted after.</summary>
-    private static string Folder => Path.Combine(Path.GetTempPath(), AppIdentity.Folder, "ocr");
-
     /// <summary>
     /// What is on the picture at <paramref name="imagePath"/> (any picture Windows decodes; its EXIF orientation is not
     /// applied, positions are in its pixels as stored). <see cref="RecognitionResult.Failed"/> when PowerShell could not
     /// read it or took longer than <see cref="Timeout"/>; <paramref name="ct"/> stops PowerShell and throws.
     /// </summary>
-    public static async Task<RecognitionResult> RecognizeAsync(string imagePath, CancellationToken ct)
+    public static Task<RecognitionResult> RecognizeAsync(string imagePath, CancellationToken ct) => RecognizeAsync(imagePath, ct, Timeout);
+
+    /// <param name="environment">More environment variables for PowerShell (tests: an execution policy).</param>
+    /// <param name="started">Told of PowerShell once it runs (tests: to see that it ends).</param>
+    internal static async Task<RecognitionResult> RecognizeAsync(string imagePath, CancellationToken ct, TimeSpan timeout,
+        IReadOnlyDictionary<string, string>? environment = null, Action<Process>? started = null)
     {
-        var name = Guid.NewGuid().ToString("N");
-        var script = Path.Combine(Folder, name + ".ps1");
-        var output = Path.Combine(Folder, name + ".json");
+        var output = Path.Combine(RecognitionResult.TempFolder, Guid.NewGuid().ToString("N") + ".json");
+        Process? process = null;
         try
         {
-            Directory.CreateDirectory(Folder);
-            await File.WriteAllTextAsync(script, Script, ct);
+            Directory.CreateDirectory(RecognitionResult.TempFolder);
             var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "WindowsPowerShell", "v1.0", "powershell.exe"))
             {
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardInput = true,
+                StandardInputEncoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), // the script is ASCII: no mark before it
             };
-            foreach (var argument in (string[])["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, Path.GetFullPath(imagePath), output])
+            foreach (var argument in (string[])["-NoLogo", "-NoProfile", "-NonInteractive", "-Command", "-"])
                 start.ArgumentList.Add(argument);
-            using var process = Process.Start(start) ?? throw new InvalidOperationException("PowerShell did not start.");
+            start.Environment["BINGLING_FIND_IMAGE"] = Path.GetFullPath(imagePath);
+            start.Environment["BINGLING_FIND_OUT"] = output;
+            foreach (var (key, value) in environment ?? new Dictionary<string, string>())
+                start.Environment[key] = value;
+            process = Process.Start(start) ?? throw new InvalidOperationException("PowerShell did not start.");
+            started?.Invoke(process);
             using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            limit.CancelAfter(Timeout);
+            limit.CancelAfter(timeout);
             try
             {
+                // Two empty lines after it: without them PowerShell ends without running the last statement (the try block).
+                await process.StandardInput.WriteAsync((Script + "\n\n").AsMemory(), limit.Token);
+                process.StandardInput.Close();
                 await process.WaitForExitAsync(limit.Token);
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
-                process.Kill(entireProcessTree: true);
-                process.WaitForExit(2000); // so the files it holds can be deleted below
-                ct.ThrowIfCancellationRequested();
-                Trace.TraceWarning($"Text recognition did not finish within {Timeout.TotalSeconds} seconds");
+                Trace.TraceWarning($"Text recognition did not finish within {timeout.TotalSeconds} seconds");
                 return Failed;
             }
             if (process.ExitCode != 0)
@@ -77,9 +86,29 @@ internal static class WindowsTextRecognition
         }
         finally
         {
-            Delete(script);
+            Stop(process); // too slow, cancelled, or its standard input broke: it ends here, before its file is deleted
             Delete(output);
         }
+    }
+
+    /// <summary>Ends PowerShell if it still runs, and lets go of it.</summary>
+    private static void Stop(Process? process)
+    {
+        if (process is null)
+            return;
+        try
+        {
+            if (!process.HasExited)
+            {
+                process.Kill(entireProcessTree: true);
+                process.WaitForExit(2000);
+            }
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or Win32Exception)
+        {
+            Trace.TraceWarning($"Could not end the text recognition: {ex.Message}");
+        }
+        process.Dispose();
     }
 
     /// <summary>The script's JSON: <c>{"text": bool, "lines": [{"t", "words": [{"t", "x", "y", "w", "h"}]}], "faces": [{"x", "y", "w", "h"}]}</c>.</summary>
@@ -106,12 +135,14 @@ internal static class WindowsTextRecognition
     }
 
     /// <summary>
-    /// Reads the picture (its first argument) and writes the JSON to its second; on an error, the message there instead and
-    /// exit code 1. A picture larger than the OCR takes is read smaller, and the boxes are scaled back to its own pixels.
-    /// Faces are looked for in grey, which is what the detector takes; without a recognition language, faces only.
+    /// Reads the picture ($env:BINGLING_FIND_IMAGE) and writes the JSON to $env:BINGLING_FIND_OUT; on an error, the message
+    /// there instead and exit code 1. A picture larger than the OCR takes is read smaller, and the boxes are scaled back to
+    /// its own pixels. Faces are looked for in grey, which is what the detector takes; without a recognition language, faces
+    /// only. ASCII only (standard input is read in the console's code page), and no empty line inside a statement, which
+    /// would end it there when typed in.
     /// </summary>
     private const string Script = """
-        param([string]$Image, [string]$Out)
+        $Image = $env:BINGLING_FIND_IMAGE; $Out = $env:BINGLING_FIND_OUT
         $ErrorActionPreference = 'Stop'
         try {
             Add-Type -AssemblyName System.Runtime.WindowsRuntime
@@ -127,7 +158,6 @@ internal static class WindowsTextRecognition
                 $task.Wait() | Out-Null
                 $task.Result
             }
-
             $file = Await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($Image)) ([Windows.Storage.StorageFile])
             $stream = Await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream])
             try {
@@ -149,7 +179,6 @@ internal static class WindowsTextRecognition
                 $stream.Dispose()
             }
             function Box($r) { @{ x = $r.X * $sx; y = $r.Y * $sy; w = $r.Width * $sx; h = $r.Height * $sy } }
-
             $lines = New-Object System.Collections.ArrayList
             $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages()
             if ($null -ne $engine) {
@@ -164,7 +193,6 @@ internal static class WindowsTextRecognition
                     [void]$lines.Add(@{ t = $line.Text; words = $words })
                 }
             }
-
             $faces = New-Object System.Collections.ArrayList
             if ([Windows.Media.FaceAnalysis.FaceDetector]::IsSupported) {
                 $gray = [Windows.Graphics.Imaging.SoftwareBitmap]::Convert($bitmap, [Windows.Graphics.Imaging.BitmapPixelFormat]::Gray8)
@@ -172,7 +200,6 @@ internal static class WindowsTextRecognition
                 $found = Await ($detector.DetectFacesAsync($gray)) ([System.Collections.Generic.IList[Windows.Media.FaceAnalysis.DetectedFace]])
                 foreach ($face in $found) { [void]$faces.Add((Box $face.FaceBox)) }
             }
-
             $json = ConvertTo-Json -InputObject @{ text = ($null -ne $engine); lines = $lines; faces = $faces } -Depth 6 -Compress
             [IO.File]::WriteAllText($Out, $json, (New-Object Text.UTF8Encoding $false))
         } catch {

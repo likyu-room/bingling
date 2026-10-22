@@ -3,7 +3,13 @@
 // people put them), and the faces it found. Names are left out: they can't be told from other words reliably.
 //
 // The OCR splits what people write as one: "010 1234 5678" comes back as three words, a hyphen may be a word of its own.
-// So a line's words are run together before the rules look at it, and a spot's box is the words its letters fall in.
+// So a line's words are run together before the rules look at it, and a spot's box is the words its letters fall in. But
+// run together, two numbers side by side read as one long number ("010 1234 5678 010 9876 5432" holds sixteen digits that
+// read as a card number). So a number is looked for word by word, over the fewest words that hold it whole: it may begin
+// and end inside a word only where a label or a particle is written on to it ("Tel:010…", "…5678로"), never between two
+// digits, and where its words part, its format must have a place for a space (010 | 1234 | 5678, not 010 1 | 234 5678).
+//
+// The rules run without backtracking: an ordinary line of Korean could otherwise keep the address rule busy for minutes.
 
 using System.Text;
 using System.Text.RegularExpressions;
@@ -34,9 +40,12 @@ public static partial class SensitiveFinder
     /// <summary>How much a box grows on every side, as a fraction of its height: the OCR's boxes hug the letters.</summary>
     private const double Margin = 0.15;
 
+    /// <summary>The most words a number is split into: a card as "1234 - 5678 - 9012 - 3456" is seven.</summary>
+    private const int MostWords = 8;
+
     /// <summary>
     /// The rules, the most particular first: where two match the same letters the longer one is kept, and on a tie the one
-    /// earlier here (a card number holds digits that read as an ID number, an ID number digits that read as a phone number).
+    /// earlier here.
     /// </summary>
     private static readonly (SensitiveKind Kind, Regex Rule)[] Rules =
     [
@@ -49,7 +58,7 @@ public static partial class SensitiveFinder
 
     /// <summary>
     /// The spots in <paramref name="read"/>, a picture <paramref name="width"/> × <paramref name="height"/> pixels: the text's
-    /// line by line, left to right, then the faces.
+    /// line by line, left to right, then the faces. A box that can't be (not a number, of no size, off the picture) is left out.
     /// </summary>
     public static IReadOnlyList<SensitiveSpot> Find(RecognitionResult read, int width, int height)
     {
@@ -58,89 +67,190 @@ public static partial class SensitiveFinder
         return
         [
             .. read.Lines.SelectMany(line => InLine(line, width, height)),
-            .. read.Faces.Select(f => new SensitiveSpot(SensitiveKind.Face, "", Fraction(f, width, height))),
+            .. read.Faces.Select(f => Fraction(f, width, height) is { } box ? new SensitiveSpot(SensitiveKind.Face, "", box) : null).OfType<SensitiveSpot>(),
         ];
     }
 
     private static IEnumerable<SensitiveSpot> InLine(RecognizedLine line, int width, int height)
     {
-        var (text, owners) = RunTogether(line.Words);
+        var words = new Words(line.Words);
         var kept = new List<(SensitiveKind Kind, int Start, int End)>();
         // Longest first; OrderBy is stable, so a tie keeps the rules' order.
-        foreach (var (kind, match) in Rules.SelectMany(r => r.Rule.Matches(text).Select(m => (r.Kind, m))).OrderByDescending(m => m.m.Length))
+        foreach (var found in Rules.SelectMany(r => words.Matches(r.Kind, r.Rule)).OrderByDescending(m => m.End - m.Start))
         {
-            var (start, end) = (match.Index, match.Index + match.Length);
-            if (!kept.Any(k => start < k.End && k.Start < end))
-                kept.Add((kind, start, end));
+            if (!kept.Any(k => found.Start < k.End && k.Start < found.End))
+                kept.Add(found);
         }
         foreach (var (kind, start, end) in kept.OrderBy(k => k.Start))
         {
-            var words = owners[start..end].Where(w => w >= 0).Distinct().Select(w => line.Words[w]).ToList();
-            var left = words.Min(w => w.X);
-            var top = words.Min(w => w.Y);
-            var box = new PixelBox(left, top, words.Max(w => w.X + w.Width) - left, words.Max(w => w.Y + w.Height) - top);
-            yield return new SensitiveSpot(kind, string.Join(' ', words.Select(w => w.Text)), Fraction(box, width, height));
+            var covered = words.Owners[start..end].Where(w => w >= 0).Distinct().Select(w => line.Words[w]).ToList();
+            var left = covered.Min(w => w.X);
+            var top = covered.Min(w => w.Y);
+            var box = new PixelBox(left, top, covered.Max(w => w.X + w.Width) - left, covered.Max(w => w.Y + w.Height) - top);
+            if (Fraction(box, width, height) is { } fraction)
+                yield return new SensitiveSpot(kind, string.Join(' ', covered.Select(w => w.Text)), fraction);
         }
     }
 
     /// <summary>
-    /// The line's words as one text, and the word each of its letters came from (-1 for a space put between two). Words
-    /// are joined as they are where the OCR may have split one thing (between digits, at a hyphen, a dot or an @), and
-    /// with a space elsewhere, so a label ("Email", "Tel") stays apart from what follows it.
+    /// A line's words as one text, and where each came from. Words are joined as they are where the OCR may have split one
+    /// thing (between digits, at a hyphen, a dot or an @), and with a space elsewhere, so a label ("Email", "Tel") stays apart
+    /// from what follows it.
     /// </summary>
-    private static (string Text, int[] Owners) RunTogether(IReadOnlyList<RecognizedWord> words)
+    private sealed class Words
     {
-        var text = new StringBuilder();
-        var owners = new List<int>();
-        for (var i = 0; i < words.Count; i++)
+        private readonly List<(int Start, int End)> _spans = []; // of each word with letters, in the text
+
+        public Words(IReadOnlyList<RecognizedWord> words)
         {
-            var word = words[i].Text;
-            if (word.Length == 0)
-                continue;
-            if (text.Length > 0 && !Joins(text[^1], word[0]))
+            var text = new StringBuilder();
+            var owners = new List<int>();
+            for (var i = 0; i < words.Count; i++)
             {
-                text.Append(' ');
-                owners.Add(-1);
+                var word = words[i].Text;
+                if (word.Length == 0)
+                    continue;
+                if (text.Length > 0 && !Joins(text[^1], word[0]))
+                {
+                    text.Append(' ');
+                    owners.Add(-1);
+                }
+                _spans.Add((text.Length, text.Length + word.Length));
+                text.Append(word);
+                owners.AddRange(Enumerable.Repeat(i, word.Length));
             }
-            text.Append(word);
-            owners.AddRange(Enumerable.Repeat(i, word.Length));
+            Text = text.ToString();
+            Owners = [.. owners];
         }
-        return (text.ToString(), [.. owners]);
+
+        public string Text { get; }
+
+        /// <summary>The word each letter of <see cref="Text"/> came from; -1 for a space put between two.</summary>
+        public int[] Owners { get; }
+
+        /// <summary>Where <paramref name="rule"/> matches, as start and end in <see cref="Text"/>.</summary>
+        public IEnumerable<(SensitiveKind Kind, int Start, int End)> Matches(SensitiveKind kind, Regex rule)
+        {
+            if (!rule.IsMatch(Text)) // most lines hold nothing: one pass over them
+                yield break;
+            if (kind is SensitiveKind.Email or SensitiveKind.Address)
+            {
+                foreach (Match m in rule.Matches(Text))
+                {
+                    if (!CutsNumber(m.Index) && !CutsNumber(m.Index + m.Length))
+                        yield return (kind, m.Index, m.Index + m.Length);
+                }
+                yield break;
+            }
+            // A number: from each word on, the fewest words that hold one whole.
+            for (var i = 0; i < _spans.Count; i++)
+            {
+                for (var j = i; j < Math.Min(_spans.Count, i + MostWords); j++)
+                {
+                    var m = rule.Match(Text, _spans[i].Start, _spans[j].End - _spans[i].Start);
+                    if (m.Success && Owners[m.Index] == Owners[_spans[i].Start] && Owners[m.Index + m.Length - 1] == Owners[_spans[j].End - 1]
+                        && !CutsNumber(m.Index) && !CutsNumber(m.Index + m.Length) && SplitsFit(kind, m)
+                        && (kind != SensitiveKind.CardNumber || IsCardNumber(m.Value)))
+                    {
+                        yield return (kind, m.Index, m.Index + m.Length);
+                        i = j;
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// <summary>True when <paramref name="at"/> falls inside a word between two digits: beginning or ending there would cut a number.</summary>
+        private bool CutsNumber(int at) =>
+            at > 0 && at < Text.Length && Owners[at - 1] == Owners[at] && char.IsAsciiDigit(Text[at - 1]) && char.IsAsciiDigit(Text[at]);
+
+        /// <summary>
+        /// True when every place <paramref name="m"/>'s words part falls where its format has a space: a phone number after its
+        /// area code or before its last four digits, an ID number after its first six, a card number between groups of four.
+        /// </summary>
+        private bool SplitsFit(SensitiveKind kind, Match m)
+        {
+            var digits = m.Value.Count(char.IsAsciiDigit);
+            var before = 0;
+            for (var at = m.Index + 1; at < m.Index + m.Length; at++)
+            {
+                if (char.IsAsciiDigit(Text[at - 1]))
+                    before++;
+                if (Owners[at - 1] == Owners[at])
+                    continue;
+                var fits = kind switch
+                {
+                    SensitiveKind.Phone => before is 2 or 3 || before == digits - 4,
+                    SensitiveKind.ResidentNumber => before == 6,
+                    _ => before % 4 == 0,
+                };
+                if (!fits)
+                    return false;
+            }
+            return true;
+        }
     }
 
     private static bool Joins(char before, char after) =>
         char.IsAsciiDigit(before) && char.IsAsciiDigit(after) || "-.@".Contains(before) || "-.@".Contains(after);
 
-    /// <summary><paramref name="box"/> grown by <see cref="Margin"/> of its height, kept on the picture, as fractions of it.</summary>
-    private static EditRect Fraction(PixelBox box, int width, int height)
+    /// <summary>
+    /// True for sixteen digits a card can have: a right Luhn check digit, and a card's first digits (3 to 6 or 9 — 9 for Korean
+    /// domestic cards — or Mastercard's 2221 to 2720). Four years in a row ("2023 2024 2025 2026") pass Luhn, but no card begins 2023.
+    /// </summary>
+    private static bool IsCardNumber(string match)
     {
+        var digits = match.Where(char.IsAsciiDigit).Select(c => c - '0').ToArray();
+        var first = digits[0] * 1000 + digits[1] * 100 + digits[2] * 10 + digits[3];
+        if (digits[0] is not (3 or 4 or 5 or 6 or 9) && first is not (>= 2221 and <= 2720))
+            return false;
+        var sum = 0;
+        for (var i = 0; i < digits.Length; i++)
+        {
+            var d = (digits.Length - i) % 2 == 0 ? digits[i] * 2 : digits[i]; // every second digit from the right, doubled
+            sum += d > 9 ? d - 9 : d;
+        }
+        return sum % 10 == 0;
+    }
+
+    /// <summary>
+    /// <paramref name="box"/> grown by <see cref="Margin"/> of its height, cut to the picture, as fractions of it; null for a
+    /// box that can't be (a number that is not one, no size) or that is off the picture altogether.
+    /// </summary>
+    private static EditRect? Fraction(PixelBox box, int width, int height)
+    {
+        if (!(double.IsFinite(box.X) && double.IsFinite(box.Y) && double.IsFinite(box.Width) && double.IsFinite(box.Height)
+            && box.Width > 0 && box.Height > 0))
+            return null;
         var grow = box.Height * Margin;
         var left = Math.Max(0, box.X - grow);
         var top = Math.Max(0, box.Y - grow);
         var right = Math.Min(width, box.X + box.Width + grow);
         var bottom = Math.Min(height, box.Y + box.Height + grow);
+        if (right <= left || bottom <= top)
+            return null;
         return new EditRect { X = left / width, Y = top / height, Width = (right - left) / width, Height = (bottom - top) / height };
     }
 
     /// <summary>010-1234-5678, 02.123.4567, 031 123 4567.</summary>
-    [GeneratedRegex(@"0\d{1,2}[-. ]?\d{3,4}[-. ]?\d{4}")]
+    [GeneratedRegex(@"0\d{1,2}[-. ]?\d{3,4}[-. ]?\d{4}", RegexOptions.NonBacktracking)]
     private static partial Regex PhoneRule();
 
-    [GeneratedRegex(@"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")]
+    [GeneratedRegex(@"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", RegexOptions.NonBacktracking)]
     private static partial Regex EmailRule();
 
     /// <summary>A resident registration number: 900101-1234567.</summary>
-    [GeneratedRegex(@"\d{6}[- ]?[1-8]\d{6}")]
+    [GeneratedRegex(@"\d{6}[- ]?[1-8]\d{6}", RegexOptions.NonBacktracking)]
     private static partial Regex ResidentRule();
 
     /// <summary>1234-5678-9012-3456, 1234 5678 9012 3456.</summary>
-    [GeneratedRegex(@"\d{4}([- ]?\d{4}){3}")]
+    [GeneratedRegex(@"\d{4}([- ]?\d{4}){3}", RegexOptions.NonBacktracking)]
     private static partial Regex CardRule();
 
     /// <summary>
     /// On one line: a city or province (…시, …도), a district or county (…구, …군), a road (…로, …길) and its number,
     /// with any words between them: 서울특별시 강남구 테헤란로 123, 경기도 성남시 분당구 판교역로 235.
     /// </summary>
-    [GeneratedRegex(@"[가-힣]+(?:시|도)(?: ?[가-힣]+)*?(?:구|군)(?: ?[가-힣\d]+)*(?:로|길) ?\d+(?:-\d+)?")]
+    [GeneratedRegex(@"[가-힣]+(?:시|도)(?: ?[가-힣]+)*?(?:구|군)(?: ?[가-힣\d]+)*(?:로|길) ?\d+(?:-\d+)?", RegexOptions.NonBacktracking)]
     private static partial Regex AddressRule();
 }

@@ -158,7 +158,7 @@
   "tool.redact.found_none": "Found nothing to hide",
   "tool.redact.no_text_language": "This PC has no language for reading text",
   "tool.redact.find_failed": "Could not look this time. Try again",
-  "tool.redact.hide_chosen": "Hide the chosen",
+  "tool.redact.hide_chosen": "Hide selected",
   "tool.redact.kind.phone": "Phone",
   "tool.redact.kind.email": "E-mail",
   "tool.redact.kind.residentnumber": "ID number",

@@ -1,6 +1,6 @@
 // The redact tool's "find what to hide": the picture, upright as the window shows it, goes to the platform's text and
 // face recognition (on this PC), SensitiveFinder picks what to offer, and the panel lists it, every spot chosen at first
-// and outlined on the picture in its kind's colour (the preview's only: the result holds boxes). "Hide the chosen" adds
+// and outlined on the picture in its kind's colour (the preview's only: the result holds boxes). "Hide selected" adds
 // their boxes, in the way of hiding chosen, as one undo step. Only for one file: the boxes go on every file, and a spot is
 // where it is on one picture only.
 
@@ -9,7 +9,6 @@ using Avalonia.Media.Immutable;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Filee.App.Controls;
-using Filee.Core;
 using Filee.Core.Formats;
 using Filee.Core.Platform;
 using Filee.Core.Presets;
@@ -58,13 +57,15 @@ public sealed partial class RedactToolViewModel
         IsFinding = true;
         Spots = [];
         FindStatus = Loc["tool.redact.finding"];
-        var folder = Path.Combine(Path.GetTempPath(), AppIdentity.Folder, "find", Guid.NewGuid().ToString("N")[..8]);
+        var folder = Path.Combine(RecognitionResult.TempFolder, Guid.NewGuid().ToString("N")[..8]);
         using var cancel = _finding = new CancellationTokenSource();
         try
         {
             var (png, width, height) = await Task.Run(() => UprightCopy(Files[0], folder), cancel.Token);
             var read = await Recognize(png, cancel.Token);
-            var found = SensitiveFinder.Find(read, width, height);
+            // Off the UI thread: a page of text is a lot of lines to look through.
+            var found = await Task.Run(() => SensitiveFinder.Find(read, width, height), cancel.Token);
+            cancel.Token.ThrowIfCancellationRequested(); // the window closed meanwhile, and a platform that answered anyway is not listened to
             Spots = [.. found.Select(s => new FoundSpot(s, Loc["tool.redact.kind." + s.Kind.ToString().ToLowerInvariant()], OnChosenChanged))];
             FindStatus = read.Failed ? Loc["tool.redact.find_failed"] : string.Join("\n", Notes(read.TextAvailable, found.Count));
         }
@@ -124,21 +125,49 @@ public sealed partial class RedactToolViewModel
     }
 
     /// <summary>
-    /// The picture as the window shows it (its first frame, turned upright) as a PNG in <paramref name="folder"/>, and its
-    /// size: whatever its format, Windows can read it, and the boxes found on it are where they show. See-through parts
-    /// go white, as black text on them would be black on black for the OCR.
+    /// The longest side of the copy that is read. A 4K screenshot and a 12-megapixel photo go whole; a 48-megapixel one
+    /// (8000 × 6000) goes at half its size, where its text is still large enough to read: whole, PowerShell took 618 MB and
+    /// 1.5 s for it, at this size 257 MB and 1 s, and found the same.
+    /// </summary>
+    internal const int ReadEdge = 4096;
+
+    /// <summary>
+    /// The picture as the window shows it (its first frame, turned upright, at most <see cref="ReadEdge"/> on its long side)
+    /// as a PNG in <paramref name="folder"/>, and its size: whatever its format, Windows can read it, and the boxes found on
+    /// it, as fractions, are where the window shows them. See-through parts go white, as black text on them would be black on
+    /// black for the OCR.
     /// </summary>
     private static (string Path, int Width, int Height) UprightCopy(string path, string folder)
     {
         using var frames = ImageReader.Read(path, FormatRegistry.Detect(path)?.Id ?? "", new Preset(), firstFrameOnly: true);
         var image = frames[0];
         image.AutoOrient();
+        if (Math.Max(image.Width, image.Height) > ReadEdge)
+            image.Resize(new MagickGeometry(ReadEdge, ReadEdge)); // fits inside, keeping the shape
         image.BackgroundColor = MagickColors.White;
         image.Alpha(AlphaOption.Remove);
         Directory.CreateDirectory(folder);
         var copy = Path.Combine(folder, "picture.png");
         image.Write(copy, MagickFormat.Png);
         return (copy, (int)image.Width, (int)image.Height);
+    }
+
+    /// <summary>
+    /// Deletes what finds left in <paramref name="folder"/> (<see cref="RecognitionResult.TempFolder"/>): copies of pictures
+    /// to hide parts of and what was read on them, which a Bingling that ended in the middle of a find could not delete.
+    /// They are private, so they go at once, not a day on. Called when Bingling starts; never throws.
+    /// </summary>
+    internal static void DeleteLeftovers(string folder)
+    {
+        try
+        {
+            if (Directory.Exists(folder))
+                Directory.Delete(folder, recursive: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // In use or locked: the next start tries again.
+        }
     }
 
     /// <summary>Stops a find going on; the window is closing.</summary>
@@ -172,6 +201,9 @@ public sealed partial class FoundSpot : ObservableObject
 
     /// <summary>The words, as read; empty for a face.</summary>
     public string Text => Spot.Text;
+
+    /// <summary>What a screen reader says for its check box: "Phone 010-1234-5678", "Face".</summary>
+    public string AccessibleName => $"{KindText} {Text}".TrimEnd();
 
     [ObservableProperty] private bool _isChosen = true;
 
