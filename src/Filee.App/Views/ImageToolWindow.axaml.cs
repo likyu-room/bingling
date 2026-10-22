@@ -48,6 +48,8 @@ public partial class ImageToolWindow : Window
         // Undo, redo and fit take no focus; a press on them hands it to the picture first, which ends a text half typed (it goes
         // on, and the undo takes it) and takes a size typed in the panel. Tunnelled and also when handled: the buttons take the press.
         HistoryButtons.AddHandler(PointerPressedEvent, (_, _) => _picture?.Focus(), RoutingStrategies.Tunnel, handledEventsToo: true);
+        // No keys while Copy works, before the picture view or a text box gets them (clicks: the XAML).
+        AddHandler(KeyDownEvent, (_, e) => e.Handled |= _model?.IsCopying == true, RoutingStrategies.Tunnel);
     }
 
     /// <summary>The fit button: the whole picture again, after the wheel zoomed it or Space + drag moved it.</summary>

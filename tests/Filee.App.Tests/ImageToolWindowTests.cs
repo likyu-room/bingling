@@ -310,6 +310,32 @@ public class ImageToolWindowTests
     }
 
     [AvaloniaFact]
+    public void The_window_takes_no_clicks_or_keys_while_it_copies()
+    {
+        // Nothing edited meanwhile would be in the copy, and closing after it would throw that away.
+        var (window, vm) = Open(TestImages.Png(400, 200), TestImages.Png(200, 400));
+        vm.CopiedHold = TimeSpan.Zero;
+        var copies = 0;
+        var clickable = true;
+        vm.CopyPicture = (_, _) =>
+        {
+            copies++;
+            clickable = ((Control)window.Content!).IsHitTestVisible;
+            window.KeyPressQwerty(PhysicalKey.ArrowRight, RawInputModifiers.None);
+            window.KeyPressQwerty(PhysicalKey.Digit3, RawInputModifiers.None);
+            window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control); // no second copy
+            return Task.FromResult(true);
+        };
+
+        window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Equal(1, copies);
+        Assert.False(clickable);
+        Assert.Equal((0, "original"), (vm.Index, vm.Aspect.Value));
+    }
+
+    [AvaloniaFact]
     public void A_typed_size_is_taken_on_enter_and_the_next_enter_saves()
     {
         var (window, vm) = Open(TestImages.Png(400, 200));

@@ -16,7 +16,8 @@
       <Setter Property="Background" Value="Transparent" />
     </Style>
   </Window.Styles>
-  <DockPanel>
+  <!-- No clicks while Copy works (keys: ImageToolWindow.axaml.cs). -->
+  <DockPanel IsHitTestVisible="{Binding !IsCopying}">
     <Border DockPanel.Dock="Top" Padding="20,10" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SubtleBorderBrush}"
             Classes="bar">
       <DockPanel>

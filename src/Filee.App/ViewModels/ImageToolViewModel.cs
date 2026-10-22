@@ -114,8 +114,12 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
 
     private int _copiedRound;
 
-    // Counts edits, undos, redos and changes of file (NotifyHistoryChanged): one made while Copy works is not in the copy.
-    private int _changes;
+    /// <summary>
+    /// True from Copy until the picture is on the clipboard, and then until the window closes after it: the window takes
+    /// no input meanwhile, so nothing is edited that the copy would not hold or that closing would throw away, and a
+    /// second Ctrl+C starts no second copy.
+    /// </summary>
+    [ObservableProperty] private bool _isCopying;
 
     /// <summary>Size of the file shown, the way it stands (EXIF orientation applied); 0 when it can't be read.</summary>
     public int ImageWidth { get; private set; }
@@ -222,7 +226,6 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <summary>The undo and redo buttons follow what the file shown has to undo and redo.</summary>
     private void NotifyHistoryChanged()
     {
-        _changes++;
         UndoCommand.NotifyCanExecuteChanged();
         RedoCommand.NotifyCanExecuteChanged();
     }
@@ -295,39 +298,41 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <summary>
     /// Puts the file shown, edited as the window shows it, on the clipboard instead of saving a file, and remembers the
     /// tool's choices as Save does. Then the window closes, unless the user turned that off
-    /// (<see cref="ImageToolSettings.CloseAfterCopy"/>): it stays, to edit more or save a file too. It also stays when the
-    /// user edited on (or went to another file) while the copy was made, as that is not in the copy. A copy that failed
-    /// (the clipboard was busy) leaves it as it was.
+    /// (<see cref="ImageToolSettings.CloseAfterCopy"/>): it stays, to edit more or save a file too. A copy that failed (the
+    /// clipboard was busy) leaves it as it was.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task Copy()
     {
         // Ctrl+C calls Execute, which does not ask CanExecute.
-        if (!CanSave || CopyPicture is null)
+        if (!CanSave || CopyPicture is null || IsCopying)
             return;
-        var changes = _changes;
-        var result = BuildResult();
-        var file = Files[Index];
-        // Annotate: a file shown without drawings of its own goes as it is, as the window shows it.
-        var edit = result?.Shared ?? result?.PerFile?.GetValueOrDefault(file) ?? new ImageEdit();
-        RememberChoices();
-        if (!await CopyPicture(file, edit))
-            return;
-        var round = ++_copiedRound;
-        JustCopied = true;
-        if (!Store.Settings.ImageTools.CloseAfterCopy)
+        IsCopying = true;
+        try
         {
-            _ = ForgetCopiedAsync(round);
-            return;
+            var result = BuildResult();
+            var file = Files[Index];
+            // Annotate: a file shown without drawings of its own goes as it is, as the window shows it.
+            var edit = result?.Shared ?? result?.PerFile?.GetValueOrDefault(file) ?? new ImageEdit();
+            RememberChoices();
+            if (!await CopyPicture(file, edit))
+                return;
+            var round = ++_copiedRound;
+            JustCopied = true;
+            if (!Store.Settings.ImageTools.CloseAfterCopy)
+            {
+                _ = ForgetCopiedAsync(round);
+                return;
+            }
+            await Task.Delay(CopiedHold); // long enough to read "Copied"
+            // Closed meanwhile (the title bar's X): there is nothing more to do.
+            if (!_disposed && Result is null)
+                Finished?.Invoke(this, EventArgs.Empty);
         }
-        await Task.Delay(CopiedHold); // long enough to read "Copied"
-        // Closed meanwhile (Cancel, Save, the title bar's X): there is nothing more to do.
-        if (_disposed || Result is not null)
-            return;
-        if (_changes == changes)
-            Finished?.Invoke(this, EventArgs.Empty);
-        else if (round == _copiedRound)
-            JustCopied = false; // newer work stays open
+        finally
+        {
+            IsCopying = false;
+        }
     }
 
     /// <summary>"Copy" again a moment later; a copy made meanwhile gets its own full moment.</summary>
