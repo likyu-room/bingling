@@ -15,6 +15,18 @@ without lines shows the English ones):
 - `recommended`: bug fixes. The card shows once per version.
 - `optional`: new features only. No card, the sidebar button only.
 
+## 1.3.1
+
+<!-- update
+level: recommended
+ko: 이미지 도구·결과 카드·화면 캡처에서 복사한 그림이 붙여 넣는 프로그램에 따라 검은 화면으로 붙던 문제를 고쳤어요
+en: A picture copied from an image tool, a result card or a capture no longer pastes black in some apps
+-->
+
+- **Copy pastes in colour**: a picture copied with **Copy** in an image tool window, on a result card or in the capture
+  window pasted as a black rectangle in apps that take the clipboard's bitmap. It now pastes as it looks there; a
+  see-through area pastes white in those apps and stays see-through in apps that take a PNG.
+
 ## 1.3.0
 
 <!-- update
