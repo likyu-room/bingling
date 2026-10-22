@@ -16,8 +16,10 @@ public partial class RedactPanel : UserControl
         InitializeComponent();
         // Tunnelled and also when handled: the list box's own parts take the pointer, and the focus must go back whatever they did.
         ModeChips.AddHandler(PointerReleasedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
-        // The delete button takes no focus of its own; the press hands it to the picture, so the keys are the picture's after it.
+        // The buttons take no focus of their own; a press hands it to the picture, so the keys are the picture's after it.
         DeleteButton.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
+        FindButton.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
+        HideChosenButton.AddHandler(PointerPressedEvent, (_, _) => FocusPicture(), RoutingStrategies.Tunnel, handledEventsToo: true);
     }
 
     /// <summary>

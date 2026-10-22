@@ -6,12 +6,16 @@
 //
 // The boxes go in and out as one RedactEdit (fractions of the picture), set back once per drag, when the button is let go.
 // When the boxes change under a drag (an undo, a delete), that drag is dropped.
+//
+// What "find what to hide" offers (Spots) is outlined in its kind's colour: the preview's only, never part of the result.
 
 using Avalonia;
 using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Media;
+using Avalonia.Media.Immutable;
 using Filee.Core.Presets;
+using Filee.Core.Privacy;
 
 namespace Filee.App.Controls;
 
@@ -25,6 +29,10 @@ public sealed class RedactCanvas : PictureView
     /// <summary>Defines <see cref="SelectedIndex"/>.</summary>
     public static readonly StyledProperty<int> SelectedIndexProperty =
         AvaloniaProperty.Register<RedactCanvas, int>(nameof(SelectedIndex), -1, defaultBindingMode: BindingMode.TwoWay);
+
+    /// <summary>Defines <see cref="Spots"/>.</summary>
+    public static readonly StyledProperty<IReadOnlyList<SensitiveSpot>?> SpotsProperty =
+        AvaloniaProperty.Register<RedactCanvas, IReadOnlyList<SensitiveSpot>?>(nameof(Spots));
 
     /// <summary>The least a box measures on each side, as a fraction of the picture: a twitch of the mouse is no box.</summary>
     internal const double MinBox = 0.005;
@@ -46,7 +54,28 @@ public sealed class RedactCanvas : PictureView
 
     private ImageCanvas.Grip? _hover;
 
-    static RedactCanvas() => AffectsRender<RedactCanvas>(RedactProperty, SelectedIndexProperty);
+    static RedactCanvas() => AffectsRender<RedactCanvas>(RedactProperty, SelectedIndexProperty, SpotsProperty);
+
+    /// <summary>The spots found to hide that are chosen, outlined on the picture; null or empty for none.</summary>
+    public IReadOnlyList<SensitiveSpot>? Spots
+    {
+        get => GetValue(SpotsProperty);
+        set => SetValue(SpotsProperty, value);
+    }
+
+    /// <summary>
+    /// A found spot's colour, its outline's and its chip's in the panel: phone orange, e-mail blue, ID number red, card purple,
+    /// address green, face pink. Dark enough for the chip's white text.
+    /// </summary>
+    internal static Color SpotColor(SensitiveKind kind) => kind switch
+    {
+        SensitiveKind.Phone => Color.FromRgb(0xB3, 0x5C, 0x00),
+        SensitiveKind.Email => Color.FromRgb(0x1A, 0x66, 0xD9),
+        SensitiveKind.ResidentNumber => Color.FromRgb(0xC6, 0x28, 0x28),
+        SensitiveKind.CardNumber => Color.FromRgb(0x8E, 0x44, 0xAD),
+        SensitiveKind.Address => Color.FromRgb(0x2E, 0x7D, 0x32),
+        _ => Color.FromRgb(0xC2, 0x18, 0x5B),
+    };
 
     /// <summary>The boxes and the way of hiding them, as fractions of the picture; set back once per drag.</summary>
     public RedactEdit? Redact
@@ -248,6 +277,8 @@ public sealed class RedactCanvas : PictureView
             context.DrawRectangle(null, DimShadowPen, outline);
             context.DrawRectangle(null, DimPen, outline);
         }
+        foreach (var spot in Spots ?? [])
+            context.DrawRectangle(null, new ImmutablePen(SpotColor(spot.Kind).ToUInt32(), 2), ImageCanvas.ToScreen(AsCrop(spot.Box), PictureRect));
         if (selected < 0)
             return;
         var box = ImageCanvas.ToScreen(AsCrop(redact.Boxes[selected]), PictureRect);

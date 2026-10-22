@@ -102,6 +102,14 @@ public interface IPlatformServices
     /// capturing failed.
     /// </summary>
     ScreenCapture? CaptureScreen(int x, int y, int width, int height) => null;
+
+    /// <summary>
+    /// The text (lines and words) and the faces on the picture at <paramref name="imagePath"/> (the redact tool hands it a
+    /// PNG, turned upright), read on this PC only, in its pixels. Never throws for a picture it can't read or a recognition
+    /// that took too long: the answer then says <see cref="RecognitionResult.Failed"/>; <paramref name="ct"/> stops it with
+    /// an <see cref="OperationCanceledException"/>. Where the platform can't read text, <see cref="RecognitionResult.Empty"/>.
+    /// </summary>
+    Task<RecognitionResult> RecognizeAsync(string imagePath, CancellationToken ct) => Task.FromResult(RecognitionResult.Empty);
 }
 
 /// <summary>Whether "Convert with Filee" is in the top-level Windows 11 File Explorer menu (not just "Show more options").</summary>

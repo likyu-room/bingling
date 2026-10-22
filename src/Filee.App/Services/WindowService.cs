@@ -242,6 +242,8 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
             window.Clipboard is { } clipboard ? ResultClipboard.CopyEditedAsync(clipboard, path, edit, log) : Task.FromResult(false);
         if (vm is ColorToolViewModel colors) // the copy button of the custom colour
             colors.SetClipboardText = text => window.Clipboard?.SetTextAsync(text) ?? throw new InvalidOperationException("The editor window has no clipboard");
+        if (vm is RedactToolViewModel redact) // find what to hide: the text and faces, read on this PC
+            redact.Recognize = services.GetRequiredService<Filee.Core.Platform.IPlatformServices>().RecognizeAsync;
         window.PlaceNear(cursor);
         var closed = new TaskCompletionSource();
         window.Closed += (_, _) => closed.TrySetResult();

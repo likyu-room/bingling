@@ -1,5 +1,6 @@
 <!-- The redact tool's side of the image tool window: the way of hiding (a black box, a mosaic or a blur), how many boxes there are,
-     what to do on the picture, the button that deletes the picked box, and the note that the result carries no photo info. -->
+     what to do on the picture, the button that deletes the picked box, "find what to hide" with what it found, and the note
+     that the result carries no photo info. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Filee.App.ViewModels"
@@ -37,6 +38,37 @@
         <TextBlock Text="{DynamicResource tool.delete_selected}" />
       </StackPanel>
     </Button>
+
+    <!-- Find what to hide: on for one file only, and its tip says why when it is off. What was found is listed, each one
+         chosen at first and outlined on the picture in its kind's colour; "Hide the chosen" makes boxes of them. -->
+    <StackPanel Spacing="8">
+      <Button x:Name="FindButton" HorizontalAlignment="Left" Padding="10,5" Focusable="False" Command="{Binding FindCommand}"
+              ToolTip.Tip="{Binding FindTip}" ToolTip.ShowOnDisabled="True">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Search}" />
+          <TextBlock Text="{DynamicResource tool.redact.find}" />
+        </StackPanel>
+      </Button>
+      <TextBlock Classes="caption" TextWrapping="Wrap" Text="{Binding FindStatus}"
+                 IsVisible="{Binding FindStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+      <ItemsControl ItemsSource="{Binding Spots}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="tools:FoundSpot">
+            <CheckBox Focusable="False" IsChecked="{Binding IsChosen}">
+              <DockPanel>
+                <Border DockPanel.Dock="Left" CornerRadius="999" Padding="7,1" Margin="0,0,6,0" VerticalAlignment="Center"
+                        Background="{Binding KindBrush}">
+                  <TextBlock Text="{Binding KindText}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                </Border>
+                <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              </DockPanel>
+            </CheckBox>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Button x:Name="HideChosenButton" HorizontalAlignment="Left" Padding="10,5" Focusable="False" Command="{Binding HideChosenCommand}"
+              IsVisible="{Binding HasSpots}" Content="{DynamicResource tool.redact.hide_chosen}" />
+    </StackPanel>
 
     <!-- Always there, set apart as the last word of the panel: the saved picture never keeps the photo's own info, which
          can hold what was hidden. -->

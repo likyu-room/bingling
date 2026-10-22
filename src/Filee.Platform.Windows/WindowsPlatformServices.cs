@@ -105,6 +105,10 @@ public sealed class WindowsPlatformServices : IPlatformServices
         }
     }
 
+    /// <summary>Through Windows PowerShell 5.1 (<see cref="WindowsTextRecognition"/>), on a worker thread.</summary>
+    public Task<RecognitionResult> RecognizeAsync(string imagePath, CancellationToken ct) =>
+        Task.Run(() => WindowsTextRecognition.RecognizeAsync(imagePath, ct), CancellationToken.None);
+
     public bool IsFileManagerAt(int x, int y)
     {
         var root = RootWindowAt(x, y);

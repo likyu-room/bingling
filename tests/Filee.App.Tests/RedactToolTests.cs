@@ -1,6 +1,7 @@
 // The redact window: drawing, selecting, moving, resizing and deleting boxes with the mouse and keys, one undo step per
 // drag, the boxes kept inside the picture, the B / M / U mode keys, Save off while there is nothing to hide, what Save hands
-// back and remembers, and the panel and the preview on the screen (black, mosaic and blur drawn by the renderer that saves).
+// back and remembers, the panel and the preview on the screen (black, mosaic and blur drawn by the renderer that saves), and
+// "find what to hide": what the platform read listed and outlined, and the chosen spots hidden as one undo step.
 
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -19,7 +20,9 @@ using Filee.App.ViewModels.Tools;
 using Filee.App.Views;
 using Filee.App.Views.Tools;
 using Filee.Core.Localization;
+using Filee.Core.Platform;
 using Filee.Core.Presets;
+using Filee.Core.Privacy;
 using Filee.Core.Settings;
 using ImageMagick;
 
@@ -652,6 +655,248 @@ public class RedactToolTests
             store.Settings.Theme.Mode = before.Mode;
             themes.Apply(store.Settings.Theme, "ko");
         }
+    }
+
+    // ───────── Find what to hide ─────────
+
+    /// <summary>A platform that reads <paramref name="read"/> on any picture, and keeps what picture it was given.</summary>
+    private sealed class FakeRecognizer(RecognitionResult read) : IPlatformServices
+    {
+        /// <summary>The picture's path, its size and format, as it was when it came.</summary>
+        public (string Path, int Width, int Height, MagickFormat Format)? Given { get; private set; }
+
+        public Task<RecognitionResult> RecognizeAsync(string imagePath, CancellationToken ct)
+        {
+            var info = new MagickImageInfo(imagePath);
+            Given = (imagePath, (int)info.Width, (int)info.Height, info.Format);
+            return Task.FromResult(read);
+        }
+
+        public bool IsFileManagerAt(int x, int y) => false;
+        public string? ProcessNameAt(int x, int y) => null;
+        public IReadOnlyList<string> GetFileManagerSelection() => [];
+        public int SystemDragThreshold => 4;
+        public bool PrefersReducedMotion => false;
+        public void SetStartWithSystem(bool enabled, string executablePath) { }
+        public void SetContextMenu(bool enabled, string executablePath, string label) { }
+        public ModernContextMenuState GetModernContextMenuState(string executablePath) => ModernContextMenuState.Unsupported;
+        public Task<ModernContextMenuResult> SetModernContextMenuAsync(bool enabled, string executablePath) => Task.FromResult(new ModernContextMenuResult(false));
+        public void RevealInFileManager(string path) { }
+        public void RaiseTopmost(nint windowHandle) { }
+    }
+
+    /// <summary>A line of words, each (text, x, y, width, height) in pixels.</summary>
+    private static RecognizedLine Line(params (string Text, double X, double Y, double W, double H)[] words) =>
+        new(string.Join(' ', words.Select(w => w.Text)), [.. words.Select(w => new RecognizedWord(w.Text, w.X, w.Y, w.W, w.H))]);
+
+    /// <summary>On a 400 × 200 picture: "Tel 010-1234-5678" at the top, an e-mail address below it, and a face on the right.</summary>
+    private static readonly RecognitionResult Read = new(
+        [Line(("Tel", 20, 20, 40, 20), ("010-1234-5678", 70, 20, 150, 20)), Line(("kim@example.com", 20, 80, 160, 20))],
+        [new PixelBox(250, 60, 80, 100)], TextAvailable: true);
+
+    /// <summary>Runs the UI thread until the find that was started is over.</summary>
+    private static void WaitForFind(RedactToolViewModel vm)
+    {
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (vm.IsFinding && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+        Assert.False(vm.IsFinding);
+    }
+
+    [AvaloniaFact]
+    public void Find_lists_what_was_read_and_hiding_the_chosen_adds_their_boxes_as_one_step()
+    {
+        var platform = new FakeRecognizer(Read);
+        var vm = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        vm.Recognize = platform.RecognizeAsync;
+        vm.Mode = vm.Modes.Single(m => m.Value == RedactMode.Mosaic);
+        vm.Redact = Boxes(RedactMode.Mosaic, Box(.8, .8, .1, .1)); // a box drawn by hand before
+        Assert.True(vm.FindCommand.CanExecute(null));
+
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+
+        // A PNG copy of the picture went to the platform, and is gone again.
+        Assert.Equal((400, 200, MagickFormat.Png), (platform.Given!.Value.Width, platform.Given.Value.Height, platform.Given.Value.Format));
+        Assert.False(File.Exists(platform.Given.Value.Path));
+        Assert.Equal(["전화번호", "이메일", "얼굴"], vm.Spots.Select(s => s.KindText));
+        Assert.Equal(["010-1234-5678", "kim@example.com", ""], vm.Spots.Select(s => s.Text));
+        Assert.All(vm.Spots, s => Assert.True(s.IsChosen)); // all chosen at first
+        Assert.Equal(3, vm.ChosenSpots.Count);
+        Assert.Equal("", vm.FindStatus);
+        Assert.Single(vm.Redact.Boxes); // found is not hidden yet
+
+        vm.Spots[1].IsChosen = false; // the e-mail address may stay
+        Assert.Equal([SensitiveKind.Phone, SensitiveKind.Face], vm.ChosenSpots.Select(s => s.Kind));
+        vm.HideChosenCommand.Execute(null);
+
+        Assert.Equal(RedactMode.Mosaic, vm.Redact.Mode); // in the way of hiding chosen
+        Assert.Equal(3, vm.Redact.Boxes.Count);
+        // The number's word, 3 px larger on every side (15 % of its height), as fractions of the picture.
+        Assert.Equal((67 / 400.0, 17 / 200.0, 156 / 400.0, 26 / 200.0), Tuple(vm.Redact.Boxes[1]), new BoxComparer());
+        Assert.Equal((235 / 400.0, 45 / 200.0, 110 / 400.0, 130 / 200.0), Tuple(vm.Redact.Boxes[2]), new BoxComparer());
+        Assert.Empty(vm.Spots); // offered once: another press would hide them twice
+        Assert.Empty(vm.ChosenSpots);
+        Assert.False(vm.HideChosenCommand.CanExecute(null));
+
+        vm.UndoCommand.Execute(null); // one step
+        Assert.Equal(Tuple(Box(.8, .8, .1, .1)), Tuple(Assert.Single(vm.Redact.Boxes)));
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_turned_photo_is_read_upright_as_the_window_shows_it()
+    {
+        var platform = new FakeRecognizer(RecognitionResult.Empty);
+        var vm = Redact([ImageToolWindowTests.TestImages.TurnedJpeg(300, 200)], TestStore(), Loc("ko"));
+        vm.Recognize = platform.RecognizeAsync;
+
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+
+        // Stored 300 × 200 with EXIF orientation 6: shown, and read, 200 wide and 300 tall, so the boxes land where they show.
+        Assert.Equal((200, 300, MagickFormat.Png), (platform.Given!.Value.Width, platform.Given.Value.Height, platform.Given.Value.Format));
+        vm.Dispose();
+    }
+
+    public static TheoryData<RecognitionResult, string[], string> Outcomes => new()
+    {
+        { new RecognitionResult([], [new PixelBox(250, 60, 80, 100)], TextAvailable: false), ["얼굴"], "이 PC에는 글자 인식 언어가 없어요" },
+        { RecognitionResult.Empty, [], "이 PC에는 글자 인식 언어가 없어요\n가릴 곳을 찾지 못했어요" },
+        { new RecognitionResult([Line(("Hello", 20, 20, 60, 20))], [], TextAvailable: true), [], "가릴 곳을 찾지 못했어요" },
+        { RecognitionResult.Empty with { Failed = true }, [], "찾다가 문제가 생겼어요. 다시 해 보세요" },
+    };
+
+    [AvaloniaTheory]
+    [MemberData(nameof(Outcomes))]
+    public void The_line_under_the_button_says_what_came_of_it(RecognitionResult read, string[] kinds, string status)
+    {
+        var vm = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        vm.Recognize = new FakeRecognizer(read).RecognizeAsync;
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+        Assert.Equal(kinds, vm.Spots.Select(s => s.KindText));
+        Assert.Equal(status, vm.FindStatus);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void While_it_looks_it_says_so_and_a_failure_is_one_line()
+    {
+        var vm = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        var answer = new TaskCompletionSource<RecognitionResult>();
+        var asked = false;
+        vm.Recognize = (_, _) =>
+        {
+            asked = true;
+            return answer.Task;
+        };
+        vm.FindCommand.Execute(null);
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (!asked && DateTime.UtcNow < until)
+        {
+            Dispatcher.UIThread.RunJobs();
+            Thread.Sleep(5);
+        }
+        Assert.True(asked);
+        Assert.True(vm.IsFinding);
+        Assert.Equal("찾는 중…", vm.FindStatus);
+        Assert.False(vm.FindCommand.CanExecute(null)); // one at a time
+        answer.SetException(new IOException("the disk is gone"));
+        WaitForFind(vm);
+        Assert.Equal("찾다가 문제가 생겼어요. 다시 해 보세요", vm.FindStatus);
+        Assert.True(vm.FindCommand.CanExecute(null));
+
+        // A picture that can't be read is a failure too.
+        var broken = Path.Combine(Path.GetTempPath(), "filee-app-tests", "broken-" + Guid.NewGuid().ToString("N")[..8] + ".png");
+        Directory.CreateDirectory(Path.GetDirectoryName(broken)!);
+        File.WriteAllText(broken, "not a picture");
+        var other = Redact([broken], TestStore(), Loc("ko"));
+        other.Recognize = new FakeRecognizer(Read).RecognizeAsync;
+        other.FindCommand.Execute(null);
+        WaitForFind(other);
+        Assert.Equal("찾다가 문제가 생겼어요. 다시 해 보세요", other.FindStatus);
+        Assert.Empty(other.Spots);
+        vm.Dispose();
+        other.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Every_kind_has_a_name_on_its_chip()
+    {
+        var read = new RecognitionResult(
+            [Line(("010-1234-5678", 0, 0, 10, 10)), Line(("a@b.co", 0, 20, 10, 10)), Line(("900101-1234567", 0, 40, 10, 10)),
+                Line(("1234-5678-9012-3456", 0, 60, 10, 10)), Line(("서울시", 0, 80, 10, 10), ("강남구", 20, 80, 10, 10), ("테헤란로", 40, 80, 10, 10), ("1", 60, 80, 10, 10))],
+            [new PixelBox(100, 100, 50, 50)], TextAvailable: true);
+        var vm = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        vm.Recognize = new FakeRecognizer(read).RecognizeAsync;
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+        Assert.Equal(Enum.GetValues<SensitiveKind>(), vm.Spots.Select(s => s.Spot.Kind));
+        Assert.Equal(["전화번호", "이메일", "주민등록번호", "카드번호", "주소", "얼굴"], vm.Spots.Select(s => s.KindText));
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void Find_is_for_one_file_only_and_its_tip_says_why()
+    {
+        var one = Redact([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc("ko"));
+        var two = Redact([ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(200, 400)], TestStore(), Loc("ko"));
+        Assert.True(one.FindCommand.CanExecute(null));
+        Assert.Equal("전화번호, 이메일, 주민등록번호, 카드번호, 주소, 얼굴을 이 PC 안에서 찾아요", one.FindTip);
+        Assert.False(two.FindCommand.CanExecute(null)); // the boxes go on every file, and a spot is one picture's
+        Assert.Equal("가리기 상자는 모든 파일에 같이 쓰여서, 파일이 하나일 때만 찾을 수 있어요", two.FindTip);
+        one.Dispose();
+        two.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_panel_lists_the_spots_and_the_picture_outlines_them_but_the_result_only_has_the_hidden_ones()
+    {
+        var store = TestStore();
+        var vm = Redact([ImageToolWindowTests.TestImages.Flat(400, 200, MagickColors.White)], store, Loc("ko"));
+        vm.Recognize = new FakeRecognizer(Read).RecognizeAsync;
+        var window = new ImageToolWindow { DataContext = vm, Width = 900, Height = 600 };
+        window.Show();
+        WaitForPreview(vm);
+        var size = new Size(400, 200);
+        var find = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.FindCommand);
+        Assert.True(ToolTip.GetShowOnDisabled(find)); // with several files, the tip says why it is off
+
+        vm.FindCommand.Execute(null);
+        WaitForFind(vm);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        foreach (var text in new[] { "가릴 곳 찾기", "전화번호", "010-1234-5678", "이메일", "kim@example.com", "얼굴", "고른 곳 가리기" })
+            Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == text);
+        Assert.Equal(3, window.GetVisualDescendants().OfType<CheckBox>().Count(c => c.IsChecked == true));
+
+        // The phone number's outline is orange on the white picture; the result holds no box yet (Save is off).
+        var phone = vm.Spots[0].Spot.Box;
+        using (var frame = window.CaptureRenderedFrame()!)
+        {
+            var top = At(window, size, phone.X + phone.Width / 2, phone.Y);
+            var edge = from dy in Enumerable.Range(-2, 5) select PixelAt(frame, top + new Point(0, dy));
+            Assert.Contains(edge, c => c.R > 140 && c.G is > 60 and < 130 && c.B < 60);
+        }
+        Assert.False(vm.SaveCommand.CanExecute(null));
+        Screenshot(window, "tool-redact-find-ko.png");
+
+        window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.HideChosenCommand).Command!.Execute(null);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        using (var hidden = window.CaptureRenderedFrame()!)
+            Assert.Equal(Avalonia.Media.Colors.Black, PixelAt(hidden, At(window, size, phone.X + phone.Width / 2, phone.Y + phone.Height / 2)));
+        Assert.Empty(window.GetVisualDescendants().OfType<CheckBox>());
+
+        vm.SaveCommand.Execute(null);
+        Assert.Equal(3, vm.Result!.Shared!.Redact!.Boxes.Count); // the boxes, and nothing of the outlines
+        Assert.Null(vm.Result.Shared.Annotations);
+        window.Close();
+        vm.Dispose();
     }
 
     private static void Screenshot(Window window, string name)
