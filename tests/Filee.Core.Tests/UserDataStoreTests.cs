@@ -995,6 +995,34 @@ public class UserDataStoreTests
     }
 
     [Fact]
+    public void A_quick_background_an_older_Filee_saved_without_its_flag_gets_it_back_once_and_the_donut_is_left_alone()
+    {
+        using var dir = new TempDir();
+        var seed = new UserDataStore(dir.Path);
+        seed.Load();
+        // What a Filee from before the flag leaves after saving: the preset as it was, the flag dropped (read as false). The
+        // user had taken the slice off the donut.
+        seed.FindPreset("quick-background")!.RunWithLastChoices = false;
+        var ring = seed.Profiles.Single(p => p.Id == "images").PresetIds;
+        ring.Remove("quick-background");
+        seed.SaveLibrary();
+
+        var store = new UserDataStore(dir.Path);
+        store.Load();
+
+        Assert.True(store.FindPreset("quick-background")!.RunWithLastChoices); // no editor could have: it opens no window again
+        Assert.DoesNotContain("quick-background", store.Profiles.Single(p => p.Id == "images").PresetIds);
+        Assert.Contains("\"runWithLastChoices\": true", File.ReadAllText(Path.Combine(dir.Path, "presets.json"))); // saved at once
+
+        // Once; and a preset of that id that is another tool (a hand-edited file) is not turned into this one.
+        Assert.False(SettingsMigrations.AddQuickBackground(store.Presets, store.Profiles));
+        var other = store.FindPreset("quick-background")!;
+        (other.Tool, other.RunWithLastChoices) = (ImageToolKind.Crop, false);
+        Assert.False(SettingsMigrations.AddQuickBackground(store.Presets, store.Profiles));
+        Assert.False(other.RunWithLastChoices);
+    }
+
+    [Fact]
     public void Missing_tool_presets_are_added_only_when_the_id_is_absent_and_the_group_is_not_brought_back()
     {
         Assert.False(SettingsMigrations.AddMissingToolPresets(BuiltInData.CreatePresets())); // a complete library is left alone

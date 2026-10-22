@@ -634,13 +634,23 @@ internal static class SettingsMigrations
     /// to a library, when that donut has room (under <see cref="ToolbarProfile.MaxSlices"/>): the slice is a gift of the
     /// version, not something to push out one of the user's. Once the preset is there it never comes back: a slice the user
     /// took off stays off. So this runs <b>before</b> <see cref="AddMissingToolPresets"/>, which makes the preset and so
-    /// ends "the id is missing"; it only touches the donut, never the presets.
+    /// ends "the id is missing"; it only touches the donut, never adds a preset. A preset that is there already gets its
+    /// <see cref="Preset.RunWithLastChoices"/> back when it lost it: a Filee from before the flag drops it when it saves
+    /// (back and forth between versions), and a tool preset has no editor to put it back, so the slice would open the
+    /// window for good.
     /// </summary>
-    /// <returns>True when the slice was added.</returns>
+    /// <returns>True when the slice was added or the flag put back.</returns>
     public static bool AddQuickBackground(List<Preset> presets, List<ToolbarProfile> profiles)
     {
         const string id = "quick-background";
-        if (presets.Any(p => p.Id == id) || profiles.FirstOrDefault(p => p.Id == "images") is not { } images
+        if (presets.FirstOrDefault(p => p.Id == id) is { } existing)
+        {
+            if (existing.Tool != ImageToolKind.AddBackground || existing.RunWithLastChoices)
+                return false;
+            existing.RunWithLastChoices = true;
+            return true;
+        }
+        if (profiles.FirstOrDefault(p => p.Id == "images") is not { } images
             || images.PresetIds.Contains(id) || images.PresetIds.Count >= ToolbarProfile.MaxSlices)
             return false;
         images.PresetIds.Add(id);

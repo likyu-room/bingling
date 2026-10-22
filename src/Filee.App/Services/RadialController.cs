@@ -419,6 +419,8 @@ public sealed class RadialController(
             catch (Exception ex)
             {
                 log.LogError(ex, "The {Tool} tool failed", preset.Tool);
+                if (ReferenceEquals(viewModel.Files, shown))
+                    Close(); // the donut was left up to show the ring: never leave it standing on a failure
             }
         });
     }

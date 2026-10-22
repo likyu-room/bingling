@@ -228,6 +228,9 @@ public class ImageToolDonutTests
         /// <summary>The messages shown (answered at once, as if OK was pressed).</summary>
         public List<string> Messages { get; } = [];
 
+        /// <summary>A message window that cannot open: whatever is awaiting it fails.</summary>
+        public bool MessageFails { get; init; }
+
         public override Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor, string? footer = null)
         {
             Opened.Add((tool, [.. files], cursor));
@@ -237,7 +240,7 @@ public class ImageToolDonutTests
         public override Task MessageAsync(Window? owner, string message)
         {
             Messages.Add(message);
-            return Task.CompletedTask;
+            return MessageFails ? Task.FromException(new InvalidOperationException("no message window")) : Task.CompletedTask;
         }
     }
 
@@ -453,12 +456,33 @@ public class ImageToolDonutTests
                 var corner = result.GetPixels().GetPixel(0, 0).ToColor()!;
                 Assert.Equal((0x11, 0x22, 0x33), (corner.R, corner.G, corner.B));
             }
+            // The run left the settings' background as it was.
+            Assert.Equal((BackgroundKind.Solid, "#112233", .4), (store.Settings.ImageTools.Background.Kind, store.Settings.ImageTools.Background.Value,
+                store.Settings.ImageTools.Background.Padding));
             job.DismissCommand.Execute(null);
         }
         finally
         {
             store.Settings.ImageTools.Background = last;
         }
+    }
+
+    [AvaloniaFact]
+    public void The_quick_slice_closes_the_donut_when_looking_at_the_pictures_fails()
+    {
+        TestServices.EnsureInitialized("ko");
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        var files = TestImages.Png(1);
+        var windows = new FakeToolWindows(null) { MessageFails = true };
+
+        // Gone after the donut looked at it, and the note about it cannot be shown: the click must not leave the donut standing.
+        var radial = ClickQuick(files, windows, beforeClick: () => File.Delete(files[0]));
+        RunUntil(() => windows.Messages.Count > 0);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.False(radial.IsVisible);
+        Assert.Equal(jobs, conversions.Jobs.Count);
     }
 
     [AvaloniaFact]
