@@ -508,6 +508,37 @@ public class ImageToolDonutTests
     }
 
     [AvaloniaFact]
+    public void Another_slice_clicked_before_the_quick_slice_has_looked_at_its_pictures_starts_nothing()
+    {
+        TestServices.EnsureInitialized("ko");
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        var windows = new FakeToolWindows(null);
+        var radial = ClickQuick(TestImages.Png(1), windows);
+
+        // At once, a conversion slice of the same donut: the quick background is still looking at the pictures.
+        var donut = radial.Window!.DonutControl;
+        var other = donut.Items!.ToList().FindIndex(i => i.Id == "to-jpg");
+        var onOther = DonutGeometry.PointAt(new Point(donut.Bounds.Width / 2, donut.Bounds.Height / 2),
+            donut.OuterRadius * 0.6, DonutGeometry.MidAngle(other, donut.Items!.Count));
+        donut.SetExternalHit(donut.HitTest(onOther), onOther);
+        donut.HandleKey(Key.Enter);
+        RunUntil(() => conversions.Jobs.Count > jobs);
+        for (var i = 0; i < 20; i++) // long enough for a second job to show up, were there one
+        {
+            Thread.Sleep(25);
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        Assert.Equal(jobs + 1, conversions.Jobs.Count);
+        var job = conversions.Jobs[0];
+        Assert.Equal("quick-background", job.Job.Preset.Id);
+        Assert.Empty(windows.Opened);
+        WaitUntilDone(job);
+        job.DismissCommand.Execute(null);
+    }
+
+    [AvaloniaFact]
     public void The_quick_slice_leaves_out_what_is_not_a_still_picture_with_the_note_the_tools_give()
     {
         TestServices.EnsureInitialized("ko");

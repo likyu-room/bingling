@@ -322,6 +322,8 @@ public sealed class RadialController(
     /// <summary>Converts with slice <paramref name="index"/>, or with slice <paramref name="sub"/> of that group's ring.</summary>
     private void Convert(int index, int sub, IReadOnlyList<string> files)
     {
+        if (_converted)
+            return; // this donut already started something (quick background still looks at its pictures): one run a donut
         if (viewModel.PresetAt(index, sub) is not { } preset || files.Count == 0)
         {
             Close();
@@ -390,8 +392,6 @@ public sealed class RadialController(
     /// </summary>
     private void RunWithLastBackground(Preset preset, IReadOnlyList<string> files)
     {
-        if (_converted)
-            return; // a second click while the first still looks at the pictures
         var dropped = files.ToList();
         var shown = viewModel.Files; // this donut's own list: still the one on screen afterwards, or another gesture has the window
         log.LogInformation("Running tool {Tool} on {Count} file(s) with its last choices", preset.Tool, dropped.Count);
