@@ -249,10 +249,11 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
         // blur of the picture itself tells the two apart (the lettering inside a cell).
         using var again = ImageEditRenderer.Render(mosaic, edit);
         Assert.True(MeanDifference(blurred, again, box) <= 0.5, "what the blur works on is not the mosaic");
-        // And it is that mosaic blurred by 0.6 of a cell (4.8 px); a blur of 4.2 or 5.4 differs by 0.4 or 0.8 already. Taken
-        // away from the edge, where the box has to stop the blur and this reference does not.
+        // And it is that mosaic blurred by 0.6 of a cell (4.8 px); a blur of 4.2 or 5.4 differs by 0.4 or 0.8 already, so 0.12
+        // leaves room for a Skia that rounds differently and still pins the sigma. Taken away from the edge, where the box
+        // has to stop the blur and this reference does not.
         using var reference = BlurredDirectly(mosaic, box, 4.8f);
-        Assert.True(MeanDifference(blurred, reference, new SKRectI(56, 46, 344, 254)) <= 0.05, "not the mosaic blurred by 0.6 of a cell");
+        Assert.True(MeanDifference(blurred, reference, new SKRectI(56, 46, 344, 254)) <= 0.12, "not the mosaic blurred by 0.6 of a cell");
 
         // The blur stays in the box: it neither fades towards see-through at the edge nor leaks out of it.
         for (var y = 0; y < 300; y++)
@@ -283,6 +284,43 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
         using var small = full.Resize(Info(200, 150), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
         Assert.True(MeanDifference(quarter.Drawn, small, area) > 5);
         Assert.InRange(MeanLuma(quarter.Drawn, area), MeanLuma(small, area) - 8, MeanLuma(small, area) + 8);
+    }
+
+    [Fact]
+    public void Blur_hides_a_box_smaller_than_a_cell_and_boxes_at_the_edge_of_the_picture_and_stays_in_them()
+    {
+        // 400 × 300 noise: cells of 8 px, and 300 = 37 × 8 + 4, so the picture's own bottom row of cells is a short one.
+        using var picture = new SKBitmap(Info(400, 300));
+        var random = new Random(3);
+        for (var y = 0; y < 300; y++)
+        {
+            for (var x = 0; x < 400; x++)
+                picture.SetPixel(x, y, new SKColor((byte)random.Next(256), (byte)random.Next(256), (byte)random.Next(256)));
+        }
+
+        foreach (var box in new[]
+        {
+            new SKRectI(197, 101, 203, 107), // 6 × 6 across the grid lines at x 200 and y 104: less than one cell
+            new SKRectI(0, 0, 60, 40), // against the top left corner
+            new SKRectI(340, 260, 400, 300), // against the bottom right one, which cuts a cell short
+            new SKRectI(0, 0, 400, 300), // the whole picture
+        })
+        {
+            using var blurred = ImageEditRenderer.Render(picture, Redact(RedactMode.Blur, box.Left / 400.0, box.Top / 300.0, box.Width / 400.0, box.Height / 300.0));
+
+            // Outside the box the picture as it was, and inside it a solid blur that is not the picture.
+            for (var y = 0; y < 300; y++)
+            {
+                for (var x = 0; x < 400; x++)
+                {
+                    if (box.Contains(x, y))
+                        Assert.True(blurred.GetPixel(x, y).Alpha == 255, $"{box}: ({x},{y}) is see-through");
+                    else
+                        Assert.True(blurred.GetPixel(x, y) == picture.GetPixel(x, y), $"{box}: ({x},{y}) changed outside the box");
+                }
+            }
+            Assert.True(Differing(blurred, picture, box, 8) > 0.5, $"{box} still shows the picture");
+        }
     }
 
     [Fact]
@@ -780,6 +818,10 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
         // (it would be, were the radius 2 % or more), and the straight edges are where the box says.
         AssertNear(Dimmed(SKColors.White), result.GetPixel(200, 200));
         Assert.True(IsWhite(result.GetPixel(204, 204)));
+        // Along the diagonal the arc of a 10 px radius runs between the pixels 202 and 203: the one at 202 is outside it and
+        // the one at 203 inside, so a radius of 9 px or less lets 202 show (with a part of it), and 11 px or more dims 203.
+        AssertNear(Dimmed(SKColors.White), result.GetPixel(202, 202));
+        Assert.True(IsWhite(result.GetPixel(203, 203)));
         Assert.True(IsWhite(result.GetPixel(200, 500)));
         AssertNear(Dimmed(SKColors.White), result.GetPixel(199, 500));
         Assert.True(IsWhite(result.GetPixel(799, 500)));

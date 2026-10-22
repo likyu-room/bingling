@@ -595,11 +595,14 @@ public class RedactToolTests
         Assert.NotEqual(Avalonia.Media.Colors.Black, PixelAt(mosaic, centre));
         Screenshot(window, "tool-redact-mosaic-ko.png");
 
-        // Blur: the same box, the blocks softened (the renderer that saves draws it here too), so not black either.
+        // Blur: the same box, the blocks softened (the renderer that saves draws it here too). Not the mosaic left as it was:
+        // down a line through the box the blur has smoothed the steps between the cells, so the screen differs from the mosaic's.
         window.KeyPressQwerty(PhysicalKey.U, RawInputModifiers.None);
         Dispatcher.UIThread.RunJobs();
         AvaloniaHeadlessPlatform.ForceRenderTimerTick();
         using var blur = window.CaptureRenderedFrame()!;
+        var softened = Enumerable.Range(-60, 121).Count(dy => PixelAt(blur, centre + new Point(0, dy)) != PixelAt(mosaic, centre + new Point(0, dy)));
+        Assert.True(softened > 10, $"only {softened} of 121 pixels down the box differ from the mosaic's");
         Assert.NotEqual(Avalonia.Media.Colors.Black, PixelAt(blur, centre));
         Screenshot(window, "tool-redact-blur-ko.png");
         window.Close();
