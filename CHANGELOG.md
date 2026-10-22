@@ -15,6 +15,52 @@ without lines shows the English ones):
 - `recommended`: bug fixes. The card shows once per version.
 - `optional`: new features only. No card, the sidebar button only.
 
+## 1.3.0
+
+<!-- update
+level: optional
+ko: 빙글링 자체 화면 캡처(Ctrl+Alt+S)와 바로 스포이트(Ctrl+Alt+C)가 생겼어요
+ko: 가리기에 흐림과 "가릴 곳 찾기"(전화번호·이메일·주민등록번호·카드번호·주소·얼굴)가 생겼어요
+ko: 그리기에 스포트라이트와 스포이트가, 배경 넣기에도 스포이트가 생겼어요
+ko: 사진 링에 지난번 배경을 창 없이 바로 넣는 "배경 바로" 칸이 생겼어요
+ko: 후원 창과 후원 링크를 뺐어요
+en: Bingling's own screen capture (Ctrl+Alt+S) and an instant eyedropper (Ctrl+Alt+C)
+en: Redact can blur, and "Find what to hide" spots phone numbers, e-mails, IDs, cards, addresses and faces
+en: Annotate has a spotlight, and Annotate and Add background have an eyedropper
+en: A "Quick frame" slot on the picture ring puts your last backdrop on pictures without a window
+en: The Sponsor window and the sponsor links are gone
+-->
+
+- **Screen capture**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> (or **Capture the screen** in the tray menu) freezes the
+  screen under the pointer. Drag over an area, then **Edit** it in the Annotate window, **Copy** it to the clipboard or
+  **Save** it as a PNG in Pictures\Bingling, named `Capture 2026-10-22 131500.png`. The top bar switches to the full
+  screen or to the eyedropper. It captures one monitor at a time (the one with the pointer); there is no window, scrolling or video capture.
+- **Instant eyedropper**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> (**Pick a color** in the tray menu) shows a
+  magnifier next to the pointer over the frozen screen. A click copies the HEX code and opens a card with the HEX, RGB
+  and HSL and a button to copy each.
+- **Shortcut actions**: a keyboard shortcut in Settings › Shortcuts now has an **Action**: open the ring, capture the
+  screen or pick a colour. Both new shortcuts are added once on update (switched off when you already use the key). A
+  Ctrl+Alt combination pressed with the right Alt (AltGr) is never a shortcut, so typing letters with AltGr still works.
+- **Blur** in Redact (<kbd>U</kbd>): the box is turned into a mosaic first and the mosaic is blurred, so what is
+  blurred can't be brought back.
+- **Find what to hide** in Redact: it looks in a single picture for phone numbers (010, area codes, 050 safe numbers,
+  +82), e-mail addresses, resident registration numbers, card numbers (only those that pass a real card check),
+  addresses (province or city, district, street and number) and faces. Names aren't looked for, and addresses without
+  a district (Sejong, Jeju) or on two lines are missed. What it finds is listed, outlined on the picture and ticked;
+  **Hide selected** adds boxes in the current style, and one Undo takes them back. It uses the text recognition of
+  Windows on your PC only, nothing is uploaded. Without a language for reading text, it finds faces only. It may not
+  work on a PC that blocks programs very strictly.
+- **Spotlight** in Annotate (<kbd>S</kbd>): drag a box and everything outside it is dimmed by 55%.
+- **Eyedropper** in Annotate and Add background (<kbd>I</kbd>): click the picture to take that colour as the custom
+  colour (<kbd>Esc</kbd> only switches it off; see-through spots can't be picked). **Copy code** copies the HEX of the
+  current colour.
+- **Quick frame**: a new twelfth slot on the picture ring. It adds the backdrop you last set in the Add background
+  window (not a picture of your own) without opening a window, and saves `photo with background.png`. Libraries from
+  before get it at the end of the picture ring when it has room.
+- **Sponsoring is gone for now**: the Sponsor window and button, the list of supporters and the links to the original
+  author's accounts are removed. They come back when Bingling has accounts of its own. "Help Bingling grow" on the
+  About page now asks for a GitHub star, a bug report or an idea.
+
 ## 1.2.1
 
 <!-- update

@@ -10,15 +10,17 @@
 4. [Reading the ring](#reading-the-ring)
 5. [The six picture tools](#the-six-picture-tools)
 6. [Editor shortcuts](#editor-shortcuts)
-7. [The result card](#the-result-card)
-8. [Settings](#settings)
-9. [FAQ](#faq)
-10. [Credits](#credits)
+7. [Screen capture and eyedropper](#screen-capture-and-eyedropper)
+8. [The result card](#the-result-card)
+9. [Settings](#settings)
+10. [FAQ](#faq)
+11. [Credits](#credits)
 
 ## What is Bingling
 
 Drag files in File Explorer, press <kbd>Ctrl</kbd>, and a ring opens around your cursor (the app calls it the donut toolbar).
 Drop the files on a slot to convert them, or to crop, redact or draw on pictures, without leaving File Explorer.
+Capturing the screen and picking a colour from anywhere on it also happen inside Bingling, with [one shortcut each](#screen-capture-and-eyedropper).
 
 <p align="center"><img src="images/tools-ring-en.png" width="360" alt="The ring for a picture, with the Tools group fanned out"></p>
 
@@ -154,6 +156,7 @@ The **Tools** slot of the picture ring holds six tools. Rest on it and they fan 
 - **Crop, Add background, Redact and Annotate** open an editing window where the ring was.
 - **Compress and Strip metadata** run right away, without a window.
 - Crop, Add background, Redact and Annotate work on single still pictures. If an animated GIF or an icon (ICO) is among the files, their slots are dimmed.
+- The picture ring also has a **Quick frame** slot outside the Tools group. It puts [your last backdrop](#quick-frame) on the pictures without a window.
 
 ### What every editing window has
 
@@ -180,12 +183,14 @@ A word is added to the name. For `photo.jpg`:
 |---|---|
 | Crop | `photo Cropped.jpg` |
 | Add background | `photo with background.png` (always PNG) |
+| Quick frame | `photo with background.png` (the same as Add background) |
 | Redact | `photo Redacted.jpg` |
 | Annotate | `photo Annotated.jpg` |
 | Compress | `photo Compressed.jpg` |
 | Strip metadata | `photo Clean.jpg` |
+| Saving a screen capture | `Capture 2026-10-22 131500.png` (in Pictures\Bingling; the date and time are the name) |
 
-Except for Add background, the result keeps the format of the original.
+Except for Add background, Quick frame and screen captures, the result keeps the format of the original.
 
 ### Crop
 
@@ -212,6 +217,9 @@ Puts the picture on a backdrop with padding, like a card, with rounded corners a
 1. Drop pictures on **Tools → Add background**.
 2. Under **Background**, pick one of 8 gradients or 6 solid colours.
    - **Custom color**: type a colour code such as `#FF7A1A` and it applies right away.
+   - **Eyedropper** (<kbd>I</kbd>): switch it on and click the picture to take the colour you see there as the custom colour; the eyedropper then switches off.
+     <kbd>Esc</kbd> only switches the eyedropper off (the window stays). A see-through spot can't be picked.
+     **Copy code** beside it copies the code (HEX) of the current solid colour.
    - **Choose image…**: use a picture of your own as the backdrop.
    - **Photo color**: fills the background with the photo's average colour, softened with white.
 3. Move the **Padding**, **Corners** and **Shadow** sliders. Each shows its value above it on the right.
@@ -220,15 +228,26 @@ Puts the picture on a backdrop with padding, like a card, with rounded corners a
 
 The result is always a PNG. The backdrop you chose is remembered for next time.
 
+### Quick frame
+
+Drop pictures on the **Quick frame** slot of the picture ring and the backdrop goes on at once, without a window, saved as a PNG. Handy for giving several captures the same look.
+
+- It uses **what you last set in the Add background window**: the backdrop, padding, corners, shadow and aspect ratio. If you never set one, the first settings apply.
+  If your last backdrop was a picture of your own, that picture isn't remembered; the gradient or colour before it is used.
+- The slot has no settings window and no tooltip. To change the backdrop, set it under **Tools → Add background** and save. Quick frame uses it from then on.
+- Like Add background it works on single still pictures only, and saves `photo with background.png`.
+- After an update the slot is added at the end of the picture ring, if the ring has room. If it was full, drag the **Quick frame** chip onto the ring under **Settings → Donut toolbar**.
+
 ### Redact
 
-Hides what you don't want to show, such as a name or a phone number, with a black box or a mosaic.
+Hides what you don't want to show, such as a name or a phone number, with a black box, a mosaic or a blur. Bingling can also [find what to hide](#find-what-to-hide) for you.
 
 <p align="center"><img src="images/redact-ko.png" width="720" alt="The Redact window"></p>
 <p align="center"><sub>Shown with the Korean interface. The English window has the same layout.</sub></p>
 
 1. Drop pictures on **Tools → Redact**.
-2. Under **Style**, pick **Black box** (<kbd>B</kbd>) or **Mosaic** (<kbd>M</kbd>).
+2. Under **Style**, pick **Black box** (<kbd>B</kbd>), **Mosaic** (<kbd>M</kbd>) or **Blur** (<kbd>U</kbd>).
+   **Blur** first turns the box into a mosaic and blurs that, so what is blurred can't be brought back.
 3. Drag on the picture to draw a box over what to hide. Draw as many as you need.
    - Click a box to select it, drag it to move it, and drag a corner to resize it.
    - Remove the selected box with **Delete selected** or <kbd>Delete</kbd>.
@@ -238,6 +257,25 @@ Hides what you don't want to show, such as a name or a phone number, with a blac
 > photo was taken, because that info can still hold what you hid.
 
 With several pictures, the same boxes go in the same place on each. Check each picture with ‹ ›.
+
+#### Find what to hide
+
+Bingling can look for things such as phone numbers and faces in the picture and offer them as candidates. It works with **one picture only**: the boxes go on every picture the same way, so with several pictures the button is off.
+
+<p align="center"><img src="images/redact-find-ko.png" width="720" alt="The Redact window with what was found"></p>
+<p align="center"><sub>Shown with the Korean interface. The English window has the same layout.</sub></p>
+
+1. Click **Find what to hide**. “Looking…” shows for a moment.
+2. What it found is listed with its kind and text, and outlined on the picture. All are ticked at first. Untick what you want to leave.
+3. Click **Hide selected**. Boxes are added over the ticked ones in the current **Style** (black box, mosaic or blur), and the list is emptied. One **Undo** takes them all back.
+
+- It looks for: **phone numbers** (010, area codes such as 02 and 031, 050 safe numbers, +82, area codes in brackets), **e-mail addresses**, **ID numbers** (Korean resident registration numbers), **card numbers** (only those that pass a real card-number check), **addresses** (with a province or city, a district, a street name and a number) and **faces**.
+  It doesn't look for names.
+- It can't find addresses without a district, such as those in Sejong and Jeju, or addresses split over two lines.
+- It isn't perfect. Look at the picture once more before you save, and box what it missed yourself.
+- It looks **on your PC only**. It uses the text recognition built into Windows, and the picture is never sent over the internet.
+  If this PC has no language for reading text, it says “This PC has no language for reading text” and finds faces only.
+- On a work PC that blocks programs very strictly, finding may not work. Box what you want to hide yourself.
 
 ### Annotate
 
@@ -260,12 +298,17 @@ Marks up a picture with arrows, text, numbers and more.
    | Ellipse | <kbd>E</kbd> | Drag to draw. Hold <kbd>Shift</kbd> for a circle. |
    | Text | <kbd>T</kbd> | Click where you want it. <kbd>Enter</kbd> finishes, <kbd>Shift</kbd>+<kbd>Enter</kbd> starts a new line. |
    | Number | <kbd>N</kbd> | Each click adds the next number: 1, 2, 3… |
+   | Spotlight | <kbd>S</kbd> | Drag a box and everything outside it is dimmed. Hold <kbd>Shift</kbd> for a square. |
 
 3. Pick a **Color** (8 colours, or a code under **Custom color**) and a **Thickness** (Thin, Normal, Thick).
    <kbd>[</kbd> and <kbd>]</kbd> change the thickness too, which also sets the size of text and numbers.
 4. Click **Save**. Save stays off until you have drawn something.
 
 - Select a drawing with the Select tool, then click a colour or a thickness: that drawing changes at once. <kbd>Delete</kbd> removes it.
+- **Spotlight** dims everything outside its box by 55%. It uses no colour or thickness. However many you draw, the outside is dimmed once, and the other drawings stay bright on top.
+- **Eyedropper** (<kbd>I</kbd>) is the button under **Custom color**. Switch it on and click the picture: that colour becomes the custom colour, and the eyedropper switches off.
+  <kbd>Esc</kbd> only switches the eyedropper off (the window stays). It takes the colour as you see it, drawings included, and a see-through spot can't be picked.
+  **Copy code** copies the code (HEX) of the current colour.
 - **Each picture has its own drawings.** Another picture shows only what you drew on it, and undo works per picture too.
   Only the pictures you drew on are saved, and the bottom says so, such as “Only the 2 marked files will be saved”.
 - If you close the window with drawings on it, it asks “Discard your drawings and close?”. Choose **Discard** or **Keep drawing**.
@@ -304,10 +347,56 @@ Keys of each tool:
 | Tool | Keys |
 |---|---|
 | Crop | <kbd>1</kbd>–<kbd>7</kbd> pick a ratio (Free, Original, 1:1, 16:9, 9:16, 4:3, 3:4) · <kbd>Shift</kbd>+drag keeps the shape |
-| Redact | <kbd>B</kbd> Black box · <kbd>M</kbd> Mosaic · <kbd>Delete</kbd> removes the selected box |
-| Annotate | <kbd>V</kbd> <kbd>P</kbd> <kbd>H</kbd> <kbd>A</kbd> <kbd>L</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>N</kbd> pick a tool · <kbd>[</kbd> <kbd>]</kbd> thickness · <kbd>Delete</kbd> removes the selected drawing |
+| Add background | <kbd>I</kbd> Eyedropper |
+| Redact | <kbd>B</kbd> Black box · <kbd>M</kbd> Mosaic · <kbd>U</kbd> Blur · <kbd>Delete</kbd> removes the selected box |
+| Annotate | <kbd>V</kbd> <kbd>P</kbd> <kbd>H</kbd> <kbd>A</kbd> <kbd>L</kbd> <kbd>R</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>N</kbd> <kbd>S</kbd> pick a tool · <kbd>I</kbd> Eyedropper · <kbd>[</kbd> <kbd>]</kbd> thickness · <kbd>Delete</kbd> removes the selected drawing |
 
-Add background has no keys of its own.
+While the eyedropper is on, <kbd>Esc</kbd> only switches it off. While you type a text, <kbd>I</kbd> is just a letter.
+
+## Screen capture and eyedropper
+
+These work on the screen itself, without a file. While Bingling runs, a shortcut starts each one over any program. They work on Windows.
+
+| What | Shortcut at first | Tray menu |
+|---|---|---|
+| Screen capture | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> | Capture the screen |
+| Instant eyedropper | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> | Pick a color |
+
+You can [change the shortcuts](#shortcuts) under **Settings → Shortcuts**. With several monitors, the one **with the mouse pointer on it** is used.
+
+### Screen capture
+
+<p align="center"><img src="images/capture-ko.png" width="640" alt="A capture with an area chosen"></p>
+<p align="center"><sub>Shown with the Korean interface, on a sample screen.</sub></p>
+
+1. Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd>. The screen freezes and dims.
+2. Drag over what you want to capture. The area is bright and its size in pixels shows. An area smaller than 8 pixels is ignored.
+   The bar at the top switches between **Area**, **Full screen** and **Eyedropper**.
+3. Buttons appear below the area (above it when there is no room).
+
+   | Button | Key | What it does |
+   |---|---|---|
+   | **Edit** | | Opens the [Annotate](#annotate) window. After you mark it up, **Save** puts it in the folder below under the same name. Save stays off until you have drawn something. |
+   | **Copy** | <kbd>Enter</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd> | Copies the picture. “Copied” shows for a moment, then it closes. |
+   | **Save** | <kbd>Ctrl</kbd>+<kbd>S</kbd> | Saves a PNG file and shows the [result card](#the-result-card). |
+
+4. To give up, press <kbd>Esc</kbd> or right-click.
+
+The file goes into **Pictures\Bingling**, named by the date and time, such as `Capture 2026-10-22 131500.png`. If that name exists, a number is added.
+
+### Instant eyedropper
+
+Gets you a colour code from anywhere on the screen.
+
+<p align="center"><img src="images/color-card-ko.png" width="300" alt="The card of a picked colour"></p>
+<p align="center"><sub>Shown with the Korean interface.</sub></p>
+
+1. Press <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd>. The screen freezes as it is, and a magnifier follows the pointer. The centre square of the magnifier is the colour you get, and its HEX shows below.
+2. Click to **copy the HEX at once** and open a colour card. <kbd>Esc</kbd> or a right-click gives up.
+3. The card shows a swatch with the HEX, RGB and HSL. **Copy HEX**, **Copy RGB** and **Copy HSL** copy that format.
+   The card goes away after 6 seconds, on <kbd>Esc</kbd>, or when you click outside it.
+
+The screen looks frozen while you pick, so a playing video gives you the colour of that moment. In the capture screen, the **Eyedropper** in the top bar does the same.
 
 ## The result card
 
@@ -318,6 +407,7 @@ A card appears in the bottom-right corner of the screen when a conversion finish
 **When the card appears**
 
 - When you save with a picture tool (Crop, Add background, Redact, Annotate)
+- When you **Save** a screen capture
 - When a conversion from the ring makes a picture (even a quick one, so you can see and copy it at once)
 - When a conversion from the ring takes longer than 5 seconds
 - When a file failed or was skipped
@@ -423,19 +513,27 @@ Watch folders work while Bingling runs. Files still downloading or copying are c
 
 ### Shortcuts
 
-Choose how the ring opens. You can add as many gestures as you like.
+Choose how the ring opens, and the shortcuts for [screen capture and the eyedropper](#screen-capture-and-eyedropper). You can add as many gestures as you like.
 
 <p align="center"><img src="images/settings-shortcuts-en.png" width="560" alt="The Shortcuts page"></p>
+<p align="center"><sub>It shows up to the screen capture card. The eyedropper card is below it.</sub></p>
 
-There are three at first:
+There are five at first:
 
 | Gesture | At first |
 |---|---|
 | <kbd>Ctrl</kbd> + drag files | On |
 | <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Space</kbd> (files selected in File Explorer) | On |
 | <kbd>Shift</kbd> + drag files | Off |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> (**Capture the screen**) | On |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> (**Pick a color**) | On |
+
+When you update from an earlier version, the screen capture and eyedropper shortcuts are added once. If you already used one of those keys, it is added switched off.
 
 - The switch at the top left of each card turns it on or off. Change the keys under **Modifier keys** (Ctrl, Alt, Shift, Win).
+- **Action**: on a keyboard shortcut card, choose **Open the donut toolbar**, **Capture the screen** or **Pick a color**. To change the keys, click **Record** and press the new keys.
+  Choosing **Capture the screen** or **Pick a color** sets **Active in** to “Everywhere”.
+- A <kbd>Ctrl</kbd>+<kbd>Alt</kbd> shortcut pressed with the right <kbd>Alt</kbd> (AltGr) is not treated as a shortcut, so a shortcut doesn't break typing letters with AltGr on your keyboard. Use the left <kbd>Alt</kbd>.
 - **Active in**: “File managers and desktop” opens the ring only in File Explorer and on the desktop. You can choose “Everywhere” instead.
 - **Never trigger in these apps**: add a program in which you need Ctrl + drag for something else.
 - To take a break, choose **Pause shortcuts** in the tray icon's menu.
@@ -453,7 +551,7 @@ No. Results are always saved as new files and the original stays as it is. Even 
 Only a watch folder set to “Move the original to "originals"” moves the original, into that folder.
 
 **Are my files uploaded anywhere?**
-No. Every conversion and edit happens on your PC. Bingling only goes online to download engines and to check for updates.
+No. Every conversion and edit happens on your PC, and so do screen capture and Redact's “Find what to hide”. Bingling only goes online to download engines and to check for updates.
 
 **Can it convert old .doc and .ppt files?**
 Yes, with the **LibreOffice** engine. Without it the slot is dimmed, and pointing at it tells you to install it.

@@ -32,13 +32,19 @@ window, watch folders and the [command line](#command-line).
   Some formats need an extra engine, which is downloaded only when you need it ([engines](docs/ENGINES.md)).
 - **Picture tools**, together in the ring's "Tools" slot:
   - Crop
-  - Add background: gradients, solid colours, your own picture or the picture's own colour
-  - Redact: black box or mosaic. The photo info (EXIF) is removed from the result too.
-  - Annotate: pen, highlighter, arrow, shapes, text and numbers
+  - Add background: gradients, solid colours, your own picture or the picture's own colour. The ring's **Quick frame** slot
+    puts your last backdrop on pictures at once, without a window.
+  - Redact: black box, mosaic or blur. **Find what to hide** spots phone numbers, e-mail addresses, ID and card numbers,
+    addresses and faces for you, on your PC only. The photo info (EXIF) is removed from the result too.
+  - Annotate: pen, highlighter, arrow, shapes, text, numbers and a spotlight that dims everything around a box
   - Compress
   - Strip metadata
 
   **Copy** (<kbd>Ctrl</kbd>+<kbd>C</kbd>) in an editing window puts the result on the clipboard without making a file.
+  An **eyedropper** in the Add background and Annotate windows picks a colour from the picture.
+- **Screen capture and eyedropper** (Windows): <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> freezes the screen so you can
+  choose an area to edit, copy or save. <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> picks a colour from anywhere on the
+  screen and copies its HEX code. Both shortcuts can be changed in Settings.
 - **Peach Glass theme**: a soft, see-through glass look, in a light and a dark mode.
 - **Result card**: when a conversion finishes a card appears. "Copy" puts the result on the clipboard so you can paste it
   into a chat or a document, and clicking the picture opens the result.
