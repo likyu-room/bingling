@@ -1,5 +1,5 @@
 // The picture in the redact window with its boxes: a drag on bare picture draws a box, a click picks one, a drag on it
-// moves it, a drag on a handle or an edge of the picked one resizes it. What the boxes hide (black or mosaic) is drawn by
+// moves it, a drag on a handle or an edge of the picked one resizes it. What the boxes hide (black, mosaic or blur) is drawn by
 // the renderer that saves the picture; the picked box gets an outline and eight handles on top, the others a thin dashed
 // outline (so a mosaic on a flat sky is still a box that can be seen and counted). Zooming and panning are
 // PictureView's, and the box geometry is ImageCanvas's (Grip, HitTest, Resize, Move), used as it is on CropRects.

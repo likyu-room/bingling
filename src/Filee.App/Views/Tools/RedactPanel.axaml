@@ -1,4 +1,4 @@
-<!-- The redact tool's side of the image tool window: the way of hiding (a black box or a mosaic), how many boxes there are,
+<!-- The redact tool's side of the image tool window: the way of hiding (a black box, a mosaic or a blur), how many boxes there are,
      what to do on the picture, the button that deletes the picked box, and the note that the result carries no photo info. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"

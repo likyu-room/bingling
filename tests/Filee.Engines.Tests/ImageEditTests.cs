@@ -152,6 +152,139 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
         }
     }
 
+    /// <summary>Black lettering on white, big enough that a cell of 8 px still holds a stroke of it: what a blur is asked to hide.</summary>
+    private static SKBitmap Lettering(int width, int height)
+    {
+        var bitmap = Filled(width, height, SKColors.White);
+        using var canvas = new SKCanvas(bitmap);
+        using var paint = new SKPaint { IsAntialias = true, Color = SKColors.Black };
+        using var font = AnnotationFonts.Create(height * .075f);
+        string[] lines = ["Filee 1234 5678", "가나다라 마바사 아자차", "kim@mail.com 010-1234-5678", "900101-1234567 서울시 강남구", "ACCOUNT 110-234-567890", "Filee 가나다 1234"];
+        for (var i = 0; i < lines.Length; i++)
+            canvas.DrawText(lines[i], width * .05f, height * (.15f + .14f * i), font, paint);
+        return bitmap;
+    }
+
+    /// <summary>The picture with <paramref name="box"/> of it blurred as it stands, the way the blur would do it without a mosaic under it.</summary>
+    private static SKBitmap BlurredDirectly(SKBitmap picture, SKRectI box, float sigma)
+    {
+        var result = picture.Copy();
+        using var image = SKImage.FromBitmap(picture);
+        using var canvas = new SKCanvas(result);
+        using var paint = new SKPaint { ImageFilter = SKImageFilter.CreateBlur(sigma, sigma, SKShaderTileMode.Clamp) };
+        canvas.ClipRect(SKRect.Create(box.Left, box.Top, box.Width, box.Height));
+        canvas.SaveLayer(paint);
+        canvas.DrawImage(image, 0, 0);
+        canvas.Restore();
+        return result;
+    }
+
+    /// <summary>The mean absolute difference per channel between two pictures of one size, over <paramref name="area"/> of them.</summary>
+    private static double MeanDifference(SKBitmap a, SKBitmap b, SKRectI area)
+    {
+        long sum = 0;
+        for (var y = area.Top; y < area.Bottom; y++)
+        {
+            for (var x = area.Left; x < area.Right; x++)
+            {
+                SKColor p = a.GetPixel(x, y), q = b.GetPixel(x, y);
+                sum += Math.Abs(p.Red - q.Red) + Math.Abs(p.Green - q.Green) + Math.Abs(p.Blue - q.Blue) + Math.Abs(p.Alpha - q.Alpha);
+            }
+        }
+        return sum / (4.0 * area.Width * area.Height);
+    }
+
+    /// <summary>The share of <paramref name="area"/> in which the two pictures differ by more than <paramref name="levels"/> (0 to 255) on average over the channels.</summary>
+    private static double Differing(SKBitmap a, SKBitmap b, SKRectI area, int levels)
+    {
+        var count = 0;
+        for (var y = area.Top; y < area.Bottom; y++)
+        {
+            for (var x = area.Left; x < area.Right; x++)
+            {
+                SKColor p = a.GetPixel(x, y), q = b.GetPixel(x, y);
+                if (Math.Abs(p.Red - q.Red) + Math.Abs(p.Green - q.Green) + Math.Abs(p.Blue - q.Blue) > 3 * levels)
+                    count++;
+            }
+        }
+        return (double)count / (area.Width * area.Height);
+    }
+
+    /// <summary>The mean brightness (0 to 255) of <paramref name="area"/> of an opaque picture.</summary>
+    private static double MeanLuma(SKBitmap picture, SKRectI area)
+    {
+        double sum = 0;
+        for (var y = area.Top; y < area.Bottom; y++)
+        {
+            for (var x = area.Left; x < area.Right; x++)
+            {
+                var c = picture.GetPixel(x, y);
+                sum += 0.299 * c.Red + 0.587 * c.Green + 0.114 * c.Blue;
+            }
+        }
+        return sum / (area.Width * area.Height);
+    }
+
+    [Fact]
+    public void Blur_softens_the_mosaic_of_the_box_so_nothing_finer_than_a_cell_is_left()
+    {
+        // 400 × 300: a cell is 8 px, so the blur is 0.6 × 8 = 4.8. The box is x 40 to 360 and y 30 to 270.
+        var box = new SKRectI(40, 30, 360, 270);
+        using var picture = Lettering(400, 300);
+        var edit = Redact(RedactMode.Blur, .1, .1, .8, .8);
+
+        using var blurred = ImageEditRenderer.Render(picture, edit);
+
+        Assert.True(Differing(blurred, picture, box, 8) > 0.2, "the box still shows the picture");
+        // Not a black box, and as bright as the picture it hides: blurring cells keeps their average.
+        Assert.InRange(MeanLuma(blurred, box), MeanLuma(picture, box) - 8, MeanLuma(picture, box) + 8);
+        // Not the mosaic left as it is either.
+        using var mosaic = ImageEditRenderer.Render(picture, Redact(RedactMode.Mosaic, .1, .1, .8, .8));
+        Assert.True(Differing(blurred, mosaic, box, 4) > 0.2, "the cells are not blurred");
+        // Not the picture blurred where it stood: the mosaic comes first, so the blur works on cells.
+        using var direct = BlurredDirectly(picture, box, 4.8f);
+        Assert.True(Differing(blurred, direct, box, 4) > 0.1, "the box is the picture blurred, with no mosaic under it");
+
+        // The proof of "nothing finer than a cell": the mosaic of the picture, hidden again, comes out the same, while a
+        // blur of the picture itself tells the two apart (the lettering inside a cell).
+        using var again = ImageEditRenderer.Render(mosaic, edit);
+        Assert.True(MeanDifference(blurred, again, box) <= 0.5, "what the blur works on is not the mosaic");
+        // And it is that mosaic blurred by 0.6 of a cell (4.8 px); a blur of 4.2 or 5.4 differs by 0.4 or 0.8 already. Taken
+        // away from the edge, where the box has to stop the blur and this reference does not.
+        using var reference = BlurredDirectly(mosaic, box, 4.8f);
+        Assert.True(MeanDifference(blurred, reference, new SKRectI(56, 46, 344, 254)) <= 0.05, "not the mosaic blurred by 0.6 of a cell");
+
+        // The blur stays in the box: it neither fades towards see-through at the edge nor leaks out of it.
+        for (var y = 0; y < 300; y++)
+        {
+            for (var x = 0; x < 400; x++)
+            {
+                if (box.Contains(x, y))
+                    Assert.True(blurred.GetPixel(x, y).Alpha == 255, $"({x},{y}) is see-through");
+                else
+                    Assert.True(blurred.GetPixel(x, y) == picture.GetPixel(x, y), $"({x},{y}) changed outside the box");
+            }
+        }
+    }
+
+    [Fact]
+    public void Blur_preview_looks_like_the_saved_picture_made_small()
+    {
+        // 800 × 600: a cell is 15 px and the blur 9; the preview is a quarter, a cell 3.75 px and the blur 2.25.
+        using var full = Lettering(800, 600);
+        var edit = Redact(RedactMode.Blur, .1, .2, .4, .3);
+        using var quarter = AtQuarterScale(full, edit);
+
+        Assert.Equal((200, 150), (quarter.Saved.Width, quarter.Saved.Height));
+        var area = new SKRectI(20, 30, 100, 75); // the box at that size
+        var difference = MeanDifference(quarter.Saved, quarter.Drawn, area);
+        Assert.True(difference <= 6, $"mean difference {difference:F2} in the box");
+        // And the comparison is between two blurs of cells, not two black boxes or two pictures of lettering.
+        using var small = full.Resize(Info(200, 150), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+        Assert.True(MeanDifference(quarter.Drawn, small, area) > 5);
+        Assert.InRange(MeanLuma(quarter.Drawn, area), MeanLuma(small, area) - 8, MeanLuma(small, area) + 8);
+    }
+
     [Fact]
     public async Task Every_frame_of_an_animation_is_redacted()
     {
@@ -323,14 +456,16 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
         Assert.Equal(path, ImageEditRenderer.CachedBackdropPath);
     }
 
-    [Fact]
-    public void Preview_scale_matches_full_size()
+    [Theory]
+    [InlineData(RedactMode.Mosaic)]
+    [InlineData(RedactMode.Blur)]
+    public void Preview_scale_matches_full_size(RedactMode mode)
     {
         // The editor window draws a small copy of the picture; saving draws the original. Both must look the same.
         using var full = Scene(800, 600);
         var edit = new ImageEdit
         {
-            Redact = new RedactEdit { Mode = RedactMode.Mosaic, Boxes = [new EditRect { X = .1, Y = .2, Width = .4, Height = .3 }] },
+            Redact = new RedactEdit { Mode = mode, Boxes = [new EditRect { X = .1, Y = .2, Width = .4, Height = .3 }] },
             Background = new BackgroundEdit { Value = "sky", Padding = .08, Corner = .05, Shadow = 60, Aspect = "1:1" },
         };
         using var quarter = AtQuarterScale(full, edit);

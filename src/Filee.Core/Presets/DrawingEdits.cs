@@ -9,7 +9,7 @@ using System.Text.Json.Serialization;
 
 namespace Filee.Core.Presets;
 
-/// <summary>How a redacted box is hidden. A mode from a newer Filee reads as <see cref="Black"/>.</summary>
+/// <summary>How a redacted box is hidden. A mode from a newer Filee reads as <see cref="Black"/>; new modes go at the end.</summary>
 public enum RedactMode
 {
     /// <summary>Covered with a black box.</summary>
@@ -17,6 +17,9 @@ public enum RedactMode
 
     /// <summary>Replaced by large blocks of the colours below it.</summary>
     Mosaic,
+
+    /// <summary>Replaced by large blocks of the colours below it, and those blocks blurred: nothing finer than a block is left.</summary>
+    Blur,
 }
 
 /// <summary>What an <see cref="Annotation"/> is. A kind from a newer Filee reads as <see cref="Pen"/>.</summary>

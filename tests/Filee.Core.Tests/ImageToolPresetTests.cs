@@ -209,6 +209,41 @@ public class ImageToolPresetTests
         Assert.Equal(BackgroundKind.Gradient, edit.Background!.Kind);
     }
 
+    /// <summary>What <see cref="RedactMode"/> was before Blur: the same converter and the same default.</summary>
+    private enum RedactModeBeforeBlur { Black, Mosaic }
+
+    [Fact]
+    public void Blur_comes_last_so_an_older_Filee_reads_it_as_Black_and_nothing_else_moves()
+    {
+        // The settings file turns enums into names and drops itself when it meets one it can't read, so Blur must not
+        // renumber its neighbours, and a build without it must fall back on the value that hides the most.
+        Assert.Equal([RedactMode.Black, RedactMode.Mosaic, RedactMode.Blur], Enum.GetValues<RedactMode>());
+        Assert.Equal(0, (int)RedactMode.Black);
+
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new LenientEnumJsonConverter<RedactModeBeforeBlur>());
+        Assert.Equal(RedactModeBeforeBlur.Black, JsonSerializer.Deserialize<RedactModeBeforeBlur>("\"Blur\"", options));
+        Assert.Equal(RedactModeBeforeBlur.Mosaic, JsonSerializer.Deserialize<RedactModeBeforeBlur>("\"Mosaic\"", options));
+    }
+
+    [Fact]
+    public void Blur_is_remembered_and_a_mode_nobody_knows_reads_as_Black_without_losing_the_rest()
+    {
+        var json = JsonSerializer.Serialize(new AppSettings { ImageTools = new ImageToolSettings { RedactMode = RedactMode.Blur, CropAspect = "16:9" } },
+            FileeJsonContext.Default.AppSettings);
+        var back = JsonSerializer.Deserialize(json, FileeJsonContext.Default.AppSettings)!.ImageTools;
+        Assert.Equal((RedactMode.Blur, "16:9"), (back.RedactMode, back.CropAspect));
+
+        // A mode of a newer Filee, in the settings and in a saved preset: Black, and the rest of the file still loads.
+        var newer = JsonSerializer.Deserialize("""{"imageTools":{"redactMode":"Smudge","cropAspect":"1:1"}}""", FileeJsonContext.Default.AppSettings)!.ImageTools;
+        Assert.Equal((RedactMode.Black, "1:1"), (newer.RedactMode, newer.CropAspect));
+
+        var preset = JsonSerializer.Deserialize("""{ "id": "x", "kind": "Tool", "tool": "Redact", "targetFormat": "*", "image": { "edit": { "redact": { "mode": "Blur", "boxes": [ { "x": 0.1, "y": 0.1, "width": 0.2, "height": 0.2 } ] } } } }""",
+            FileeJsonContext.Default.Preset)!;
+        Assert.Equal(RedactMode.Blur, preset.Image.Edit!.Redact!.Mode);
+        Assert.Equal(RedactMode.Blur, preset.Clone().Image.Edit!.Redact!.Mode);
+    }
+
     [Fact]
     public void A_tool_kind_from_a_newer_Filee_loads_and_the_preset_kind_Tool_is_read_by_name()
     {

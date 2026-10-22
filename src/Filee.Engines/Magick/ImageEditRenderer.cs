@@ -107,13 +107,17 @@ public static class ImageEditRenderer
         canvas.DrawImage(picture, dest, Sampling(dest.Width < picture.Width));
         canvas.Restore();
 
-        var mosaic = edit.Redact?.Mode == RedactMode.Mosaic;
+        var mode = edit.Redact?.Mode;
         // max(8, short side / 40) pixels of the full-size picture, rounded up (never finer), in this picture's pixels.
         var cell = Math.Max(8, Math.Ceiling(full / 40.0)) * shortSide / full;
         using var paint = new SKPaint { Color = SKColors.Black };
+        // The blur is 0.6 of a cell, in the pixels of the canvas, so a small preview blurs in proportion.
+        var sigma = ((float)(0.6 * cell * dest.Width / picture.Width), (float)(0.6 * cell * dest.Height / picture.Height));
         foreach (var box in boxes)
         {
-            if (mosaic)
+            if (mode == RedactMode.Blur)
+                BlurredMosaic(canvas, picture, box, cell, sigma, paint, Shown);
+            else if (mode == RedactMode.Mosaic)
                 Mosaic(canvas, picture, box, cell, paint, Shown);
             else
                 canvas.DrawRect(Shown(box), paint);
@@ -404,6 +408,25 @@ public static class ImageEditRenderer
                 canvas.DrawRect(shown((columns[i], rows[j], columns[i + 1], rows[j + 1])), paint);
             }
         }
+    }
+
+    /// <summary>
+    /// A <see cref="Mosaic"/> that is blurred as it is laid on. The blur never sees the picture itself, only the cells, so
+    /// nothing finer than a cell is left to bring back. It stops at the edge of the box: the cells are cropped there and
+    /// clamped, so the edge stays solid and none of the blur leaks out.
+    /// </summary>
+    private static void BlurredMosaic(SKCanvas canvas, SKImage picture, (int Left, int Top, int Right, int Bottom) box, double cell,
+        (float X, float Y) sigma, SKPaint paint, Func<(int, int, int, int), SKRect> shown)
+    {
+        var area = shown(box);
+        using var blur = SKImageFilter.CreateBlur(sigma.X, sigma.Y, SKShaderTileMode.Clamp, null, area);
+        using var soften = new SKPaint { ImageFilter = blur };
+        canvas.Save();
+        canvas.ClipRect(area);
+        canvas.SaveLayer(soften);
+        Mosaic(canvas, picture, box, cell, paint, shown);
+        canvas.Restore();
+        canvas.Restore();
     }
 
     /// <summary>

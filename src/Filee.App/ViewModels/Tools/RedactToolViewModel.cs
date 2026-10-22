@@ -1,7 +1,7 @@
-// The redact tool in the image tool window: the boxes to hide and the way of hiding them (a black box or a mosaic), which
-// box is picked, the B / M / Delete keys, and the edit it hands back. One set of boxes goes on every file: the boxes are
-// fractions of the picture, so another file shows them in the same place, and every preview is the result. Save is off
-// until there is a box.
+// The redact tool in the image tool window: the boxes to hide and the way of hiding them (a black box, a mosaic or a blur),
+// which box is picked, the B / M / U / Delete keys, and the edit it hands back. One set of boxes goes on every file: the
+// boxes are fractions of the picture, so another file shows them in the same place, and every preview is the result. Save
+// is off until there is a box.
 
 using Avalonia.Input;
 using CommunityToolkit.Mvvm.Input;
@@ -27,13 +27,18 @@ public sealed partial class RedactToolViewModel : ImageToolViewModel
     internal RedactToolViewModel(IReadOnlyList<string> files, UserDataStore store, ILocalizer loc, ILogger? log)
         : base(ImageToolKind.Redact, files, store, loc, log)
     {
-        Modes = [new(RedactMode.Black, loc["tool.redact.black"]), new(RedactMode.Mosaic, loc["tool.redact.mosaic"])];
+        Modes =
+        [
+            new(RedactMode.Black, loc["tool.redact.black"]),
+            new(RedactMode.Mosaic, loc["tool.redact.mosaic"]),
+            new(RedactMode.Blur, loc["tool.redact.blur"]),
+        ];
         _redact = new RedactEdit { Mode = store.Settings.ImageTools.RedactMode };
     }
 
     protected override string TitleKey => "tool.redact.title";
 
-    /// <summary>The two ways of hiding, as the chips show them.</summary>
+    /// <summary>The ways of hiding, as the chips show them.</summary>
     public IReadOnlyList<Choice<RedactMode>> Modes { get; }
 
     /// <summary>How every box is hidden. One undo step.</summary>
@@ -88,7 +93,7 @@ public sealed partial class RedactToolViewModel : ImageToolViewModel
     /// <summary>Nothing to hide yet: there is nothing to save.</summary>
     protected override bool CanSave => _redact.Boxes.Count > 0;
 
-    /// <summary>Delete or Backspace removes the picked box; B picks the black box, M the mosaic.</summary>
+    /// <summary>Delete or Backspace removes the picked box; B picks the black box, M the mosaic, U the blur.</summary>
     public override bool HandleKey(Key key, KeyModifiers modifiers)
     {
         if (modifiers != KeyModifiers.None)
@@ -102,6 +107,9 @@ public sealed partial class RedactToolViewModel : ImageToolViewModel
                 return true;
             case Key.M:
                 Mode = Modes.First(m => m.Value == RedactMode.Mosaic);
+                return true;
+            case Key.U:
+                Mode = Modes.First(m => m.Value == RedactMode.Blur);
                 return true;
             default:
                 return false;

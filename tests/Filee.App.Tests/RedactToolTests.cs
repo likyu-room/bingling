@@ -1,6 +1,6 @@
 // The redact window: drawing, selecting, moving, resizing and deleting boxes with the mouse and keys, one undo step per
-// drag, the boxes kept inside the picture, the B / M mode keys, Save off while there is nothing to hide, what Save hands
-// back and remembers, and the panel and the preview on the screen (black and mosaic drawn by the renderer that saves).
+// drag, the boxes kept inside the picture, the B / M / U mode keys, Save off while there is nothing to hide, what Save hands
+// back and remembers, and the panel and the preview on the screen (black, mosaic and blur drawn by the renderer that saves).
 
 using System.Runtime.InteropServices;
 using Avalonia;
@@ -75,7 +75,7 @@ public class RedactToolTests
         Assert.Empty(vm.Redact.Boxes);
         Assert.Equal(-1, vm.SelectedIndex);
         Assert.Equal(RedactMode.Mosaic, vm.Mode.Value);
-        Assert.Equal(["검은 상자", "모자이크"], vm.Modes.Select(m => m.Label));
+        Assert.Equal(["검은 상자", "모자이크", "흐림"], vm.Modes.Select(m => m.Label));
         Assert.Equal("상자 0개", vm.BoxCountText);
         vm.Dispose();
     }
@@ -425,6 +425,35 @@ public class RedactToolTests
     }
 
     [AvaloniaFact]
+    public void Mode_key_U_switches_to_blur_and_Save_remembers_it()
+    {
+        var store = TestStore();
+        var (window, vm) = Open(store, 900, ImageToolWindowTests.TestImages.Png(400, 200));
+        Drag(window, At(window, Picture, .1, .2), At(window, Picture, .6, .8));
+
+        window.KeyPressQwerty(PhysicalKey.U, RawInputModifiers.None);
+        Assert.Equal(RedactMode.Blur, vm.Mode.Value);
+        Assert.Equal(RedactMode.Blur, vm.Redact.Mode);
+        var chips = window.GetVisualDescendants().OfType<ListBoxItem>().ToList();
+        Assert.Equal(3, chips.Count(c => c.DataContext is Choice<RedactMode>));
+        Assert.True(chips.Single(c => c.DataContext is Choice<RedactMode> { Value: RedactMode.Blur }).IsSelected);
+
+        window.KeyPressQwerty(PhysicalKey.U, RawInputModifiers.Control); // Ctrl+U is not the key
+        Assert.Equal(RedactMode.Blur, vm.Mode.Value);
+        window.KeyPressQwerty(PhysicalKey.M, RawInputModifiers.None);
+        Assert.Equal(RedactMode.Mosaic, vm.Mode.Value);
+        window.KeyPressQwerty(PhysicalKey.U, RawInputModifiers.None);
+        window.KeyPressQwerty(PhysicalKey.Z, RawInputModifiers.Control); // the mode is one undo step
+        Assert.Equal(RedactMode.Mosaic, vm.Mode.Value);
+        window.KeyPressQwerty(PhysicalKey.U, RawInputModifiers.None);
+
+        window.KeyPressQwerty(PhysicalKey.Enter, RawInputModifiers.None);
+        Assert.Equal(RedactMode.Blur, vm.Result!.Shared!.Redact!.Mode);
+        Assert.Equal(RedactMode.Blur, store.Settings.ImageTools.RedactMode); // the next window starts on it
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
     public void Enter_saves_only_with_a_box_and_the_save_button_follows()
     {
         var (window, vm) = Open(TestStore(), 900, ImageToolWindowTests.TestImages.Png(400, 200));
@@ -539,8 +568,8 @@ public class RedactToolTests
         var size = new Size(1000, 700);
         Assert.Equal("가리기 · photo.png", window.Title);
         Assert.Single(window.GetVisualDescendants().OfType<PictureView>());
-        Assert.Equal(2, window.GetVisualDescendants().OfType<ListBoxItem>().Count());
-        foreach (var text in new[] { "방식", "검은 상자", "모자이크", "상자 0개", "그림 위를 끌어서 가릴 곳을 고르세요", "결과에서 사진 정보(EXIF)도 지워져요" })
+        Assert.Equal(3, window.GetVisualDescendants().OfType<ListBoxItem>().Count());
+        foreach (var text in new[] { "방식", "검은 상자", "모자이크", "흐림", "상자 0개", "그림 위를 끌어서 가릴 곳을 고르세요", "결과에서 사진 정보(EXIF)도 지워져요" })
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == text);
 
         // Nothing to hide yet: Save is off.
@@ -565,6 +594,14 @@ public class RedactToolTests
         using var mosaic = window.CaptureRenderedFrame()!;
         Assert.NotEqual(Avalonia.Media.Colors.Black, PixelAt(mosaic, centre));
         Screenshot(window, "tool-redact-mosaic-ko.png");
+
+        // Blur: the same box, the blocks softened (the renderer that saves draws it here too), so not black either.
+        window.KeyPressQwerty(PhysicalKey.U, RawInputModifiers.None);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        using var blur = window.CaptureRenderedFrame()!;
+        Assert.NotEqual(Avalonia.Media.Colors.Black, PixelAt(blur, centre));
+        Screenshot(window, "tool-redact-blur-ko.png");
         window.Close();
         vm.Dispose();
     }
