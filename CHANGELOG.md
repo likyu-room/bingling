@@ -20,7 +20,9 @@ without lines shows the English ones):
 <!-- update
 level: optional
 ko: 사진 편집 창에서 파일을 만들지 않고 바로 복사할 수 있어요 (Ctrl+C)
+ko: 설치 없이 쓰는 포터블 ZIP도 받을 수 있어요
 en: Copy from the picture editing windows without making a file (Ctrl+C)
+en: A portable ZIP to use Bingling without installing it
 -->
 
 - **Copy from the editing windows**: Crop, Add background, Redact and Annotate have a **Copy** button next to Save
@@ -28,6 +30,8 @@ en: Copy from the picture editing windows without making a file (Ctrl+C)
   writing a file, ready to paste into a chat or a document, and the window closes. With several pictures, it copies the
   one shown and the window stays open for the next. **Settings → General → Image tools → "Close the editing window
   after Copy"** keeps it open after one picture too, to edit more or save a file as well.
+- **Portable ZIP**: `Bingling-1.2.0-win-Portable.zip` runs without installing: unpack it into a folder you keep and
+  run `Bingling.exe`. To update, unpack the new ZIP over it. See the user guide for what differs from Setup.
 
 ## 1.1.1
 

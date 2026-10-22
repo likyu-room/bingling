@@ -37,6 +37,8 @@ window, watch folders and the [command line](#command-line).
   - Annotate: pen, highlighter, arrow, shapes, text and numbers
   - Compress
   - Strip metadata
+
+  **Copy** (<kbd>Ctrl</kbd>+<kbd>C</kbd>) in an editing window puts the result on the clipboard without making a file.
 - **Peach Glass theme**: a soft, see-through glass look, in a light and a dark mode.
 - **Result card**: when a conversion finishes a card appears. "Copy" puts the result on the clipboard so you can paste it
   into a chat or a document, and clicking the picture opens the result.
@@ -58,6 +60,9 @@ For Windows 10 and 11.
 Bingling tells you when a new version is out and updates while keeping your settings and engines.
 If you use 1.1.0 under its former name, Filee Plus, just install Bingling: Setup removes Filee Plus and moves its
 settings and downloaded engines over.
+
+**Without installing (portable)**: download `Bingling-<version>-win-Portable.zip`, unpack it into any folder and run
+`Bingling.exe`. To update, unpack the new ZIP over the same folder. See the [user guide](docs/manual/en.md#without-installing-portable).
 
 ## Command line
 

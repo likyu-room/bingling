@@ -64,6 +64,27 @@ Bingling runs on Windows 10 and 11.
 After Setup, Bingling runs in the notification area of the taskbar (the tray).
 Updates don't ask about engines again. Your settings and engines stay.
 
+### Without installing (portable)
+
+If you can't run Setup or would rather not install, use the portable ZIP. It needs no administrator rights.
+
+1. Download `Bingling-<version>-win-Portable.zip` from the [releases page](https://github.com/likyu-room/bingling/releases/latest).
+2. Unpack it into a folder you will keep (for example `Documents\Bingling`).
+3. Run `Bingling.exe` in that folder. If “Windows protected your PC” appears, choose **More info**, then **Run anyway**.
+
+- The ring, the picture tools, conversions, the result card and engine downloads work as in the installed copy.
+- On its first start it registers “Start Bingling when I sign in” and the Explorer context menu for your account. On
+  Windows 11 the menu entry is under “Show more options”.
+- Settings are kept in the same place as the installed copy's (`%APPDATA%\Bingling`). It is not meant to be carried to
+  other PCs on a USB stick.
+
+**Updating**: when a new version is out, its card has a **Download** button that opens the releases page. Right-click
+the tray icon, choose **Quit**, then unpack the new ZIP over the same folder. Your settings and engines stay.
+
+**Removing it**: in **Settings → General**, turn off “Start Bingling when I sign in” and “Show ‘Convert with Bingling’ in
+the Explorer context menu”, choose **Quit** in the tray, then delete the folder. To delete the downloaded engines as
+well, delete the `%LocalAppData%\Bingling` folder too.
+
 ## Basic use
 
 ### Open the ring by dragging
@@ -435,7 +456,8 @@ Install it in **Settings → Engines**. DOCX, XLSX, PPTX and HWP convert without
 
 **Setup asks for an administrator on my work PC.**
 Choose **Install for me only** in Setup's first window. Bingling then installs for your account without administrator rights.
-If your company blocks unsigned programs from running at all, this doesn't help either. Ask your IT department.
+If Setup itself is blocked, unpack the [portable ZIP](#without-installing-portable) and use that.
+If your company blocks unsigned programs from running at all, none of this helps. Ask your IT department.
 
 **How do I update?**
 When a new version is out, Bingling shows a card such as “Bingling 1.2.0 is available”. Click **Update** and it downloads and installs the new version.
