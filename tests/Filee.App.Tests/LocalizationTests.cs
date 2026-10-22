@@ -149,9 +149,11 @@ public partial class LocalizationTests
     {
         var ko = Load("ko");
         Assert.Equal("동작", ko["triggers.action"]);
-        Assert.Equal("링 열기", ko["triggers.action.Donut"]);
+        Assert.Equal("링 열기 (선택한 파일)", ko["triggers.action.Donut"]); // the ring is the one that works on selected files
+        Assert.Equal("키보드 단축키", ko["triggers.kind.KeyChord"]); // a capture or a colour pick is a keyboard shortcut too
         Assert.Equal("화면 캡처", ko["triggers.action.Capture"]);
         Assert.Equal("색 찍기", ko["triggers.action.PickColor"]);
+        Assert.Equal("링을 열거나 화면을 캡처하고 색을 찍는 방법을 정하세요. 제스처는 원하는 만큼 추가할 수 있어요.", ko["triggers.description"]);
         Assert.Equal("화면 캡처", ko["tray.capture"]);
         Assert.Equal("색 찍기", ko["tray.pick_color"]);
 
@@ -160,6 +162,10 @@ public partial class LocalizationTests
             var strings = Load(code);
             foreach (var key in new[] { "triggers.action", "triggers.action.Donut", "triggers.action.Capture", "triggers.action.PickColor", "tray.capture", "tray.pick_color" })
                 Assert.False(string.IsNullOrWhiteSpace(strings[key]), $"{code}:{key}");
+
+            // "(selected files)" says what the ring works on, so it is the ring's action's: the kind of shortcut is plain.
+            Assert.DoesNotContain(strings["triggers.kind.KeyChord"], c => c is '(' or '（');
+            Assert.Contains(strings["triggers.action.Donut"], c => c is '(' or '（');
         }
     }
 

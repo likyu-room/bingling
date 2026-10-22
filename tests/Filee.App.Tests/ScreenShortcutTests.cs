@@ -113,7 +113,8 @@ public class ScreenShortcutTests
     {
         var vm = new TriggerGestureViewModel(Chord(), Localizer("ko"), () => { });
 
-        Assert.Equal(["링 열기", "화면 캡처", "색 찍기"], vm.Actions.Select(a => a.Label));
+        Assert.Equal(["링 열기 (선택한 파일)", "화면 캡처", "색 찍기"], vm.Actions.Select(a => a.Label));
+        Assert.Equal("키보드 단축키", vm.Kinds.Single(k => k.Value == TriggerKind.KeyChord).Label);
     }
 
     [AvaloniaFact]
