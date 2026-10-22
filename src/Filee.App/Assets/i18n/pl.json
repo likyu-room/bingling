@@ -147,6 +147,7 @@
   "tool.custom_color_tip": "Wpisz kod koloru, a zadziała od razu",
   "tool.eyedropper": "Pipeta",
   "tool.eyedropper_tip": "Pobierz kolor z obrazu (I). Esc przerywa",
+  "tool.copy_color": "Kopiuj kod",
   "tool.copy_color_tip": "Kopiuj kod koloru (HEX)",
   "tool.crop.keys": "Proporcje wybierzesz też klawiszami 1–7",
   "tool.redact.keys": "B Czarne pole · M Mozaika · U Rozmycie",

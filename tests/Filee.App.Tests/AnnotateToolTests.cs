@@ -295,6 +295,61 @@ public class AnnotateToolTests
     }
 
     [AvaloniaFact]
+    public void Picking_a_spotlight_leaves_the_chips_alone_and_a_chip_makes_no_undo_step_for_it()
+    {
+        var vm = Annotate([ImageToolWindowTests.TestImages.Png(400, 200)], TestStore());
+        // A spotlight uses neither colour nor thickness: what it carries is what it was drawn with, no business of the chips.
+        vm.Annotations =
+        [
+            new Annotation
+            {
+                Kind = AnnotationKind.Spotlight,
+                Color = "#007AFF",
+                Width = StrokeLevel.Thick,
+                Points = [new EditPoint { X = .2, Y = .2 }, new EditPoint { X = .8, Y = .8 }],
+            },
+        ];
+        var (color, width) = (vm.Color, vm.StrokeWidth);
+        Assert.NotEqual(("#007AFF", StrokeLevel.Thick), (color, width));
+        var drawn = vm.Annotations;
+
+        vm.SelectedIndex = 0;
+        Assert.Equal((color, width), (vm.Color, vm.StrokeWidth)); // picking it changed no chip, and the next drawing's style
+
+        // The chips still work for the next drawings, and the spotlight is not changed by them.
+        vm.SelectedColor = vm.Colors.Single(c => c.Hex == "#34C759");
+        vm.StrokeWidth = StrokeLevel.Thick;
+        vm.HandleKey(Avalonia.Input.Key.OemOpenBrackets, KeyModifiers.None);
+        Assert.Equal(("#34C759", StrokeLevel.Normal), (vm.Color, vm.StrokeWidth));
+        Assert.Same(drawn, vm.Annotations);
+
+        // So the one undo step there is, is the spotlight's own.
+        vm.UndoCommand.Execute(null);
+        Assert.Empty(vm.Annotations);
+        Assert.False(vm.UndoCommand.CanExecute(null));
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_pen_stroke_over_a_spotlights_edge_is_picked_before_the_spotlight_under_it()
+    {
+        var (window, vm) = Open();
+        Key(window, PhysicalKey.P);
+        Drag(window, At(window, .4, .2), At(window, .6, .2)); // a stroke along the top edge of the box drawn next
+        Key(window, PhysicalKey.S);
+        Drag(window, At(window, .3, .2), At(window, .7, .8)); // later in the list, and drawn under the stroke
+        Assert.Equal([AnnotationKind.Pen, AnnotationKind.Spotlight], vm.Annotations.Select(a => a.Kind));
+
+        Key(window, PhysicalKey.V);
+        Click(window, At(window, .5, .2));
+        Assert.Equal(0, vm.SelectedIndex); // the stroke, which is on top on the screen
+        Click(window, At(window, .33, .2)); // along the same edge, off the stroke: the spotlight
+        Assert.Equal(1, vm.SelectedIndex);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
     public void Number_tool_counts_per_file()
     {
         var (window, vm) = Open(files: 2);
@@ -1342,6 +1397,179 @@ public class AnnotateToolTests
         vm.Dispose();
     }
 
+    private static readonly Avalonia.Media.Color FirstBand = Avalonia.Media.Color.Parse("#2A6FB5");
+
+    /// <summary>
+    /// The colour, in the next frame, of the magnifier's cell left of its middle one when the pointer is at
+    /// <paramref name="pointer"/> (a point of the window): the first band's on <see cref="FourBands"/> with the pointer on the
+    /// second band's first pixel, and whatever is on the picture there when there is no magnifier.
+    /// </summary>
+    private static Avalonia.Media.Color LensSeen(Window window, Point pointer)
+    {
+        var canvas = Canvas(window);
+        var lens = Magnifier.PlaceBeside(window.TranslatePoint(pointer, canvas)!.Value, canvas.Bounds.Size);
+        const double cell = Magnifier.Diameter / Magnifier.Cells;
+        var at = canvas.TranslatePoint(lens + new Point(5.5 * cell, 6.5 * cell), window)!.Value;
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        using var frame = window.CaptureRenderedFrame()!;
+        return PixelAt(frame, at);
+    }
+
+    [AvaloniaFact]
+    public void The_eyedropper_picks_no_colour_off_a_see_through_pixel_and_the_colour_of_a_half_see_through_one()
+    {
+        var (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.HalfClear(400, 200));
+        Key(window, PhysicalKey.I);
+
+        // Nothing is there to pick: no colour is put in, and the eyedropper stays on for another try.
+        Click(window, At(window, .25, .5));
+        Assert.Equal(("", "#FF3B30", true), (vm.CustomColorHex, vm.Color, vm.IsEyedropperOn));
+
+        // Half see-through red: its colour, as it is drawn.
+        Click(window, At(window, .75, .5));
+        Assert.False(vm.IsEyedropperOn);
+        var picked = Avalonia.Media.Color.Parse(vm.CustomColorHex);
+        Assert.True(picked.R > 250 && picked.G < 5 && picked.B < 5, $"red, not {vm.CustomColorHex}");
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_magnifier_is_made_anew_when_what_is_under_the_pointer_changes_while_it_stays_still()
+    {
+        var other = ImageToolWindowTests.TestImages.Bands(400, 200, "#E67E22", "#1ABC9C", "#F1C40F", "#34495E");
+        var (window, vm) = Open(TestStore(), FourBands(), other);
+        var button = window.GetVisualDescendants().OfType<ToggleButton>().Single();
+        var pointer = At(window, 100.5 / 400, .5); // the second band's first pixel: the cell left of the middle one is the first band's
+        window.MouseMove(pointer);
+        Assert.NotEqual(FirstBand, LensSeen(window, pointer)); // not on yet
+
+        // On with the pointer already over the picture: the magnifier is there at once, with no move to bring it.
+        Key(window, PhysicalKey.I);
+        Assert.Equal(FirstBand, LensSeen(window, pointer));
+
+        // A drawing under it (a spotlight that dims all but the left tenth), and an undo of it: the colours change, the pointer not.
+        vm.Annotations =
+        [
+            new Annotation
+            {
+                Kind = AnnotationKind.Spotlight,
+                Points = [new EditPoint { X = 0, Y = 0 }, new EditPoint { X = .1, Y = 1 }],
+            },
+        ];
+        Assert.NotEqual(FirstBand, LensSeen(window, pointer));
+        Key(window, PhysicalKey.Z, RawInputModifiers.Control);
+        Assert.Equal(FirstBand, LensSeen(window, pointer));
+
+        // Another file.
+        Turn(window, vm, PhysicalKey.ArrowRight);
+        Assert.Equal(Avalonia.Media.Color.Parse("#E67E22"), LensSeen(window, pointer));
+
+        // The pointer gone to the panel: no magnifier, and none comes back when the view is fitted again (Ctrl+0) beside it.
+        window.MouseMove(Centre(window, button));
+        Assert.NotEqual(Avalonia.Media.Color.Parse("#E67E22"), LensSeen(window, pointer));
+        Key(window, PhysicalKey.Digit0, RawInputModifiers.Control);
+        Assert.NotEqual(Avalonia.Media.Color.Parse("#E67E22"), LensSeen(window, pointer));
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_magnifier_goes_when_the_pointer_leaves_the_picture_and_comes_back_with_it()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        var button = window.GetVisualDescendants().OfType<ToggleButton>().Single();
+        var pointer = At(window, 100.5 / 400, .5);
+        Key(window, PhysicalKey.I);
+        window.MouseMove(pointer + new Point(.1, 0));
+        window.MouseMove(pointer);
+        Assert.Equal(FirstBand, LensSeen(window, pointer));
+
+        window.MouseMove(Shown(window).TopLeft - new Point(8, 8)); // the margin round the picture, still on the canvas
+        Assert.NotEqual(FirstBand, LensSeen(window, pointer));
+        window.MouseMove(pointer);
+        Assert.Equal(FirstBand, LensSeen(window, pointer));
+        window.MouseMove(Centre(window, button)); // off the canvas altogether
+        Assert.NotEqual(FirstBand, LensSeen(window, pointer));
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_eyedropper_picks_the_edge_pixels_of_the_picture_and_only_with_the_left_button()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        // The first and the last pixel of the picture, in its corners and at its ends.
+        foreach (var (x, y, hex) in new[] { (0.0, .5, "#2A6FB5"), (1.0, .5, "#8E44AD"), (0.0, 0.0, "#2A6FB5"), (1.0, 1.0, "#8E44AD") })
+        {
+            Key(window, PhysicalKey.I);
+            Click(window, At(window, x, y));
+            Assert.Equal((hex, false), (vm.CustomColorHex, vm.IsEyedropperOn));
+        }
+
+        // The right button, the middle one (a pan) and a left press while Space is held (also a pan) pick nothing and draw nothing.
+        Key(window, PhysicalKey.I);
+        var at = At(window, .4, .5);
+        window.MouseDown(at, MouseButton.Right);
+        window.MouseUp(at, MouseButton.Right);
+        window.MouseDown(at, MouseButton.Middle);
+        window.MouseUp(at, MouseButton.Middle);
+        window.KeyPressQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        Click(window, at);
+        window.KeyReleaseQwerty(PhysicalKey.Space, RawInputModifiers.None);
+        Assert.Equal(("#8E44AD", true), (vm.CustomColorHex, vm.IsEyedropperOn));
+        Assert.Empty(vm.Annotations);
+
+        Click(window, at); // the left button alone does
+        Assert.Equal(("#B5362A", false), (vm.CustomColorHex, vm.IsEyedropperOn));
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_magnifier_is_above_the_dashed_outline_of_the_picked_drawing()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        vm.Annotations =
+        [
+            new Annotation
+            {
+                Kind = AnnotationKind.Rectangle,
+                Width = StrokeLevel.Thin,
+                Points = [new EditPoint { X = .05, Y = .1 }, new EditPoint { X = .95, Y = .6 }],
+            },
+        ];
+        vm.SelectedIndex = 0; // picked: the dashes of white go round it
+
+        // The pointer 112 DIPs under the outline's top edge: that edge runs through the middle of the magnifier's circle.
+        var canvas = Canvas(window);
+        var image = PictureView.ImageRect(canvas.Bounds.Size, Picture, 1, default);
+        var top = AnnotateCanvas.Extent(vm.Annotations[0], image).Inflate(4).Top;
+        var pointer = new Point(image.X + image.Width * .5, top + 112);
+        var lens = Magnifier.PlaceBeside(pointer, canvas.Bounds.Size);
+        Assert.Equal(top - 60, lens.Y, 3);
+
+        int WhiteAlongTheEdge()
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            using var frame = window.CaptureRenderedFrame()!;
+            return (from dx in Enumerable.Range(20, 81)
+                    from dy in Enumerable.Range(-1, 3)
+                    select PixelAt(frame, canvas.TranslatePoint(new Point(lens.X + dx, Math.Floor(top) + dy), window)!.Value))
+                .Count(c => c.R >= 240 && c.G >= 240 && c.B >= 240);
+        }
+
+        Assert.True(WhiteAlongTheEdge() > 20); // the outline is there to cross the circle
+        Key(window, PhysicalKey.I);
+        window.MouseMove(canvas.TranslatePoint(pointer + new Point(.1, 0), window)!.Value);
+        window.MouseMove(canvas.TranslatePoint(pointer, window)!.Value);
+        Assert.Equal(0, WhiteAlongTheEdge()); // and the magnifier covers it
+        window.Close();
+        vm.Dispose();
+    }
+
     [AvaloniaFact]
     public void The_eyedropper_picks_what_is_seen_with_the_drawings_on_it()
     {
@@ -1440,7 +1668,14 @@ public class AnnotateToolTests
         vm.CopiedHold = TimeSpan.FromMilliseconds(40);
         var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.CopyColorCommand);
         string Label() => button.GetVisualDescendants().OfType<TextBlock>().Single(t => t.IsEffectivelyVisible).Text!;
-        Assert.Equal("복사", Label());
+        // Not "Copy" alone: the bar below has a Copy of the picture, and the two are told apart by their words, for people who
+        // cannot see them as well (the name a screen reader says, and the tip, are not the bar's either).
+        Assert.Equal("코드 복사", Label());
+        Assert.Equal("코드 복사", AutomationProperties.GetName(button));
+        Assert.Equal("색 코드(HEX)를 복사해요", ToolTip.GetTip(button));
+        var eyedropper = window.GetVisualDescendants().OfType<ToggleButton>().Single();
+        Assert.Equal("스포이트", AutomationProperties.GetName(eyedropper));
+        Assert.Contains("(I)", (string)ToolTip.GetTip(eyedropper)!); // the key is in the tip
 
         // The colour in use, a chip's too.
         window.MouseDown(Centre(window, button), MouseButton.Left);
@@ -1448,7 +1683,7 @@ public class AnnotateToolTests
         Assert.Equal(["#FF3B30"], copied);
         Assert.Equal("복사됨", Label());
         await ColorPickTests.Until(() => !vm.ColorCopied);
-        Assert.Equal("복사", Label());
+        Assert.Equal("코드 복사", Label());
 
         vm.CustomColorHex = "12ab34";
         window.MouseDown(Centre(window, button), MouseButton.Left);

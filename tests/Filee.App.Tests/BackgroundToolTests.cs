@@ -738,7 +738,7 @@ public class BackgroundToolTests
 
         // On the picture: the picture's colour, which becomes the backdrop (one undo step).
         window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.None);
-        Click(window, At(window, .5, .5, result)); // 200 px into the picture: the third band
+        Click(window, At(window, .6, .5, result)); // 248 px into the picture, in the middle of the third band (200 to 300)
         Assert.Equal("#3AA856", vm.CustomColorHex);
         Assert.Equal((BackgroundKind.Solid, "#3AA856"), (vm.PreviewEdit.Background!.Kind, vm.PreviewEdit.Background.Value));
         vm.UndoCommand.Execute(null);
@@ -752,6 +752,32 @@ public class BackgroundToolTests
         Click(window, at);
         // About 3 times as large around the middle: .5 - .3 / 3 = .4 of the result, 192 px in, 152 px into the picture: the second band.
         Assert.Equal("#B5362A", vm.CustomColorHex);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_eyedropper_reads_one_pixel_of_a_result_bigger_than_the_preview_grid()
+    {
+        // 2000 × 1000 with a red pixel in the middle and 10 % round it: a result of 2200 × 1200, more than 2048 across, which
+        // a grid shrunk to 2048 would draw the picture on at .93 and blend the dot with the grey round it.
+        var (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.Dot(2000, 1000, 1000, 500));
+        vm.SelectedSwatch = vm.Swatches.Single(s => s.Id == "solid-sky");
+        vm.Padding = 10;
+        vm.Shadow = 0;
+        vm.Corner = 0;
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        var result = new Size(2200, 1200);
+
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.None);
+        Click(window, At(window, 1100.5 / 2200, 600.5 / 1200, result)); // the dot is the picture's (1000, 500), the result's (1100, 600)
+        Assert.Equal("#FF0000", vm.CustomColorHex);
+
+        // The pixel beside it is the grey, not a mix.
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.None);
+        Click(window, At(window, 1101.5 / 2200, 600.5 / 1200, result));
+        Assert.Equal("#808080", vm.CustomColorHex);
         window.Close();
         vm.Dispose();
     }

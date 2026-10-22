@@ -1,6 +1,6 @@
 // What the annotate and add background tools share around their custom colour: the eyedropper that fills it from the
-// picture as the window shows it (key I; Esc turns it off and leaves the window open), and the button that copies the
-// colour's HEX code.
+// picture as the window shows it (key I turns it on and off; Esc turning it off without closing the window is the window's,
+// ImageToolWindow), and the button that copies the colour's HEX code.
 
 using Avalonia.Input;
 using Avalonia.Media;

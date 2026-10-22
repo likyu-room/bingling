@@ -323,7 +323,8 @@ public sealed partial class AnnotateToolViewModel : ColorToolViewModel
     /// </summary>
     private void ShowPickedStyle()
     {
-        if (_selected < 0 || _selected >= Annotations.Count)
+        // A spotlight uses neither: what it carries is no style to show, and would put a stale colour on the next drawing.
+        if (_selected < 0 || _selected >= Annotations.Count || Annotations[_selected].Kind == AnnotationKind.Spotlight)
             return;
         var picked = Annotations[_selected];
         if (BackgroundToolViewModel.HexColor(picked.Color) is { } hex && hex != _color)
@@ -377,7 +378,9 @@ public sealed partial class AnnotateToolViewModel : ColorToolViewModel
     /// </summary>
     private void RestylePicked(Action<Annotation> apply, Func<Annotation, bool> needed)
     {
-        if (_selected < 0 || _selected >= Annotations.Count || !needed(Annotations[_selected]))
+        // Not a spotlight, which draws with neither: the step would change nothing, and an undo of it only the chips.
+        if (_selected < 0 || _selected >= Annotations.Count || Annotations[_selected].Kind == AnnotationKind.Spotlight
+            || !needed(Annotations[_selected]))
             return;
         var next = Annotations.Select(a => a.Clone()).ToList();
         apply(next[_selected]);

@@ -165,6 +165,7 @@ public sealed class AnnotateCanvas : PictureView
                 EndPress();
             if (_typing is not null)
                 StopTyping();
+            RefreshLens(); // an undo or a delete changes the picture under the pointer, which did not move
         }
     }
 
@@ -181,14 +182,18 @@ public sealed class AnnotateCanvas : PictureView
 
     /// <summary>
     /// The drawing a press at <paramref name="p"/> takes: the top one (the last drawn) whose line passes within
-    /// <see cref="Reach"/> of it (an outline, not the inside of a box), or whose text or sticker it is on; -1 for none.
+    /// <see cref="Reach"/> of it (an outline, not the inside of a box), or whose text or sticker it is on; -1 for none. A
+    /// spotlight is drawn under all the rest wherever it is in the list, so it is the last to be taken.
     /// </summary>
     internal static int HitTest(IReadOnlyList<Annotation> notes, Rect image, Point p)
     {
-        for (var i = notes.Count - 1; i >= 0; i--)
+        foreach (var spotlights in new[] { false, true })
         {
-            if (Hits(notes[i], image, p))
-                return i;
+            for (var i = notes.Count - 1; i >= 0; i--)
+            {
+                if ((notes[i].Kind == AnnotationKind.Spotlight) == spotlights && Hits(notes[i], image, p))
+                    return i;
+            }
         }
         return -1;
     }
@@ -599,9 +604,8 @@ public sealed class AnnotateCanvas : PictureView
 
     // ───────── Drawing ─────────
 
-    public override void Render(DrawingContext context)
+    protected override void RenderOverPicture(DrawingContext context)
     {
-        base.Render(context); // the picture with its drawings
         if (Picture is null)
             return;
         var (notes, selected) = Shown();

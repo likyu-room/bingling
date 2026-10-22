@@ -63,6 +63,28 @@ public class ImageToolWindowTests
             return path;
         }
 
+        /// <summary>The left half of the picture see-through altogether and the right half red at half opacity: a pick on each.</summary>
+        public static string HalfClear(int width, int height)
+        {
+            var path = Path.Combine(Folder(), "half-clear.png");
+            using var image = new MagickImage(MagickColors.Transparent, (uint)width, (uint)height);
+            using var half = new MagickImage(new MagickColor("#FF000080"), (uint)(width / 2), (uint)height);
+            image.Composite(half, width / 2, 0, CompositeOperator.Over);
+            image.Write(path, MagickFormat.Png);
+            return path;
+        }
+
+        /// <summary>Grey with a single red pixel at (<paramref name="x"/>, <paramref name="y"/>): a pick lands on it only if it is as sharp as a pixel.</summary>
+        public static string Dot(int width, int height, int x, int y)
+        {
+            var path = Path.Combine(Folder(), "dot.png");
+            using var image = new MagickImage(new MagickColor("#808080"), (uint)width, (uint)height);
+            using var dot = new MagickImage(MagickColors.Red, 1, 1);
+            image.Composite(dot, x, y, CompositeOperator.Over);
+            image.Write(path, MagickFormat.Png);
+            return path;
+        }
+
         /// <summary>A JPEG stored as <paramref name="width"/> × <paramref name="height"/> that a phone turned: EXIF orientation 6.</summary>
         public static string TurnedJpeg(int width, int height)
         {

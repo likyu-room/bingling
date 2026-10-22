@@ -136,8 +136,7 @@ public partial class PictureView : Control
     {
         InvalidateVisual();
         InvalidateArrange();
-        if (Eyedropper)
-            UpdateLens(); // the pixel under the pointer is another now
+        RefreshLens(); // the pixel under the pointer is another now
     }
 
     // ───────── Geometry ─────────
@@ -188,7 +187,7 @@ public partial class PictureView : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        TrackEyedropper(e);
+        TrackEyedropper(e, remake: _panning is null); // a pan moves the picture too: the magnifier is made once, by ViewChanged
         if (_panning is not { } panning)
             return;
         _pan = panning.Pan + (e.GetPosition(this) - panning.Start);
@@ -218,7 +217,7 @@ public partial class PictureView : Control
         var content = ContentSize;
         if (content.Width <= 0)
             return;
-        TrackEyedropper(e);
+        TrackEyedropper(e, remake: false); // ViewChanged makes the magnifier, for the picture as zoomed
         var zoom = Math.Clamp(_zoom * Math.Pow(1.2, e.Delta.Y), MinZoom, MaxZoom);
         _pan = ZoomAt(Bounds.Size, content, _zoom, _pan, e.GetPosition(this), zoom);
         _zoom = zoom;
@@ -233,6 +232,12 @@ public partial class PictureView : Control
         context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size)); // takes the pointer everywhere, also off the picture
         if (Picture is { } picture)
             context.Custom(new EditPreviewDrawOperation(PictureRect, picture, EditToDraw ?? NoEdit, FullShortSide));
-        DrawLens(context);
+        RenderOverPicture(context);
+        DrawLens(context); // above all of it
+    }
+
+    /// <summary>What a tool's canvas draws over the picture and its edit (the outline of the picked drawing), under the eyedropper's magnifier.</summary>
+    protected virtual void RenderOverPicture(DrawingContext context)
+    {
     }
 }

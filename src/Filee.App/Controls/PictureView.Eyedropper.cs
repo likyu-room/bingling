@@ -1,8 +1,9 @@
 // The eyedropper of the picture view (the annotate and add background windows): while it is on, a magnifier follows the
 // pointer over the picture and a press picks the colour under it instead of drawing. The colour is the picture as the
 // window shows it, with the tool's edit drawn on it by the renderer that saves (the drawings, the backdrop): the pixels
-// round the pointer are drawn again, a 13 × 13 square of them, at the picture's own resolution, so it is the same point
-// at every zoom and screen scale (it goes by the pointer's place in the picture, not on the screen).
+// round the pointer are drawn again, a 13 × 13 square of them, at the result's own resolution (the saved picture's pixels,
+// however big), so it is the same point at every zoom and screen scale (it goes by the pointer's place in the picture, not
+// on the screen).
 
 using Avalonia;
 using Avalonia.Input;
@@ -19,9 +20,6 @@ public partial class PictureView
     /// <summary>Defines <see cref="Eyedropper"/>.</summary>
     public static readonly StyledProperty<bool> EyedropperProperty =
         AvaloniaProperty.Register<PictureView, bool>(nameof(Eyedropper));
-
-    /// <summary>The long side of the grid of pixels a pick goes by: the preview picture's, which is as sharp as the window shows.</summary>
-    private const double SampleEdge = 2048;
 
     private static readonly PixelPoint LensMiddle = new(Magnifier.Cells / 2, Magnifier.Cells / 2);
 
@@ -43,13 +41,14 @@ public partial class PictureView
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        if (change.Property == PictureProperty || change.Property == EditProperty)
+            RefreshLens(); // another file or an undo: what is under the pointer is another, though the pointer did not move
         if (change.Property != EyedropperProperty)
             return;
         if (Eyedropper)
         {
             Cursor = new Cursor(StandardCursorType.Cross);
-            if (IsPointerOver)
-                UpdateLens();
+            RefreshLens();
         }
         else
         {
@@ -65,14 +64,33 @@ public partial class PictureView
             HideLens();
     }
 
-    /// <summary>The pointer moved (or the wheel turned) at <paramref name="e"/>: the magnifier follows, and nothing else takes the move.</summary>
-    private void TrackEyedropper(PointerEventArgs e)
+    /// <summary>
+    /// The pointer moved (or the wheel turned) at <paramref name="e"/>: the magnifier follows, and nothing else takes the move.
+    /// <paramref name="remake"/> false when the picture moves too (a pan, a zoom) and <see cref="ViewChanged"/> will make the
+    /// magnifier, once, for the picture where it is then.
+    /// </summary>
+    private void TrackEyedropper(PointerEventArgs e, bool remake = true)
     {
         _pointer = e.GetPosition(this);
         if (!Eyedropper)
             return;
-        UpdateLens();
+        if (remake)
+            UpdateLens();
         e.Handled = true;
+    }
+
+    /// <summary>
+    /// What is under the pointer may have changed while it stayed still (another file, an undo, a zoom or a fit by the keys):
+    /// the magnifier is made anew where the pointer last was, or is gone if the pointer is not over this view.
+    /// </summary>
+    protected void RefreshLens()
+    {
+        if (!Eyedropper)
+            return;
+        if (IsPointerOver)
+            UpdateLens();
+        else
+            HideLens();
     }
 
     /// <summary>A press while the eyedropper is on: the colour under it is picked. The press is taken wherever it lands, so nothing is drawn or picked under it.</summary>
@@ -83,7 +101,12 @@ public partial class PictureView
         e.Handled = true;
         Color? picked = null;
         using (var around = SampleAround(point.Position))
-            picked = around?.ColorAt(LensMiddle);
+        {
+            // A pixel see-through altogether has no colour (it reads as black): nothing is picked, the eyedropper stays on.
+            using var pixels = around?.Image.PeekPixels();
+            if (pixels is not null && pixels.GetPixelColor(LensMiddle.X, LensMiddle.Y).Alpha > 0)
+                picked = around!.ColorAt(LensMiddle);
+        }
         if (picked is { } color)
             ColorPicked?.Invoke(color);
     }
@@ -123,8 +146,9 @@ public partial class PictureView
         var (content, shown) = (ContentSize, PictureRect);
         if (Picture is not { } picture || picture.Handle == IntPtr.Zero || content.Width < 1 || content.Height < 1 || !shown.Contains(p))
             return null;
-        var shrink = Math.Min(1, SampleEdge / Math.Max(content.Width, content.Height));
-        var grid = new SKSizeI(Math.Max(1, (int)Math.Round(content.Width * shrink)), Math.Max(1, (int)Math.Round(content.Height * shrink)));
+        // The result at its own size, however big: only the 13 × 13 pixels round the pointer are drawn (the surface is that
+        // big), so a big result costs no more, and a smaller grid would draw the picture shrunk and mix its pixels.
+        var grid = new SKSizeI((int)Math.Round(content.Width), (int)Math.Round(content.Height));
         var at = ToFraction(p, shown);
         return Around(picture, EditToDraw ?? NoEdit, FullShortSide, grid,
             new SKPointI(Math.Clamp((int)(at.X * grid.Width), 0, grid.Width - 1), Math.Clamp((int)(at.Y * grid.Height), 0, grid.Height - 1)));
@@ -134,7 +158,7 @@ public partial class PictureView
     /// <paramref name="edit"/> drawn on <paramref name="picture"/> as the renderer draws a result <paramref name="grid"/> big, but
     /// only the <see cref="Magnifier.Cells"/> pixels round <paramref name="at"/> of it, which then are the middle of the shot.
     /// </summary>
-    internal static ScreenShot Around(SKImage picture, ImageEdit edit, int fullShortSide, SKSizeI grid, SKPointI at)
+    private static ScreenShot Around(SKImage picture, ImageEdit edit, int fullShortSide, SKSizeI grid, SKPointI at)
     {
         const int cells = Magnifier.Cells;
         using var surface = SKSurface.Create(new SKImageInfo(cells, cells));

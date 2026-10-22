@@ -143,6 +143,7 @@
   "tool.custom_color_tip": "रंग का कोड लिखते ही वह लागू हो जाता है",
   "tool.eyedropper": "रंग चुनें",
   "tool.eyedropper_tip": "तस्वीर से रंग चुनें (I)। रुकने के लिए Esc दबाएँ",
+  "tool.copy_color": "कोड कॉपी करें",
   "tool.copy_color_tip": "रंग का कोड (HEX) कॉपी करें",
   "tool.crop.keys": "अंक कुंजियों 1–7 से भी अनुपात चुन सकते हैं",
   "tool.redact.keys": "B काला बॉक्स · M मोज़ेक · U धुंधला",

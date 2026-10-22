@@ -147,6 +147,7 @@
   "tool.custom_color_tip": "输入颜色代码后立即生效",
   "tool.eyedropper": "取色",
   "tool.eyedropper_tip": "从图片中取色 (I)，按 Esc 取消",
+  "tool.copy_color": "复制色码",
   "tool.copy_color_tip": "复制颜色代码 (HEX)",
   "tool.crop.keys": "也可以按数字键 1–7 选择比例",
   "tool.redact.keys": "B 黑框 · M 马赛克 · U 模糊",

@@ -1,6 +1,7 @@
 <!-- The two buttons under a tool's custom colour box (annotate and add background): the eyedropper, which picks the colour
-     off the picture (key I, a tip says so), and the one that copies the colour's HEX code and says "Copied" for a moment.
-     The row wraps, so a longer label of another language drops to the next line instead of being cut off. -->
+     off the picture (key I, a tip says so), and the one that copies the colour's HEX code and says "Copied" for a moment
+     ("Copy code", not "Copy": the bar below has a Copy of the picture). Both are named for a screen reader too. The row
+     wraps, so a longer label of another language drops to the next line instead of being cut off. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:tools="using:Filee.App.ViewModels.Tools"
@@ -15,9 +16,9 @@
       </StackPanel>
     </ToggleButton>
     <Button x:Name="CopyButton" Command="{Binding CopyColorCommand}" Focusable="False" Padding="10,5"
-            ToolTip.Tip="{DynamicResource tool.copy_color_tip}">
+            ToolTip.Tip="{DynamicResource tool.copy_color_tip}" AutomationProperties.Name="{DynamicResource tool.copy_color}">
       <Panel>
-        <TextBlock Text="{DynamicResource toast.copy}" IsVisible="{Binding !ColorCopied}" />
+        <TextBlock Text="{DynamicResource tool.copy_color}" IsVisible="{Binding !ColorCopied}" />
         <TextBlock Text="{DynamicResource toast.copied}" IsVisible="{Binding ColorCopied}" />
       </Panel>
     </Button>
