@@ -211,7 +211,10 @@ public static partial class SensitiveFinder
                     continue;
                 var fits = kind switch
                 {
-                    SensitiveKind.Phone => before is 2 or 3 or 4 || before == digits - 4, // 02, 010, 0504 (+82 10: after 82, 8210)
+                    // 02, 010, and four only for 0504 or +82 10 (after 82, 8210): a date or time with a leading 0 then a
+                    // number ("06.24 12345", "0930 123456") is no phone.
+                    SensitiveKind.Phone => before is 2 or 3 || before == digits - 4
+                        || before == 4 && (m.Value.StartsWith('+') || m.Value.Where(char.IsAsciiDigit).Take(3).SequenceEqual("050")),
                     SensitiveKind.ResidentNumber => before == 6,
                     _ => before % 4 == 0,
                 };

@@ -238,6 +238,10 @@ public class SensitiveFinderTests
     [InlineData("합계 150000 120000 30000")] // a row of amounts
     [InlineData("주문번호 20261022-0001234")]
     [InlineData("송장번호 6012 3456 7890")]
+    [InlineData("결제 2026.06.24 123456 승인")] // a date with a leading 0, then an approval number
+    [InlineData("06.24 12345")]
+    [InlineData("0930 123456")] // a time, then a number
+    [InlineData("0042 606547")]
     public void Ordinary_text_is_not_found(string text) => Assert.Empty(Find(Line(text.Split(' '))));
 
     [Fact]
