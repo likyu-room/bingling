@@ -26,8 +26,8 @@ en: Copy from the picture editing windows without making a file (Ctrl+C)
 - **Copy from the editing windows**: Crop, Add background, Redact and Annotate have a **Copy** button next to Save
   (<kbd>Ctrl</kbd>+<kbd>C</kbd>). It puts the picture shown, edited as the window shows it, on the clipboard without
   writing a file, ready to paste into a chat or a document, and the window closes. With several pictures, it copies the
-  one shown. **Settings → General → Image tools → "Close the editing window after Copy"** keeps the window open
-  instead, to edit more or save a file too.
+  one shown and the window stays open for the next. **Settings → General → Image tools → "Close the editing window
+  after Copy"** keeps it open after one picture too, to edit more or save a file as well.
 
 ## 1.1.1
 

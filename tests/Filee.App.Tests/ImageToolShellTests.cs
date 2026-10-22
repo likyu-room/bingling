@@ -171,9 +171,19 @@ public class ImageToolShellTests
     [AvaloniaFact]
     public async Task Copy_puts_the_file_shown_with_its_edit_on_the_clipboard_and_closes_without_saving()
     {
+        using var one = ImageToolViewModel.Create(ImageToolKind.Crop, [ImageToolWindowTests.TestImages.Png(400, 200)], TestStore(), Loc())!;
+        one.CopiedHold = TimeSpan.Zero;
+        one.CopyPicture = (_, _) => Task.FromResult(true);
+        var closed = 0;
+        one.Finished += (_, _) => closed++;
+        await one.CopyCommand.ExecuteAsync(null);
+        Assert.Equal(1, closed);
+        Assert.Null(one.Result); // nothing to run: no file is written
+
+        // Of several files, the one shown; the window stays for the next (and for the other files' own drawings).
         string[] files = [ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(300, 500)];
         using var vm = ImageToolViewModel.Create(ImageToolKind.Crop, files, TestStore(), Loc())!;
-        vm.CopiedHold = TimeSpan.Zero;
+        vm.CopiedHold = TimeSpan.FromMinutes(1);
         var copies = new List<(string Path, ImageEdit Edit)>();
         vm.CopyPicture = (path, edit) =>
         {
@@ -190,8 +200,7 @@ public class ImageToolShellTests
         var (path, edit) = Assert.Single(copies);
         Assert.Equal(files[1], path); // the file shown, not the first
         Assert.NotNull(edit.Crop);
-        Assert.Equal(1, finished);
-        Assert.Null(vm.Result); // nothing to run: no file is written
+        Assert.Equal(0, finished);
         Assert.Equal("복사됨", vm.CopyText);
     }
 
@@ -222,9 +231,7 @@ public class ImageToolShellTests
     public async Task Annotate_copies_the_drawings_of_the_file_shown_or_the_file_as_it_is()
     {
         string[] files = [ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(400, 200)];
-        var store = TestStore();
-        store.Settings.ImageTools.CloseAfterCopy = false; // both files are copied in turn
-        using var vm = (AnnotateToolViewModel)ImageToolViewModel.Create(ImageToolKind.Annotate, files, store, Loc())!;
+        using var vm = (AnnotateToolViewModel)ImageToolViewModel.Create(ImageToolKind.Annotate, files, TestStore(), Loc())!;
         vm.CopiedHold = TimeSpan.FromMinutes(1);
         var copies = new List<ImageEdit>();
         vm.CopyPicture = (_, edit) =>
@@ -232,9 +239,12 @@ public class ImageToolShellTests
             copies.Add(edit);
             return Task.FromResult(true);
         };
+        var finished = 0;
+        vm.Finished += (_, _) => finished++;
         vm.Annotations = [new Annotation { Kind = AnnotationKind.Number, Number = 1, Points = [new EditPoint { X = .5, Y = .5 }] }];
 
         await vm.CopyCommand.ExecuteAsync(null);
+        Assert.Equal(0, finished); // several files: the window stays, and so do their drawings
         vm.NextCommand.Execute(null);
         await vm.CopyCommand.ExecuteAsync(null); // the second file has no drawings: it goes as the window shows it
 

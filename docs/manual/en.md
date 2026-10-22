@@ -137,7 +137,7 @@ The **Tools** slot of the picture ring holds six tools. Rest on it and they fan 
 - The buttons at the bottom are **Reset**, **Cancel**, **Copy** and **Save**. As the note beside them says, the original stays untouched: the result is saved next to it as a new file.
 - **Copy** (<kbd>Ctrl</kbd>+<kbd>C</kbd>) copies the edited picture without making a file, ready to paste into a chat or a document.
   The window then closes. To keep it open, to edit more or save a file too, change it in **Settings → General → Image tools**.
-  With several pictures, Copy takes the one you are looking at.
+  With several pictures, Copy takes the one you are looking at, and the window stays open so you can copy the next.
 
 **Several files at once**
 

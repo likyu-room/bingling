@@ -297,9 +297,9 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
 
     /// <summary>
     /// Puts the file shown, edited as the window shows it, on the clipboard instead of saving a file, and remembers the
-    /// tool's choices as Save does. Then the window closes, unless the user turned that off
-    /// (<see cref="ImageToolSettings.CloseAfterCopy"/>): it stays, to edit more or save a file too. A copy that failed (the
-    /// clipboard was busy) leaves it as it was.
+    /// tool's choices as Save does. Then a window of one file closes, unless the user turned that off
+    /// (<see cref="ImageToolSettings.CloseAfterCopy"/>): it stays, to edit more or save a file too. A window of several
+    /// files always stays. A copy that failed (the clipboard was busy) leaves it as it was.
     /// </summary>
     [RelayCommand(CanExecute = nameof(CanSave))]
     private async Task Copy()
@@ -319,7 +319,8 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
                 return;
             var round = ++_copiedRound;
             JustCopied = true;
-            if (!Store.Settings.ImageTools.CloseAfterCopy)
+            // Several files: the next can be copied too, and closing would throw away the other files' own edits (annotate).
+            if (!Store.Settings.ImageTools.CloseAfterCopy || HasMany)
             {
                 _ = ForgetCopiedAsync(round);
                 return;
