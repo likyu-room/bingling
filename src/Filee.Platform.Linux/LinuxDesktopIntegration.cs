@@ -12,7 +12,7 @@ internal sealed class LinuxDesktopIntegration(string configHome, string dataHome
 
     internal static string? ToThunarAccelerator(TriggerGesture gesture)
     {
-        if (!gesture.Enabled || gesture.Kind != TriggerKind.KeyChord || string.IsNullOrEmpty(gesture.Key))
+        if (!gesture.Enabled || gesture.Kind != TriggerKind.KeyChord || gesture.Action != TriggerAction.Donut || string.IsNullOrEmpty(gesture.Key))
             return null;
         var key = gesture.Key switch
         {

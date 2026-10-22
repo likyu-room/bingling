@@ -51,7 +51,7 @@ public sealed class SystemIntegrationService(IPlatformServices platform, ILocali
             ApplyOne(() =>
             {
                 var shortcut = settings.ContextMenuEnabled && !settings.Paused
-                    ? settings.Triggers.FirstOrDefault(g => g.Enabled && g.Kind == TriggerKind.KeyChord) : null;
+                    ? settings.Triggers.FirstOrDefault(g => g.Enabled && g.Kind == TriggerKind.KeyChord && g.Action == TriggerAction.Donut) : null;
                 var accelerator = shortcut is null ? null : LinuxPlatformServices.ToThunarAccelerator(shortcut);
                 if (!_shortcutApplied || _shortcut != accelerator)
                 {

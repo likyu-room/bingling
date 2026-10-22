@@ -114,6 +114,16 @@ public sealed class LinuxDesktopIntegrationTests : IDisposable
         Assert.Contains("\"" + accelerator + "\"", contents);
     }
 
+    [Theory]
+    [InlineData(TriggerAction.Donut, "<Control><Alt>s")]
+    [InlineData(TriggerAction.Capture, null)]
+    [InlineData(TriggerAction.PickColor, null)]
+    public void OnlyRingShortcutsBecomeThunarAccelerators(TriggerAction action, string? expected)
+    {
+        var gesture = new TriggerGesture { Kind = TriggerKind.KeyChord, Modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt, Key = "S", Action = action };
+        Assert.Equal(expected, LinuxDesktopIntegration.ToThunarAccelerator(gesture));
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_root))

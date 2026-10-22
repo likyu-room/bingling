@@ -78,6 +78,7 @@ public sealed class UserDataStore
 
         var schema = Settings.SchemaVersion;
         SettingsMigrations.Apply(Settings);
+        var settingsChanged = SettingsMigrations.AddScreenShortcuts(Settings);
         var libraryChanged = File.Exists(ProfilesPath) && SettingsMigrations.ApplyToLibrary(schema, Presets, Profiles);
         // Whatever the schema: a tool added after the library was made comes in on every load (and only while its id is missing).
         libraryChanged |= SettingsMigrations.AddMissingToolPresets(Presets);
@@ -85,7 +86,7 @@ public sealed class UserDataStore
         EnsureConsistency();
 
         // Persist upgrades right away so they run once, even if the user never changes a setting.
-        if (schema < AppSettings.CurrentSchemaVersion && File.Exists(SettingsPath))
+        if ((schema < AppSettings.CurrentSchemaVersion || settingsChanged) && File.Exists(SettingsPath))
             Write(SettingsPath, Settings, FileeJsonContext.Default.AppSettings);
         if (libraryChanged)
         {
@@ -331,6 +332,28 @@ internal static class SettingsMigrations
             settings.Triggers = TriggerGesture.Defaults();
 
         settings.SchemaVersion = AppSettings.CurrentSchemaVersion;
+    }
+
+    /// <summary>
+    /// Offers the capture and colour-pick shortcuts (<see cref="TriggerGesture.ScreenShortcuts"/>) to settings from before
+    /// them, once (<see cref="AppSettings.ScreenShortcutsAdded"/>, not a schema bump). One the user already has for that
+    /// action is kept as it is; one on a key chord the user already uses comes in switched off.
+    /// </summary>
+    /// <returns>True when a shortcut was added and the settings need saving (the flag alone goes out with the next save).</returns>
+    public static bool AddScreenShortcuts(AppSettings settings)
+    {
+        if (settings.ScreenShortcutsAdded)
+            return false;
+        settings.ScreenShortcutsAdded = true;
+        var added = false;
+        foreach (var shortcut in TriggerGesture.ScreenShortcuts().Where(s => settings.Triggers.All(g => g.Action != s.Action)))
+        {
+            shortcut.Enabled = !settings.Triggers.Any(g => g.Kind == TriggerKind.KeyChord && g.Modifiers == shortcut.Modifiers
+                && string.Equals(g.Key, shortcut.Key, StringComparison.OrdinalIgnoreCase));
+            settings.Triggers.Add(shortcut);
+            added = true;
+        }
+        return added;
     }
 
     /// <summary>Upgrades presets and profiles written with settings schema <paramref name="from"/>.</summary>

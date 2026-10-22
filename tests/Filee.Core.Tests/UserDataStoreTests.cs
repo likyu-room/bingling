@@ -1120,4 +1120,87 @@ public class UserDataStoreTests
         Assert.NotNull(target.FindPreset("shared"));
         Assert.Single(target.Profiles, p => p.IsFallback);
     }
+
+    [Fact]
+    public void Screen_shortcuts_come_to_an_existing_user_once()
+    {
+        var settings = new AppSettings { Triggers = [new() { Kind = TriggerKind.Drag }] };
+        Assert.False(settings.ScreenShortcutsAdded);
+
+        Assert.True(SettingsMigrations.AddScreenShortcuts(settings));
+
+        Assert.True(settings.ScreenShortcutsAdded);
+        Assert.Equal([TriggerAction.Donut, TriggerAction.Capture, TriggerAction.PickColor], settings.Triggers.Select(g => g.Action));
+        Assert.All(settings.Triggers, g => Assert.True(g.Enabled));
+        Assert.Equal(("S", "C"), (settings.Triggers[1].Key, settings.Triggers[2].Key));
+
+        // A shortcut the user then deletes stays deleted.
+        settings.Triggers.RemoveAt(1);
+        Assert.False(SettingsMigrations.AddScreenShortcuts(settings));
+        Assert.Equal(2, settings.Triggers.Count);
+    }
+
+    [Fact]
+    public void A_screen_shortcut_on_a_key_the_user_already_uses_comes_in_switched_off()
+    {
+        var settings = new AppSettings
+        {
+            Triggers = [new() { Kind = TriggerKind.KeyChord, Modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt, Key = "S" }],
+        };
+
+        SettingsMigrations.AddScreenShortcuts(settings);
+
+        Assert.True(settings.Triggers[0].Enabled); // theirs, untouched
+        Assert.False(settings.Triggers.Single(g => g.Action == TriggerAction.Capture).Enabled);
+        Assert.True(settings.Triggers.Single(g => g.Action == TriggerAction.PickColor).Enabled);
+    }
+
+    [Fact]
+    public void Screen_shortcuts_are_not_added_twice_to_settings_that_have_them()
+    {
+        var defaults = new AppSettings(); // a new install's triggers already hold both
+        Assert.False(SettingsMigrations.AddScreenShortcuts(defaults)); // nothing to add, nothing to save
+        Assert.True(defaults.ScreenShortcutsAdded);
+        Assert.Single(defaults.Triggers, g => g.Action == TriggerAction.Capture);
+        Assert.Single(defaults.Triggers, g => g.Action == TriggerAction.PickColor);
+
+        var done = new AppSettings { ScreenShortcutsAdded = true, Triggers = [] };
+        Assert.False(SettingsMigrations.AddScreenShortcuts(done));
+        Assert.Empty(done.Triggers);
+    }
+
+    [Fact]
+    public void Load_adds_the_screen_shortcuts_to_settings_from_before_them_and_saves_them()
+    {
+        using var dir = new TempDir();
+        var path = Path.Combine(dir.Path, "settings.json");
+        File.WriteAllText(path,
+            """{"schemaVersion":22,"language":"ko","triggers":[{"kind":"Drag","modifiers":"Ctrl","button":"Left"},{"kind":"KeyChord","modifiers":"Ctrl, Alt","key":"Space"}]}""");
+
+        var store = new UserDataStore(dir.Path);
+        store.Load();
+
+        Assert.Equal("ko", store.Settings.Language);
+        Assert.Equal([TriggerAction.Donut, TriggerAction.Donut, TriggerAction.Capture, TriggerAction.PickColor], store.Settings.Triggers.Select(g => g.Action));
+        Assert.True(store.Settings.ScreenShortcutsAdded);
+        Assert.Contains("\"screenShortcutsAdded\": true", File.ReadAllText(path)); // saved without any other change
+
+        store.Settings.Triggers.RemoveAll(g => g.Action == TriggerAction.Capture);
+        store.SaveSettings();
+        var reloaded = new UserDataStore(dir.Path);
+        reloaded.Load();
+        Assert.DoesNotContain(reloaded.Settings.Triggers, g => g.Action == TriggerAction.Capture);
+    }
+
+    [Fact]
+    public void A_new_install_has_each_screen_shortcut_once()
+    {
+        using var dir = new TempDir();
+        var store = new UserDataStore(dir.Path);
+        store.Load();
+
+        Assert.Single(store.Settings.Triggers, g => g.Action == TriggerAction.Capture);
+        Assert.Single(store.Settings.Triggers, g => g.Action == TriggerAction.PickColor);
+        Assert.True(store.Settings.ScreenShortcutsAdded);
+    }
 }

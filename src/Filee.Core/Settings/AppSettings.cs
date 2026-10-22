@@ -120,6 +120,12 @@ public sealed class AppSettings
 
     public List<TriggerGesture> Triggers { get; set; } = TriggerGesture.Defaults();
 
+    /// <summary>
+    /// Set once the capture and colour-pick shortcuts were offered (<c>SettingsMigrations.AddScreenShortcuts</c>), so a
+    /// shortcut the user deletes later doesn't come back. Off in a file from before them, which is how they get added.
+    /// </summary>
+    public bool ScreenShortcutsAdded { get; set; }
+
     /// <summary>Process names (without .exe) in which gestures never trigger.</summary>
     public List<string> ExcludedProcesses { get; set; } = [];
 
