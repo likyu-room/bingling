@@ -115,6 +115,7 @@
   "tool.annotate.tool.ellipse": "Elipsa",
   "tool.annotate.tool.text": "Tekst",
   "tool.annotate.tool.number": "Numer",
+  "tool.annotate.tool.spotlight": "Reflektor",
   "tool.annotate.color": "Kolor",
   "tool.annotate.color.red": "Czerwony",
   "tool.annotate.color.orange": "Pomarańczowy",
@@ -153,6 +154,7 @@
   "tool.annotate.hint.shape": "Przeciągnij, aby rysować. Z Shiftem wyjdzie kwadrat lub koło.",
   "tool.annotate.hint.text": "Kliknij, gdzie ma być tekst. Enter kończy, Shift+Enter zaczyna nowy wiersz.",
   "tool.annotate.hint.number": "Każde kliknięcie dodaje kolejny numer: 1, 2, 3…",
+  "tool.annotate.hint.spotlight": "Przeciągnij ramkę, a reszta obrazu zostanie przyciemniona. Z Shiftem wyjdzie kwadrat.",
   "tool.background.output": "Wynik: {0} × {1}px",
 
   "toast.converting": "{0} → {1}",

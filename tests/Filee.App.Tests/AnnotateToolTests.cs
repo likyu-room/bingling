@@ -228,6 +228,71 @@ public class AnnotateToolTests
     }
 
     [AvaloniaFact]
+    public void Spotlight_is_dragged_out_like_a_box_and_picked_moved_and_deleted_like_one()
+    {
+        var (window, vm) = Open();
+        var shown = Shown(window);
+        Key(window, PhysicalKey.S);
+        Assert.Equal(AnnotationKind.Spotlight, vm.DrawingTool);
+        Assert.Equal(9, vm.ToolIndex); // the tenth cell, after the select tool and the eight before it
+
+        Drag(window, At(window, .2, .2), At(window, .6, .7));
+        var box = Assert.Single(vm.Annotations);
+        Assert.Equal(AnnotationKind.Spotlight, box.Kind);
+        Assert.Equal([(.2, .2), (.6, .7)], box.Points.Select(Xy), new PointComparer());
+
+        // Shift: a square on the screen. A side under 4 DIPs is a twitch of the mouse, as for any box.
+        var from = At(window, .7, .1);
+        Drag(window, from, from + new Point(60, 20), RawInputModifiers.Shift);
+        var square = vm.Annotations[1];
+        var (w, h) = ((square.Points[1].X - square.Points[0].X) * shown.Width, (square.Points[1].Y - square.Points[0].Y) * shown.Height);
+        Assert.True(w > 50 && Math.Abs(w - h) < .01, $"{w} × {h} on the screen");
+        Drag(window, At(window, .1, .9), At(window, .1, .9) + new Point(90, 3.5));
+        Assert.Equal(2, vm.Annotations.Count);
+
+        // Picked by the edge of its box, as a rectangle is (not by what is inside it), moved and deleted.
+        Key(window, PhysicalKey.V);
+        Click(window, At(window, .4, .45));
+        Assert.Equal(-1, vm.SelectedIndex);
+        Click(window, At(window, .4, .2));
+        Assert.Equal(0, vm.SelectedIndex);
+        Drag(window, At(window, .4, .2), At(window, .5, .3));
+        Assert.Equal([(.3, .3), (.7, .8)], vm.Annotations[0].Points.Select(Xy), new PointComparer());
+        Key(window, PhysicalKey.Delete);
+        Assert.Equal(AnnotationKind.Spotlight, Assert.Single(vm.Annotations).Kind);
+        Key(window, PhysicalKey.Z, RawInputModifiers.Control);
+        Assert.Equal(2, vm.Annotations.Count);
+        Assert.Equal(0, vm.SelectedIndex);
+
+        // The box outlined around the picked one is the box itself, not wider by a line's thickness (a spotlight has none).
+        var outline = AnnotateCanvas.Extent(vm.Annotations[0], shown);
+        Assert.Equal(.4 * shown.Width, outline.Width, 3);
+        Assert.Equal(.5 * shown.Height, outline.Height, 3);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_preview_dims_what_is_outside_the_spotlight_with_the_renderer_that_saves()
+    {
+        var (window, vm) = Open();
+        Key(window, PhysicalKey.S);
+        Drag(window, At(window, .3, .2), At(window, .7, .8));
+        Assert.Single(vm.Annotations);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+
+        // The test picture grows only downwards, so a point inside the box and one outside it at the same height are one colour.
+        using var frame = window.CaptureRenderedFrame()!;
+        var (inside, outside) = (PixelAt(frame, At(window, .4, .5)), PixelAt(frame, At(window, .15, .5)));
+        Assert.True(inside.R > 100, $"the box shows {inside}");
+        foreach (var (shown, original) in new[] { (outside.R, inside.R), (outside.G, inside.G), (outside.B, inside.B) })
+            Assert.True(Math.Abs(shown - original * .45) < 12, $"{outside} outside, where {inside} inside would be dimmed to 45 %");
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
     public void Number_tool_counts_per_file()
     {
         var (window, vm) = Open(files: 2);
@@ -396,7 +461,7 @@ public class AnnotateToolTests
         {
             (PhysicalKey.H, AnnotationKind.Highlighter), (PhysicalKey.A, AnnotationKind.Arrow), (PhysicalKey.L, AnnotationKind.Line),
             (PhysicalKey.R, AnnotationKind.Rectangle), (PhysicalKey.E, AnnotationKind.Ellipse), (PhysicalKey.T, AnnotationKind.Text),
-            (PhysicalKey.N, AnnotationKind.Number), (PhysicalKey.P, AnnotationKind.Pen),
+            (PhysicalKey.N, AnnotationKind.Number), (PhysicalKey.S, AnnotationKind.Spotlight), (PhysicalKey.P, AnnotationKind.Pen),
         })
         {
             Key(window, key);
@@ -986,11 +1051,13 @@ public class AnnotateToolTests
         {
             (AnnotationKind.Pen, "draw"), (AnnotationKind.Highlighter, "draw"), (AnnotationKind.Arrow, "line"), (AnnotationKind.Line, "line"),
             (AnnotationKind.Rectangle, "shape"), (AnnotationKind.Ellipse, "shape"), (AnnotationKind.Text, "text"), (AnnotationKind.Number, "number"),
+            (AnnotationKind.Spotlight, "spotlight"),
         })
         {
             vm.DrawingTool = kind;
             Assert.Equal(Hint(hint), vm.ToolHint);
         }
+        Assert.Equal("끌어서 상자를 그리면 그 바깥이 어두워져요. Shift를 누르면 정사각형이 돼요.", Hint("spotlight"));
         Assert.Equal("누른 곳에 써요. Enter로 마치고, Shift+Enter로 줄을 바꿔요.", Hint("text"));
         Assert.Equal("끌어서 그려요. Shift를 누르면 반듯하게 꺾여요.", Hint("line"));
         Assert.Equal("끌어서 그려요. Shift를 누르면 정사각형·정원이 돼요.", Hint("shape"));
@@ -1023,7 +1090,8 @@ public class AnnotateToolTests
 
         double? top = null;
         foreach (var tool in new AnnotationKind?[] { null, AnnotationKind.Pen, AnnotationKind.Highlighter, AnnotationKind.Arrow,
-            AnnotationKind.Line, AnnotationKind.Rectangle, AnnotationKind.Ellipse, AnnotationKind.Text, AnnotationKind.Number })
+            AnnotationKind.Line, AnnotationKind.Rectangle, AnnotationKind.Ellipse, AnnotationKind.Text, AnnotationKind.Number,
+            AnnotationKind.Spotlight })
         {
             vm.DrawingTool = tool;
             Dispatcher.UIThread.RunJobs();
@@ -1206,7 +1274,11 @@ public class AnnotateToolTests
         var (window, vm) = Open(TestStore(), ImageToolWindowTests.TestImages.Png(1000, 700));
         foreach (var text in new[] { "색", "굵기", "가늘게", "보통", "굵게", "사용자 색" })
             Assert.Contains(window.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == text);
-        Assert.Equal(9, window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "ToolCells").ItemCount);
+        var cells = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "ToolCells");
+        Assert.Equal(10, cells.ItemCount);
+        var tenth = cells.ContainerFromIndex(9)!; // the spotlight, with its key in the tip like the others
+        Assert.Equal("스포트라이트", AutomationProperties.GetName(tenth));
+        Assert.EndsWith(" (S)", ((TextBlock)ToolTip.GetTip(tenth)!).Inlines!.OfType<Avalonia.Controls.Documents.Run>().Last().Text); // the name's run is a resource, set once it is shown
         // The colour chips are named for people who cannot see them, not by their codes.
         var colors = window.GetVisualDescendants().OfType<ListBox>().Single(l => l.Name == "ColorChips");
         Assert.Equal(["빨강", "주황", "노랑", "초록", "파랑", "보라", "검정", "흰색"],

@@ -1,10 +1,10 @@
 // The picture in the annotate window with what is drawn on it. A press draws with the tool: a pen or highlighter path, a
-// line, an arrow, a box or an ellipse dragged out (Shift: 45° steps, a square, a circle), a number sticker per click, or a
-// text typed into a box laid over the picture (Enter puts it there, Shift+Enter starts a new line, Esc drops it). The
-// select tool picks the drawing under the pointer (the top one first, a line within 6 DIPs), drags it along, and a double
-// click on a text types it anew; so does a click on one with the text tool. Everything is drawn by the renderer that saves
-// the picture, the drawing being dragged too; the picked one gets a dashed outline on top. Zooming and panning are
-// PictureView's.
+// line, an arrow, a box, an ellipse or a spotlight dragged out (Shift: 45° steps, a square, a circle), a number sticker
+// per click, or a text typed into a box laid over the picture (Enter puts it there, Shift+Enter starts a new line, Esc
+// drops it). The select tool picks the drawing under the pointer (the top one first, a line within 6 DIPs), drags it
+// along, and a double click on a text types it anew; so does a click on one with the text tool. Everything is drawn by
+// the renderer that saves the picture, the drawing being dragged too (a spotlight dims what is outside its box there as
+// it does in the saved one); the picked one gets a dashed outline on top. Zooming and panning are PictureView's.
 //
 // The drawings go in and out as one list (fractions of the picture), set back once per drawing, drag or text. When the
 // list changes under a drag or a text being typed (an undo, a delete, another file), that drag or text is dropped: it
@@ -50,8 +50,8 @@ public sealed class AnnotateCanvas : PictureView
 
     /// <summary>
     /// The least a drawing measures on the screen (DIPs): a pen stroke that never goes further from where it began, a line
-    /// or an arrow shorter (an arrow's head is drawn full size however short it is), a box or an ellipse with a side
-    /// shorter. Such a twitch of the mouse draws nothing.
+    /// or an arrow shorter (an arrow's head is drawn full size however short it is), a box, an ellipse or a spotlight with
+    /// a side shorter. Such a twitch of the mouse draws nothing.
     /// </summary>
     internal const double MinStroke = 4;
 
@@ -201,7 +201,7 @@ public sealed class AnnotateCanvas : PictureView
         {
             case AnnotationKind.Text or AnnotationKind.Number:
                 return Extent(note, image).Contains(p);
-            case AnnotationKind.Rectangle when points.Count > 1:
+            case AnnotationKind.Rectangle or AnnotationKind.Spotlight when points.Count > 1:
                 var box = new Rect(points[0], points[1]);
                 return Near([box.TopLeft, box.TopRight, box.BottomRight, box.BottomLeft, box.TopLeft], p, Reach + half);
             case AnnotationKind.Ellipse when points.Count > 1:
@@ -213,8 +213,11 @@ public sealed class AnnotateCanvas : PictureView
         }
     }
 
-    /// <summary>Half of how wide a drawing's line is drawn (a highlighter is three lines wide, an arrow's head as much).</summary>
-    private static double HalfWidth(Annotation note, Rect image) =>
+    /// <summary>
+    /// Half of how wide a drawing's line is drawn (a highlighter is three lines wide, an arrow's head as much); a spotlight
+    /// has no line, its edge is the edge of its box.
+    /// </summary>
+    private static double HalfWidth(Annotation note, Rect image) => note.Kind == AnnotationKind.Spotlight ? 0 :
         ImageEditRenderer.Sizes(note.Width).Line * ShortSide(image) / 2 * (note.Kind is AnnotationKind.Highlighter or AnnotationKind.Arrow ? 3 : 1);
 
     /// <summary>Whether <paramref name="p"/> is within <paramref name="reach"/> of the line through <paramref name="line"/>.</summary>
@@ -260,22 +263,23 @@ public sealed class AnnotateCanvas : PictureView
     internal static bool LongEnough(Annotation note, Rect image)
     {
         var points = note.Points.Select(q => ToScreen(q, image)).ToList();
-        if (note.Kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse)
+        if (note.Kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Spotlight)
             return points.Count > 1 && Math.Abs(points[1].X - points[0].X) >= MinStroke && Math.Abs(points[1].Y - points[0].Y) >= MinStroke;
         return points.Any(q => Point.Distance(q, points[0]) >= MinStroke);
     }
 
     /// <summary>
-    /// The second point of a line, an arrow, a box or an ellipse dragged from <paramref name="start"/> to <paramref name="p"/>
-    /// (on the control). With Shift, a line or an arrow goes at a multiple of 45° on the screen and a box or an ellipse is
-    /// square there, as long as the drag; it stops where it would leave the picture, keeping that angle.
+    /// The second point of a line, an arrow, a box, an ellipse or a spotlight dragged from <paramref name="start"/> to
+    /// <paramref name="p"/> (on the control). With Shift, a line or an arrow goes at a multiple of 45° on the screen and a
+    /// box, an ellipse or a spotlight is square there, as long as the drag; it stops where it would leave the picture,
+    /// keeping that angle.
     /// </summary>
     private static EditPoint SecondPoint(AnnotationKind kind, Point start, Point p, bool shift, Rect image)
     {
         if (!shift)
             return Clamped(ToFraction(p, image));
         var v = (Vector)(p - start);
-        if (kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse)
+        if (kind is AnnotationKind.Rectangle or AnnotationKind.Ellipse or AnnotationKind.Spotlight)
         {
             var side = Math.Max(Math.Abs(v.X), Math.Abs(v.Y));
             v = new Vector(v.X < 0 ? -side : side, v.Y < 0 ? -side : side);

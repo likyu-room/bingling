@@ -128,6 +128,7 @@ public static class ImageEditRenderer
         if (edit.Annotations is { } annotations)
         {
             var scaleSide = Math.Min(dest.Width, dest.Height);
+            DimOutsideSpotlights(canvas, annotations, dest, scaleSide); // under the rest, wherever the spotlights are in the list
             foreach (var annotation in annotations)
                 DrawAnnotation(canvas, annotation, dest, scaleSide);
         }
@@ -167,7 +168,7 @@ public static class ImageEditRenderer
     /// <summary>Draws one annotation on the picture shown in <paramref name="dest"/>; <paramref name="shortSide"/> is that rect's short side.</summary>
     private static void DrawAnnotation(SKCanvas canvas, Annotation note, SKRect dest, float shortSide)
     {
-        var points = note.Points.Select(p => new SKPoint(dest.Left + (float)p.X * dest.Width, dest.Top + (float)p.Y * dest.Height)).ToList();
+        var points = note.Points.Select(p => PointOn(dest, p)).ToList();
         var (lineSize, textSize, stickerSize) = Sizes(note.Width);
         var width = (float)lineSize * shortSide;
         var color = SKColor.TryParse(note.Color, out var parsed) ? parsed : SKColor.Parse(AnnotationColors[0]);
@@ -220,8 +221,40 @@ public static class ImageEditRenderer
                     canvas.DrawPath(path, paint);
                 break;
         }
-        // Anything else is a drawing with too few points to show, left out.
+        // Anything else is a drawing with too few points to show, left out (a spotlight is drawn by DimOutsideSpotlights).
     }
+
+    /// <summary>
+    /// Covers the picture in <paramref name="dest"/> with black at 55 %, once, except for the boxes of its spotlights: where
+    /// they overlap or touch it is no darker or lighter than elsewhere. A box's corners are rounded by 1 % of
+    /// <paramref name="shortSide"/>. A spotlight without a box to show (a point short, or no width or height) is left out;
+    /// colour and thickness are not used.
+    /// </summary>
+    private static void DimOutsideSpotlights(SKCanvas canvas, List<Annotation> annotations, SKRect dest, float shortSide)
+    {
+        // One path, so the box edges are cut in one go: clipped box by box, two boxes sharing an edge would each leave
+        // half a pixel dimmed along it.
+        using var boxes = new SKPath();
+        var radius = 0.01f * shortSide;
+        foreach (var note in annotations)
+        {
+            if (note.Kind != AnnotationKind.Spotlight || note.Points.Count < 2)
+                continue;
+            var box = Corners(PointOn(dest, note.Points[0]), PointOn(dest, note.Points[1]));
+            if (box.Width > 0 && box.Height > 0)
+                boxes.AddRoundRect(box, radius, radius);
+        }
+        if (boxes.IsEmpty)
+            return;
+        using var dim = new SKPaint { Color = SKColors.Black.WithAlpha((byte)Math.Round(255 * 0.55)) };
+        canvas.Save();
+        canvas.ClipPath(boxes, SKClipOperation.Difference, antialias: true);
+        canvas.DrawRect(dest, dim);
+        canvas.Restore();
+    }
+
+    /// <summary>A point given as fractions of the picture in <paramref name="dest"/>, on the canvas.</summary>
+    private static SKPoint PointOn(SKRect dest, EditPoint p) => new(dest.Left + (float)p.X * dest.Width, dest.Top + (float)p.Y * dest.Height);
 
     /// <summary>The points joined by straight lines; one point gives a zero-length line, which a round cap draws as a dot.</summary>
     private static SKPath Polyline(List<SKPoint> points)

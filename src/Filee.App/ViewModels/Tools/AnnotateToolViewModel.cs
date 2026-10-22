@@ -24,7 +24,7 @@ public sealed record ColorSwatch(string Hex, string Label, IBrush Brush);
 public sealed partial class AnnotateToolViewModel : ImageToolViewModel
 {
     /// <summary>The tool keys in the order of the panel's cells: V the select tool, then the <see cref="AnnotationKind"/>s in order.</summary>
-    private static readonly Key[] ToolKeys = [Key.V, Key.P, Key.H, Key.A, Key.L, Key.R, Key.E, Key.T, Key.N];
+    private static readonly Key[] ToolKeys = [Key.V, Key.P, Key.H, Key.A, Key.L, Key.R, Key.E, Key.T, Key.N, Key.S];
 
     /// <summary>The names of <see cref="ImageEditRenderer.AnnotationColors"/>, in their order, as <c>tool.annotate.color.*</c> keys.</summary>
     private static readonly string[] ColorIds = ["red", "orange", "yellow", "green", "blue", "purple", "black", "white"];
@@ -133,6 +133,7 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
         AnnotationKind.Arrow or AnnotationKind.Line => "tool.annotate.hint.line",
         AnnotationKind.Rectangle or AnnotationKind.Ellipse => "tool.annotate.hint.shape",
         AnnotationKind.Text => "tool.annotate.hint.text",
+        AnnotationKind.Spotlight => "tool.annotate.hint.spotlight",
         _ => "tool.annotate.hint.number",
     }];
 
@@ -248,7 +249,7 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
     /// <summary>How many files have something drawn on them.</summary>
     private int Marked => _drawings.Count(d => d.Count > 0);
 
-    /// <summary>V, P, H, A, L, R, E, T and N pick a tool; [ and ] change the thickness; Delete or Backspace removes the picked drawing.</summary>
+    /// <summary>V, P, H, A, L, R, E, T, N and S pick a tool; [ and ] change the thickness; Delete or Backspace removes the picked drawing.</summary>
     public override bool HandleKey(Key key, KeyModifiers modifiers)
     {
         if (modifiers != KeyModifiers.None)

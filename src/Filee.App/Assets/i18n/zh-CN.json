@@ -115,6 +115,7 @@
   "tool.annotate.tool.ellipse": "椭圆",
   "tool.annotate.tool.text": "文字",
   "tool.annotate.tool.number": "编号",
+  "tool.annotate.tool.spotlight": "聚光灯",
   "tool.annotate.color": "颜色",
   "tool.annotate.color.red": "红色",
   "tool.annotate.color.orange": "橙色",
@@ -153,6 +154,7 @@
   "tool.annotate.hint.shape": "拖动来画。按住 Shift 可画成正方形或正圆。",
   "tool.annotate.hint.text": "点击想放的位置输入。按 Enter 完成，Shift+Enter 换行。",
   "tool.annotate.hint.number": "每点一下就加上下一个编号：1、2、3…",
+  "tool.annotate.hint.spotlight": "拖动画出方框，框外的部分会变暗。按住 Shift 可画成正方形。",
   "tool.background.output": "结果：{0} × {1}px",
 
   "toast.converting": "{0} → {1}",

@@ -746,6 +746,162 @@ public class ImageEditTests(EngineFixture fx) : IClassFixture<EngineFixture>
         Assert.True(IsWhite(ellipse.GetPixel(125, 125))); // the box's corner is outside the ellipse
     }
 
+    // ───────── Spotlight ─────────
+
+    /// <summary>What black at 55 % leaves of <paramref name="c"/>: a pixel outside every spotlight.</summary>
+    private static SKColor Dimmed(SKColor c) => new((byte)Math.Round(c.Red * .45), (byte)Math.Round(c.Green * .45), (byte)Math.Round(c.Blue * .45));
+
+    private static Annotation Spotlight((double X, double Y) a, (double X, double Y) b, string color = "#FF3B30", StrokeLevel width = StrokeLevel.Normal) =>
+        Note(AnnotationKind.Spotlight, color, width, [a, b]);
+
+    [Fact]
+    public void A_spotlight_dims_everything_outside_its_box_and_leaves_the_inside_as_it_was()
+    {
+        using var picture = Scene(600, 400);
+        using var result = ImageEditRenderer.Render(picture, Drawn(Spotlight((.8, .7), (.3, .2)))); // corners in any order
+
+        // The box is x 180-480, y 80-280.
+        for (var y = 90; y < 270; y++)
+        {
+            for (var x = 190; x < 470; x++)
+                Assert.Equal(picture.GetPixel(x, y), result.GetPixel(x, y));
+        }
+        foreach (var (x, y) in new[] { (5, 5), (595, 395), (100, 300), (300, 10), (300, 390), (500, 200), (179, 180), (300, 79), (300, 280) })
+            AssertNear(Dimmed(picture.GetPixel(x, y)), result.GetPixel(x, y));
+    }
+
+    [Fact]
+    public void A_spotlights_corners_are_rounded_by_one_percent_of_the_short_side()
+    {
+        using var picture = Filled(1000, 1000, SKColors.White);
+        using var result = ImageEditRenderer.Render(picture, Drawn(Spotlight((.2, .2), (.8, .8))));
+
+        // The radius is 10 px, so the box's own corner pixel is cut away, but one 4 px in along the diagonal is not
+        // (it would be, were the radius 2 % or more), and the straight edges are where the box says.
+        AssertNear(Dimmed(SKColors.White), result.GetPixel(200, 200));
+        Assert.True(IsWhite(result.GetPixel(204, 204)));
+        Assert.True(IsWhite(result.GetPixel(200, 500)));
+        AssertNear(Dimmed(SKColors.White), result.GetPixel(199, 500));
+        Assert.True(IsWhite(result.GetPixel(799, 500)));
+        AssertNear(Dimmed(SKColors.White), result.GetPixel(800, 500));
+    }
+
+    [Fact]
+    public void Spotlights_that_overlap_dim_the_outside_once_and_the_inside_not_at_all()
+    {
+        using var picture = Filled(600, 400, new SKColor(200, 200, 200));
+        var a = Spotlight((.1, .1), (.5, .6)); // x 60-300, y 40-240
+        var b = Spotlight((.3, .3), (.9, .9)); // x 180-540, y 120-360
+        using var one = ImageEditRenderer.Render(picture, Drawn(a));
+        using var two = ImageEditRenderer.Render(picture, Drawn(a, b));
+        using var swapped = ImageEditRenderer.Render(picture, Drawn(b, a));
+
+        var outside = one.GetPixel(580, 20);
+        AssertNear(Dimmed(new SKColor(200, 200, 200)), outside);
+        Assert.Equal(outside, two.GetPixel(580, 20)); // outside both: no darker than outside one
+        Assert.Equal(outside, swapped.GetPixel(580, 20));
+        foreach (var (x, y) in new[] { (100, 60), (500, 340), (250, 200) }) // in a only, in b only, in both
+            Assert.Equal(new SKColor(200, 200, 200), two.GetPixel(x, y));
+        Assert.Equal(outside, one.GetPixel(500, 340)); // dim with a alone ...
+        Assert.Equal(new SKColor(200, 200, 200), two.GetPixel(500, 340)); // ... shown by b
+        Assert.True(two.GetPixelSpan().SequenceEqual(swapped.GetPixelSpan())); // the order does not matter
+    }
+
+    [Fact]
+    public void Spotlights_side_by_side_leave_no_dim_line_between_them()
+    {
+        using var picture = Filled(600, 400, new SKColor(200, 200, 200));
+        const double Edge = 300.5 / 600; // the two share the line x = 300.5, in the middle of a pixel
+        using var result = ImageEditRenderer.Render(picture, Drawn(Spotlight((.1, .2), (Edge, .8)), Spotlight((Edge, .2), (.9, .8))));
+
+        // The pixel on it is half in each box. Cut out one box at a time, each would leave half of it dimmed and it would
+        // come out a quarter dimmed (at 55 %: 172 where it is 200).
+        for (var y = 140; y < 220; y++)
+        {
+            for (var x = 298; x < 302; x++)
+                AssertNear(new SKColor(200, 200, 200), result.GetPixel(x, y));
+        }
+    }
+
+    [Fact]
+    public void A_spotlight_is_laid_under_the_other_drawings_wherever_it_is_in_the_list()
+    {
+        using var picture = Filled(600, 400, SKColors.White);
+        // The line is listed first and lies out in the dim part; the spotlight comes after it and still goes under it.
+        var line = Note(AnnotationKind.Line, "#FF3B30", StrokeLevel.Thick, [(.1, .9), (.9, .9)]);
+        using var result = ImageEditRenderer.Render(picture, Drawn(line, Spotlight((.3, .2), (.7, .6))));
+
+        AssertNear(new SKColor(0xFF, 0x3B, 0x30), result.GetPixel(300, 360)); // its own colour, not 55 % darker
+        AssertNear(Dimmed(SKColors.White), result.GetPixel(300, 330));
+        AssertNear(Dimmed(SKColors.White), result.GetPixel(300, 390));
+    }
+
+    [Fact]
+    public void A_spotlights_colour_and_thickness_change_nothing()
+    {
+        using var picture = Scene(600, 400);
+        using var red = ImageEditRenderer.Render(picture, Drawn(Spotlight((.2, .2), (.6, .7), "#FF3B30", StrokeLevel.Thin)));
+        using var blue = ImageEditRenderer.Render(picture, Drawn(Spotlight((.2, .2), (.6, .7), "not a colour", StrokeLevel.Thick)));
+
+        Assert.True(red.GetPixelSpan().SequenceEqual(blue.GetPixelSpan()));
+        Assert.False(red.GetPixelSpan().SequenceEqual(picture.GetPixelSpan())); // and it did dim
+    }
+
+    [Fact]
+    public void A_spotlight_with_no_box_to_show_dims_nothing()
+    {
+        using var picture = Scene(600, 400);
+        foreach (var note in new[]
+        {
+            Note(AnnotationKind.Spotlight, "#FF3B30", StrokeLevel.Normal, [(.5, .5)]), // one corner
+            Note(AnnotationKind.Spotlight, "#FF3B30", StrokeLevel.Normal, []),
+            Spotlight((.5, .2), (.5, .8)), // no width
+            Spotlight((.2, .5), (.8, .5)), // no height
+        })
+        {
+            using var result = ImageEditRenderer.Render(picture, Drawn(note));
+            Assert.True(result.GetPixelSpan().SequenceEqual(picture.GetPixelSpan()));
+        }
+    }
+
+    [Fact]
+    public void A_spotlight_dims_the_picture_and_not_its_backdrop()
+    {
+        using var picture = Filled(600, 400, new SKColor(200, 200, 200));
+        var edit = Drawn(Spotlight((.4, .4), (.6, .6)));
+        edit.Background = new BackgroundEdit { Kind = BackgroundKind.Solid, Value = "#FFFFFF", Padding = .1, Corner = 0, Shadow = 0 };
+        using var result = ImageEditRenderer.Render(picture, edit);
+
+        Assert.Equal((680, 480), (result.Width, result.Height)); // the picture is at (40, 40)
+        Assert.True(IsWhite(result.GetPixel(10, 10)));
+        Assert.True(IsWhite(result.GetPixel(670, 470)));
+        AssertNear(Dimmed(new SKColor(200, 200, 200)), result.GetPixel(60, 60));
+        Assert.Equal(new SKColor(200, 200, 200), result.GetPixel(340, 240));
+    }
+
+    [Fact]
+    public void Preview_scale_matches_full_size_with_a_spotlight()
+    {
+        using var full = Scene(800, 600);
+        var plain = new ImageEdit { Background = new BackgroundEdit { Value = "sky", Padding = .08, Corner = .05, Shadow = 60, Aspect = "1:1" } };
+        var edit = plain.Clone();
+        edit.Annotations =
+        [
+            Spotlight((.2, .25), (.7, .7)),
+            Note(AnnotationKind.Number, "#FFFFFF", StrokeLevel.Thick, [(.9, .1)], number: 1),
+        ];
+
+        using var without = AtQuarterScale(full, plain);
+        using var with = AtQuarterScale(full, edit);
+
+        Assert.All(MeanDifference(with), mean => Assert.True(mean <= 6, $"mean difference {mean:F2}"));
+        // A mean can hide a box in the wrong place: count the pixels it dimmed.
+        var saved = Changed(without.Saved, with.Saved);
+        var drawn = Changed(without.Drawn, with.Drawn);
+        Assert.True(saved > 20000, $"{saved} pixels dimmed");
+        Assert.InRange(drawn, saved * 0.95, saved * 1.05);
+    }
+
     [Fact]
     public void A_colour_that_cannot_be_read_draws_red()
     {

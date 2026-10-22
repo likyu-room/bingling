@@ -48,6 +48,9 @@ public enum AnnotationKind
 
     /// <summary>A numbered circle at its anchor.</summary>
     Number,
+
+    /// <summary>A box between two corners that everything else on the picture is dimmed around; colour and thickness are not used.</summary>
+    Spotlight,
 }
 
 /// <summary>How thick an <see cref="Annotation"/> is drawn. A level from a newer Filee reads as <see cref="Thin"/>.</summary>
@@ -134,8 +137,8 @@ public sealed class Annotation
     public StrokeLevel Width { get; set; } = StrokeLevel.Normal;
 
     /// <summary>
-    /// Pen and highlighter: the path. Arrow and line: from, to. Rectangle and ellipse: two opposite corners. Text and
-    /// number: the anchor (one point).
+    /// Pen and highlighter: the path. Arrow and line: from, to. Rectangle, ellipse and spotlight: two opposite corners. Text
+    /// and number: the anchor (one point).
     /// </summary>
     public List<EditPoint> Points { get; set; } = [];
 

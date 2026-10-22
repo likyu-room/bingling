@@ -115,6 +115,7 @@
   "tool.annotate.tool.ellipse": "Ellipse",
   "tool.annotate.tool.text": "Text",
   "tool.annotate.tool.number": "Number",
+  "tool.annotate.tool.spotlight": "Spotlight",
   "tool.annotate.color": "Color",
   "tool.annotate.color.red": "Red",
   "tool.annotate.color.orange": "Orange",
@@ -153,6 +154,7 @@
   "tool.annotate.hint.shape": "Drag to draw. Hold Shift for a square or a circle.",
   "tool.annotate.hint.text": "Click where you want it. Enter finishes, Shift+Enter starts a new line.",
   "tool.annotate.hint.number": "Each click adds the next number: 1, 2, 3…",
+  "tool.annotate.hint.spotlight": "Drag a box and everything outside it is dimmed. Hold Shift for a square.",
   "tool.background.output": "Result: {0} × {1}px",
 
   "toast.converting": "{0} → {1}",

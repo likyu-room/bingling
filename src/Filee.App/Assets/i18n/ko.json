@@ -115,6 +115,7 @@
   "tool.annotate.tool.ellipse": "원",
   "tool.annotate.tool.text": "글자",
   "tool.annotate.tool.number": "번호",
+  "tool.annotate.tool.spotlight": "스포트라이트",
   "tool.annotate.color": "색",
   "tool.annotate.color.red": "빨강",
   "tool.annotate.color.orange": "주황",
@@ -153,6 +154,7 @@
   "tool.annotate.hint.shape": "끌어서 그려요. Shift를 누르면 정사각형·정원이 돼요.",
   "tool.annotate.hint.text": "누른 곳에 써요. Enter로 마치고, Shift+Enter로 줄을 바꿔요.",
   "tool.annotate.hint.number": "누를 때마다 1, 2, 3… 번호가 붙어요.",
+  "tool.annotate.hint.spotlight": "끌어서 상자를 그리면 그 바깥이 어두워져요. Shift를 누르면 정사각형이 돼요.",
   "tool.background.output": "결과 {0} × {1}px",
 
   "toast.converting": "{0} → {1}",

@@ -244,6 +244,47 @@ public class ImageToolPresetTests
         Assert.Equal(RedactMode.Blur, preset.Clone().Image.Edit!.Redact!.Mode);
     }
 
+    /// <summary>What <see cref="AnnotationKind"/> was before Spotlight: the same converter and the same default.</summary>
+    private enum AnnotationKindBeforeSpotlight { Pen, Highlighter, Arrow, Line, Rectangle, Ellipse, Text, Number }
+
+    [Fact]
+    public void Spotlight_comes_last_so_an_older_Filee_reads_it_as_a_Pen_and_nothing_else_moves()
+    {
+        // As with Blur: the settings file drops itself on a name it can't read, so Spotlight must not renumber its
+        // neighbours (the panel's cells and keys follow this order), and a build without it falls back on Pen.
+        Assert.Equal(
+            [AnnotationKind.Pen, AnnotationKind.Highlighter, AnnotationKind.Arrow, AnnotationKind.Line, AnnotationKind.Rectangle,
+                AnnotationKind.Ellipse, AnnotationKind.Text, AnnotationKind.Number, AnnotationKind.Spotlight],
+            Enum.GetValues<AnnotationKind>());
+        Assert.Equal(0, (int)AnnotationKind.Pen);
+
+        var options = new JsonSerializerOptions();
+        options.Converters.Add(new LenientEnumJsonConverter<AnnotationKindBeforeSpotlight>());
+        Assert.Equal(AnnotationKindBeforeSpotlight.Pen, JsonSerializer.Deserialize<AnnotationKindBeforeSpotlight>("\"Spotlight\"", options));
+        Assert.Equal(AnnotationKindBeforeSpotlight.Number, JsonSerializer.Deserialize<AnnotationKindBeforeSpotlight>("\"Number\"", options));
+    }
+
+    [Fact]
+    public void A_spotlight_is_remembered_saved_in_a_preset_and_cloned_and_a_tool_nobody_knows_reads_as_Pen()
+    {
+        var json = JsonSerializer.Serialize(new AppSettings { ImageTools = new ImageToolSettings { LastTool = AnnotationKind.Spotlight, CropAspect = "16:9" } },
+            FileeJsonContext.Default.AppSettings);
+        var back = JsonSerializer.Deserialize(json, FileeJsonContext.Default.AppSettings)!.ImageTools;
+        Assert.Equal((AnnotationKind.Spotlight, "16:9"), (back.LastTool, back.CropAspect));
+
+        // A tool of a newer Filee, in the settings: Pen, and the rest of the file still loads.
+        var newer = JsonSerializer.Deserialize("""{"imageTools":{"lastTool":"Stamp","cropAspect":"1:1"}}""", FileeJsonContext.Default.AppSettings)!.ImageTools;
+        Assert.Equal((AnnotationKind.Pen, "1:1"), (newer.LastTool, newer.CropAspect));
+
+        var preset = JsonSerializer.Deserialize("""{ "id": "x", "kind": "Tool", "tool": "Annotate", "targetFormat": "*", "image": { "edit": { "annotations": [ { "kind": "Spotlight", "points": [ { "x": 0.1, "y": 0.2 }, { "x": 0.6, "y": 0.7 } ] } ] } } }""",
+            FileeJsonContext.Default.Preset)!;
+        var spotlight = Assert.Single(preset.Image.Edit!.Annotations!);
+        Assert.Equal((AnnotationKind.Spotlight, 2), (spotlight.Kind, spotlight.Points.Count));
+        var clone = Assert.Single(preset.Clone().Image.Edit!.Annotations!);
+        Assert.Equal((AnnotationKind.Spotlight, 2), (clone.Kind, clone.Points.Count));
+        Assert.NotSame(spotlight.Points[0], clone.Points[0]);
+    }
+
     [Fact]
     public void A_tool_kind_from_a_newer_Filee_loads_and_the_preset_kind_Tool_is_read_by_name()
     {

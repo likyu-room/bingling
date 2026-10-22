@@ -1,4 +1,4 @@
-<!-- The annotate tool's side of the image tool window: the nine tools (select and the eight ways of drawing, each with its
+<!-- The annotate tool's side of the image tool window: the ten tools (select and the nine ways of drawing, each with its
      key in its tip, and a line on how the one in use works), the button that deletes the picked drawing, the colours with
      one typed in, and the thickness. -->
 <UserControl xmlns="https://github.com/avaloniaui"
@@ -58,6 +58,11 @@
         <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.number}">
           <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.number}" /><Run Text=" (N)" /></TextBlock></ToolTip.Tip>
           <PathIcon Data="M12,2A10,10 0 1,0 12,22A10,10 0 1,0 12,2Z M11.5,7H13.5V17H11.5V9.6L9.5,10.4V8.4Z" />
+        </ListBoxItem>
+        <ListBoxItem AutomationProperties.Name="{DynamicResource tool.annotate.tool.spotlight}">
+          <ToolTip.Tip><TextBlock><Run Text="{DynamicResource tool.annotate.tool.spotlight}" /><Run Text=" (S)" /></TextBlock></ToolTip.Tip>
+          <!-- A dark square with a window cut in it: what is outside the box is dimmed, what is inside is not. -->
+          <PathIcon Data="M3,3H21V21H3Z M7,7V17H17V7Z" />
         </ListBoxItem>
       </ListBox>
 
