@@ -89,7 +89,7 @@ well, delete the `%LocalAppData%\Bingling` folder too.
 
 ### Open the ring by dragging
 
-1. Drag files in File Explorer or on the desktop. You can drag many at once.
+1. Drag files or folders in File Explorer or on the desktop. You can drag many at once.
 2. While dragging, press <kbd>Ctrl</kbd>. The ring opens around your cursor. (Holding <kbd>Ctrl</kbd> before you start dragging works too.)
 3. Release the mouse button over the slot you want.
 
@@ -133,6 +133,9 @@ Look at the [picture above](#what-is-bingling) while you read this.
 - **Slots**: each slot does one thing. The large text is its name, the small text the format of the result.
   A slot that keeps the format, such as “Half size”, shows the source format in small text.
 - **A ring for each kind of file**: pictures, PDF, documents, video and so on each get their own ring. A mix of kinds gets the “Mixed files” ring.
+- **The folders ring**: drag only folders and the folders ring opens. **ZIP** and **7Z** make one archive per folder
+  (`Photos` → `Photos.zip`); **One ZIP** puts every folder you dragged into a single ZIP. Folders dragged
+  together with files open the “Mixed files” ring, whose **One ZIP** packs the folders too.
   A ring holds up to 12 slots.
 - **Group slots**: a slot with “Group of 6” in small text, like “Tools”, holds several slots.
   Rest on it or move outward and its slots fan out around it. While dragging, drop on one of those.

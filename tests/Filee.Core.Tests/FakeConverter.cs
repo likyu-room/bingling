@@ -148,7 +148,8 @@ internal sealed class FakeCombiner : IFileCombiner
     {
         if (Throw)
             throw new InvalidOperationException("boom");
-        Inputs.AddRange(inputPaths);
+        lock (Inputs) // folders are packed side by side
+            Inputs.AddRange(inputPaths);
         File.WriteAllText(outputPath, string.Join("|", inputPaths.Select(Path.GetFileName)));
         return Task.CompletedTask;
     }

@@ -81,6 +81,7 @@ public sealed class UserDataStore
         var libraryChanged = File.Exists(ProfilesPath) && SettingsMigrations.ApplyToLibrary(schema, Presets, Profiles);
         // Whatever the schema: a tool added after the library was made comes in on every load (and only while its id is missing).
         libraryChanged |= SettingsMigrations.AddMissingToolPresets(Presets);
+        libraryChanged |= SettingsMigrations.AddMissingFolderProfile(Profiles);
         EnsureConsistency();
 
         // Persist upgrades right away so they run once, even if the user never changes a setting.
@@ -599,6 +600,19 @@ internal static class SettingsMigrations
                 group.SubPresetIds.Insert(group.SubPresetIds.FindLastIndex(id => ring.IndexOf(id) is var r && r >= 0 && r < rank) + 1, tool.Id);
         }
         return changed;
+    }
+
+    /// <summary>
+    /// Adds the folders donut (<see cref="BuiltInData.FolderProfile"/>) to a library from before it, after the normal
+    /// donuts. It can't be deleted in Settings → Toolbar, so a library without it never chose that.
+    /// </summary>
+    public static bool AddMissingFolderProfile(List<ToolbarProfile> profiles)
+    {
+        if (profiles.Any(p => p.ForFolders))
+            return false;
+        var mixed = profiles.FindIndex(p => p.IsFallback);
+        profiles.Insert(mixed < 0 ? profiles.Count : mixed, BuiltInData.FolderProfile());
+        return true;
     }
 
     private static bool AddPdfSlides(List<Preset> presets, List<ToolbarProfile> profiles)

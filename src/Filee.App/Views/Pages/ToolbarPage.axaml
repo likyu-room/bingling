@@ -160,8 +160,10 @@
               <TextBox Text="{Binding ProfileName}" />
             </StackPanel>
 
+            <TextBlock Classes="caption" Text="{DynamicResource toolbar.folders_note}" TextWrapping="Wrap" IsVisible="{Binding IsFolders}" />
+
             <!-- The label wraps (a ToggleSwitch header doesn't), so it sits next to a bare switch. -->
-            <StackPanel Spacing="2">
+            <StackPanel Spacing="2" IsVisible="{Binding !IsFolders}">
               <DockPanel>
                 <ToggleSwitch x:Name="MixedToggle" DockPanel.Dock="Right" OnContent="{x:Null}" OffContent="{x:Null}" MinWidth="0"
                               Margin="12,0,0,0" VerticalAlignment="Center"

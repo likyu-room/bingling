@@ -233,6 +233,7 @@
   "profile.data": "Dane",
   "profile.models": "Modele 3D",
   "profile.mixed": "Różne pliki",
+  "profile.folders": "Foldery",
 
   "preset.half_size": "Połowa rozmiaru",
   "preset.grayscale": "Skala szarości",
@@ -456,6 +457,7 @@
   "toolbar.ext_unknown_tip": "Nieznany typ pliku",
   "toolbar.mixed_toggle": "Używaj dla mieszanych zaznaczeń (pliki różnych typów)",
   "toolbar.mixed_locked": "Bingling potrzebuje co najmniej jednego profilu dla mieszanych zaznaczeń, więc ten zostaje.",
+  "toolbar.folders_note": "Ten pierścień otwiera się, gdy przeciągasz same foldery, bez względu na ich zawartość. Foldery przeciągnięte razem z plikami otwierają pierścień różnych plików.",
   "toolbar.mixed_badge": "Dla mieszanych zaznaczeń",
   "toolbar.mixed_title": "Pokaż ten pasek, gdy każdy zaznaczony plik jest jednym z:",
   "toolbar.mixed_expand": "Pokaż rozszerzenia",

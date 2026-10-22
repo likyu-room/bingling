@@ -115,9 +115,12 @@ public static class OutputPathResolver
         if (string.IsNullOrWhiteSpace(pattern))
             pattern = "{name}";
 
-        var ext = FormatRegistry.ExtensionOf(tokens.SourcePath);
+        // A folder's name is all of it: "v1.2" is no ".2" file.
+        var folder = Directory.Exists(tokens.SourcePath);
+        var ext = folder ? "" : FormatRegistry.ExtensionOf(tokens.SourcePath);
+        var name = folder ? Path.GetFileName(Path.TrimEndingDirectorySeparator(tokens.SourcePath)) : FormatRegistry.NameWithoutExtension(tokens.SourcePath);
         return pattern
-            .Replace("{name}", FormatRegistry.NameWithoutExtension(tokens.SourcePath), StringComparison.OrdinalIgnoreCase)
+            .Replace("{name}", name, StringComparison.OrdinalIgnoreCase)
             .Replace("{ext}", ext, StringComparison.OrdinalIgnoreCase)
             .Replace("{preset}", tokens.PresetName, StringComparison.OrdinalIgnoreCase)
             .Replace("{date}", tokens.Now.ToString("yyyyMMdd"), StringComparison.OrdinalIgnoreCase)

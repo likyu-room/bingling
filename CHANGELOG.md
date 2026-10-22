@@ -20,12 +20,18 @@ without lines shows the English ones):
 <!-- update
 level: optional
 ko: 링으로 사진을 바꾸면 금방 끝나도 결과 미리보기 카드가 떠요
+ko: 폴더를 끌면 폴더 링이 떠서 ZIP·7Z로 압축할 수 있어요
 en: A picture made from the ring shows on the result card, even a quick one
+en: Drag folders to get the folders ring: compress them to ZIP or 7Z
 -->
 
 - **See the picture you made**: when a conversion from the ring makes a picture (PNG → JPG, 50 % smaller, …), the
   result card now shows it even when the ring finished at once. Its thumbnail opens the result, and **Copy** puts it
   on the clipboard. Other results that finish at once still show only the ✓ in the ring.
+- **The folders ring**: dragging folders (and Ctrl+Alt+Space on folders selected in Explorer) used to open nothing.
+  Only folders now open the folders ring: **ZIP** and **7Z** make one archive per folder, named after the whole folder
+  (`v1.2` → `v1.2.zip`), and **One ZIP** puts them all into one. Folders dragged with files open the mixed files ring,
+  whose One ZIP packs the folders too. Its slices can be changed in Settings › Toolbar like any other ring.
 
 ## 1.2.0
 

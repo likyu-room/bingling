@@ -16,11 +16,14 @@ internal static class DraggedFiles
         data.Contains(DataFormat.File) || data.Items.Any(item => item.Formats.Any(IsFilenames));
 
     /// <summary>
-    /// Local file paths in the drag (folders and virtual items are ignored). A shortcut counts as the file it points
-    /// to; one to a folder is ignored like the folder.
+    /// Local files and folders in the drag (virtual items are ignored): folders open the folders donut. A shortcut
+    /// counts as what it points to.
     /// </summary>
     public static IReadOnlyList<string> Local(IDataTransfer data) =>
-        Local(data, File.Exists, AppHost.Get<IPlatformServices>().ResolveShortcuts);
+        Local(data, Exists, AppHost.Get<IPlatformServices>().ResolveShortcuts);
+
+    /// <summary>A file or a folder at <paramref name="path"/>: something the donut can take.</summary>
+    internal static bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
 
     internal static IReadOnlyList<string> Local(IDataTransfer data, Func<string, bool> fileExists,
         Func<IReadOnlyList<string>, IReadOnlyList<string>>? resolveShortcuts = null)

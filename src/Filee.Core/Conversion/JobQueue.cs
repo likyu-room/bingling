@@ -236,13 +236,18 @@ public sealed class JobQueue : IAsyncDisposable
     }
 
     /// <summary>Packs every source file, unchanged, into one archive named after the first file.</summary>
-    private async Task RunCombinedAsync(ConversionJob job, string workDir)
+    private Task RunCombinedAsync(ConversionJob job, string workDir) => PackAsync(job, job.Files, 1, workDir);
+
+    /// <summary>
+    /// Packs <paramref name="files"/> unchanged into one archive of the preset's format named after the first of them:
+    /// every file of a "compress into one" job, or one folder on the folders donut. A folder goes in with its content.
+    /// </summary>
+    private async Task PackAsync(ConversionJob job, IReadOnlyList<FileResult> files, int index, string workDir)
     {
         var format = FormatRegistry.Get(job.Preset.TargetFormat);
         var inputs = new List<FileResult>();
-        foreach (var file in job.Files)
+        foreach (var file in files)
         {
-            // Folders (from the command line; drops deliver files) are packed with their content.
             if (File.Exists(file.SourcePath) || Directory.Exists(file.SourcePath))
                 inputs.Add(file);
             else
@@ -254,7 +259,7 @@ public sealed class JobQueue : IAsyncDisposable
             return;
         }
 
-        var output = CreateFinalAllocator(job, inputs[0].SourcePath, 1).Allocate(format.PrimaryExtension);
+        var output = CreateFinalAllocator(job, inputs[0].SourcePath, index).Allocate(format.PrimaryExtension);
         if (output is null)
         {
             foreach (var f in inputs)
@@ -365,6 +370,14 @@ public sealed class JobQueue : IAsyncDisposable
         string intermediate = "pdf")
     {
         var ct = job.CancellationToken;
+        // The folders donut: a folder goes into an archive of its own, with its content.
+        if (finalOutput && Directory.Exists(file.SourcePath) && _combiner is not null
+            && FormatRegistry.FindById(job.Preset.TargetFormat) is { Category: FormatCategory.Archive } archive
+            && archive.Id != FormatRegistry.Folder)
+        {
+            await PackAsync(job, [file], index, workDir);
+            return file.Outputs;
+        }
         var source = FormatRegistry.Detect(file.SourcePath);
         if (source is null)
             return Fail(file, "error.unsupported_source", "." + FormatRegistry.ExtensionOf(file.SourcePath));

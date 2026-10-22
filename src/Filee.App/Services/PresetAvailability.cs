@@ -15,8 +15,10 @@ public sealed class PresetAvailability(ConverterCatalog catalog, ILocalizer loc,
     /// </summary>
     public string? Check(Preset preset, IReadOnlyList<FileFormat> formats)
     {
-        // "Compress into one archive" packs the files as they are, so any file works, even of an unknown type.
-        if (preset.Archive.CombineIntoOne
+        // "Compress into one archive" packs the files as they are, so any file works, even of an unknown type; and any
+        // archive takes folders as they are (JobQueue packs each into one of its own).
+        var onlyFolders = formats.Count > 0 && formats.All(f => f.Id == FormatRegistry.Folder);
+        if ((preset.Archive.CombineIntoOne || onlyFolders)
             && FormatRegistry.FindById(preset.TargetFormat) is { Category: FormatCategory.Archive } archive
             && archive.Id != FormatRegistry.Folder)
         {

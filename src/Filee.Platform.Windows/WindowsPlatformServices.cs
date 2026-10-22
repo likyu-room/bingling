@@ -163,7 +163,7 @@ public sealed class WindowsPlatformServices : IPlatformServices
                     foreach (dynamic item in items)
                     {
                         string path = item.Path;
-                        if (File.Exists(path))
+                        if (File.Exists(path) || Directory.Exists(path)) // folders open the folders donut
                             paths.Add(path);
                     }
                     if (paths.Count > 0)

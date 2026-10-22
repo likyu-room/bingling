@@ -285,4 +285,22 @@ public class ToolbarPageTests
         Assert.True(vm.IsMixed);
         Assert.NotNull(vm.MixedExtensions);
     }
+
+    [AvaloniaFact]
+    public void The_folders_profile_has_no_extensions_and_stays()
+    {
+        TestServices.EnsureInitialized("en");
+        var store = AppHost.Get<UserDataStore>();
+        var vm = new ToolbarPageViewModel(store, AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<WindowService>());
+        vm.SelectedProfile = vm.Profiles.Single(p => p.Profile.Id == "folders");
+
+        Assert.True(vm.IsFolders);
+        Assert.Null(vm.ExtensionTags); // it opens for folders, not for extensions
+        Assert.Null(vm.MixedExtensions);
+        Assert.False(vm.CanChangeMixed);
+        Assert.False(vm.CanDelete);
+
+        vm.SelectedProfile = vm.Profiles.Single(p => p.Profile.Id == "images");
+        Assert.False(vm.IsFolders);
+    }
 }

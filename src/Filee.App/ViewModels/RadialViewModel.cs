@@ -167,7 +167,7 @@ public sealed partial class RadialViewModel(UserDataStore store, ILocalizer loc,
         // file: asked for its length after it was found, a file deleted in between would throw.
         var total = files.Sum(f => new FileInfo(f) is { Exists: true } info ? info.Length : 0);
         CenterTitle = (formats.Count == 1
-            ? loc.Format("donut.files_same", files.Count, formats[0].DisplayName)
+            ? loc.Format("donut.files_same", files.Count, FormatLabels.Name(loc, formats[0])) // "폴더 2개" for folders
             : loc.Format("donut.files_mixed", files.Count))
             + (total > 0 ? " · " + ByteSize.Format(total) : "");
         CenterSubtitle = clickMode ? loc["donut.close_hint"] : null;

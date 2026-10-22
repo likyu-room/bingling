@@ -233,6 +233,7 @@
   "profile.data": "数据",
   "profile.models": "3D 模型",
   "profile.mixed": "混合文件",
+  "profile.folders": "文件夹",
 
   "preset.half_size": "缩小 50%",
   "preset.grayscale": "灰度",
@@ -456,6 +457,7 @@
   "toolbar.ext_unknown_tip": "未知文件类型",
   "toolbar.mixed_toggle": "用于混合选择（不同类型的文件）",
   "toolbar.mixed_locked": "Bingling 至少需要一个用于混合选择的配置，因此无法关闭。",
+  "toolbar.folders_note": "只拖入文件夹时会打开这个环形菜单，与文件夹里的内容无关。文件夹和文件一起拖入时会打开混合文件的环形菜单。",
   "toolbar.mixed_badge": "用于混合选择",
   "toolbar.mixed_title": "当选中的文件都属于以下扩展名时显示此工具栏：",
   "toolbar.mixed_expand": "显示扩展名",

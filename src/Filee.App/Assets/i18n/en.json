@@ -233,6 +233,7 @@
   "profile.data": "Data",
   "profile.models": "3D models",
   "profile.mixed": "Mixed files",
+  "profile.folders": "Folders",
 
   "preset.half_size": "Half size",
   "preset.grayscale": "Grayscale",
@@ -456,6 +457,7 @@
   "toolbar.ext_unknown_tip": "Unknown file type",
   "toolbar.mixed_toggle": "Use for mixed selections (files of different types)",
   "toolbar.mixed_locked": "Bingling needs at least one profile for mixed selections, so this one stays.",
+  "toolbar.folders_note": "This donut opens when you drag only folders, whatever is in them. Folders dragged together with files open the mixed files donut.",
   "toolbar.mixed_badge": "For mixed selections",
   "toolbar.mixed_title": "Show this toolbar when every selected file is one of:",
   "toolbar.mixed_expand": "Show the extensions",

@@ -33,6 +33,12 @@ public sealed class ToolbarProfile
     /// </summary>
     public bool IsFallback { get; set; }
 
+    /// <summary>
+    /// The folders profile: used when every dropped item is a folder (see <see cref="ProfileSelector.Select"/>). It has
+    /// no extensions; a folder has none of its own.
+    /// </summary>
+    public bool ForFolders { get; set; }
+
     /// <summary>Preset ids in donut order, clockwise starting at 12 o'clock.</summary>
     public List<string> PresetIds { get; set; } = [];
 
@@ -47,6 +53,7 @@ public sealed class ToolbarProfile
         NameKey = NameKey,
         Extensions = [.. Extensions],
         IsFallback = IsFallback,
+        ForFolders = ForFolders,
         PresetIds = [.. PresetIds],
     };
 }
@@ -57,6 +64,7 @@ public static class ProfileSelector
     /// <summary>
     /// Picks the profile for the given files, in this order:
     /// <list type="number">
+    /// <item>only folders: the folders profile (<see cref="ToolbarProfile.ForFolders"/>);</item>
     /// <item>the first normal profile that has every file's extension;</item>
     /// <item>otherwise the first mixed-selection profile (list order) whose extensions include every file's;</item>
     /// <item>otherwise the catch-all (see <see cref="CatchAll"/>).</item>
@@ -64,8 +72,13 @@ public static class ProfileSelector
     /// </summary>
     public static ToolbarProfile? Select(IReadOnlyList<ToolbarProfile> profiles, IEnumerable<string> filePaths)
     {
-        var extensions = filePaths
-            .Select(FormatRegistry.ExtensionOf)
+        var items = filePaths.Select(path => (Path: path, IsFolder: Directory.Exists(path))).ToList();
+        if (items.Count > 0 && items.All(i => i.IsFolder) && profiles.FirstOrDefault(p => p.ForFolders) is { } folders)
+            return folders;
+
+        // A folder has no extension of its own ("v1.2" is no ".2" file): among files it leaves the choice to the mixed ones.
+        var extensions = items
+            .Select(i => i.IsFolder ? "" : FormatRegistry.ExtensionOf(i.Path))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
 
@@ -90,7 +103,8 @@ public static class ProfileSelector
         ?? profiles.FirstOrDefault(p => p.IsFallback)
         ?? profiles.FirstOrDefault();
 
-    /// <summary>Formats of the given files that Filee recognises.</summary>
+    /// <summary>Formats of the given files that Filee recognises; a folder is the folder format, whatever its name.</summary>
     public static IReadOnlyList<FileFormat> DetectFormats(IEnumerable<string> filePaths) =>
-        filePaths.Select(FormatRegistry.Detect).OfType<FileFormat>().Distinct().ToList();
+        filePaths.Select(path => Directory.Exists(path) ? FormatRegistry.FindById(FormatRegistry.Folder) : FormatRegistry.Detect(path))
+            .OfType<FileFormat>().Distinct().ToList();
 }

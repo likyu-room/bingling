@@ -388,6 +388,7 @@ public static class BuiltInData
         .. WithSubtitleProfile(CatalogProfiles()),
         DataProfile(),
         ModelProfile(),
+        FolderProfile(),
         new()
         {
             Id = "mixed", NameKey = "profile.mixed", IsFallback = true,
@@ -425,6 +426,18 @@ public static class BuiltInData
     };
 
     /// <summary>Markdown, plain text and HTML (added in settings schema 4, see SettingsMigrations).</summary>
+    /// <summary>
+    /// The folders donut (only folders dragged): each folder into an archive of its own, or all of them into one. It came
+    /// after 1.2.0; older libraries get it through <c>SettingsMigrations.AddMissingFolderProfile</c>.
+    /// </summary>
+    public static ToolbarProfile FolderProfile() => new()
+    {
+        Id = "folders",
+        NameKey = "profile.folders",
+        ForFolders = true,
+        PresetIds = ["to-zip", "to-7z", "zip-all"],
+    };
+
     public static ToolbarProfile TextProfile() => new()
     {
         Id = "text",

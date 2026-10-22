@@ -92,6 +92,9 @@ public sealed partial class ToolbarPageViewModel : ObservableObject
     /// <summary>False for the last mixed-selection profile: Filee always needs one.</summary>
     [ObservableProperty] private bool _canChangeMixed;
 
+    /// <summary>The selected profile is the folders donut: no extensions, no mixed toggle, no delete.</summary>
+    [ObservableProperty] private bool _isFolders;
+
     [ObservableProperty] private bool _canDelete;
 
     /// <summary>Extension chips of a normal profile (null for a mixed one).</summary>
@@ -174,9 +177,11 @@ public sealed partial class ToolbarPageViewModel : ObservableObject
         _loading = true;
         IsMixed = profile?.IsFallback == true;
         _loading = false;
-        CanChangeMixed = profile is not null && !(profile.IsFallback && mixedCount <= 1);
+        // The folders donut opens for folders, not for extensions, and stays (SettingsMigrations.AddMissingFolderProfile).
+        IsFolders = profile?.ForFolders == true;
+        CanChangeMixed = profile is not null && !IsFolders && !(profile.IsFallback && mixedCount <= 1);
         CanDelete = CanChangeMixed;
-        ExtensionTags = profile is { IsFallback: false } ? new ExtensionTagsViewModel(profile, _store.Profiles, _loc, _store.SaveLibrary) : null;
+        ExtensionTags = profile is { IsFallback: false, ForFolders: false } ? new ExtensionTagsViewModel(profile, _store.Profiles, _loc, _store.SaveLibrary) : null;
         MixedExtensions = profile is { IsFallback: true } ? new MixedExtensionsViewModel(profile, _store.Profiles, _loc, _store.SaveLibrary) : null;
     }
 

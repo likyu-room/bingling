@@ -1,6 +1,7 @@
 // Which donut opens for a set of files: normal profiles first, then mixed-selection profiles limited to checked
 // extensions, then the catch-all.
 
+using Filee.Core.Formats;
 using Filee.Core.Presets;
 using Filee.Core.Profiles;
 
@@ -20,6 +21,19 @@ public class ProfileSelectorTests
 
     [Fact]
     public void Picks_profile_matching_all_files() => Assert.Equal("images", Pick(_builtIn, "a.jpg", "b.PNG"));
+
+    [Fact]
+    public void Folders_open_the_folders_donut_and_a_folder_among_files_the_mixed_one()
+    {
+        using var dir = new TempDir();
+        var photos = Directory.CreateDirectory(Path.Combine(dir.Path, "photos")).FullName;
+        var dotted = Directory.CreateDirectory(Path.Combine(dir.Path, "v1.2")).FullName; // no ".2" file
+
+        Assert.Equal("folders", Pick(_builtIn, photos));
+        Assert.Equal("folders", Pick(_builtIn, photos, dotted));
+        Assert.Equal("mixed", Pick(_builtIn, photos, dir.File("a.jpg")));
+        Assert.Equal([FormatRegistry.Folder], ProfileSelector.DetectFormats([dotted]).Select(f => f.Id));
+    }
 
     [Theory]
     [InlineData("pdf", "a.pdf")]

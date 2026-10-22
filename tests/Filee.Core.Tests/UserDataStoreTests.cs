@@ -290,7 +290,7 @@ public class UserDataStoreTests
         Assert.Equal(ids.IndexOf("text") + 1, ids.IndexOf("ebooks"));
         Assert.Equal(ids.IndexOf("fonts") + 1, ids.IndexOf("data")); // schema 14
         Assert.Equal(ids.IndexOf("data") + 1, ids.IndexOf("models")); // schema 15
-        Assert.Equal(ids.IndexOf("mixed") - 1, ids.IndexOf("models"));
+        Assert.Equal(ids.IndexOf("folders") - 1, ids.IndexOf("models")); // the last category donut; the folders one follows
         Assert.Equal(ids.IndexOf("audio") + 1, ids.IndexOf("subtitles"));
         Assert.Contains("cr2", profiles.Single(p => p.Id == "images").Extensions);
         Assert.DoesNotContain("mp3", profiles.Single(p => p.Id == "audio").Extensions);
@@ -536,7 +536,7 @@ public class UserDataStoreTests
         Assert.Equal(["to-glb", "to-stl", "to-obj", "to-3mf", "to-ply", "to-gltf"], presets.Where(p => modelIds.Contains(p.Id)).Select(p => p.Id));
         var ids = profiles.Select(p => p.Id).ToList();
         Assert.Equal(ids.IndexOf("data") + 1, ids.IndexOf("models"));
-        Assert.Equal(ids.IndexOf("mixed") - 1, ids.IndexOf("models"));
+        Assert.Equal(ids.IndexOf("folders") - 1, ids.IndexOf("models")); // the last category donut; the folders one follows
         var models = profiles.Single(p => p.Id == "models");
         Assert.Equal(["glb", "gltf", "stl", "obj", "3mf", "ply", "fbx"], models.Extensions);
         Assert.Equal(BuiltInData.ModelProfile().PresetIds, models.PresetIds);
@@ -886,6 +886,28 @@ public class UserDataStoreTests
         var crowded = LibraryFrom1_0_0(other.Path, full);
         Assert.Equal(full, crowded.FindPreset("tools")!.SubPresetIds); // no room: nothing is pushed out
         Assert.All(NewTools, id => Assert.NotNull(crowded.FindPreset(id))); // still there to add in Settings → Toolbar
+    }
+
+    [Fact]
+    public void A_library_from_before_the_folders_donut_gains_it_once_after_the_normal_ones()
+    {
+        using var dir = new TempDir();
+        var seed = new UserDataStore(dir.Path);
+        seed.Load();
+        seed.Profiles.RemoveAll(p => p.ForFolders);
+        seed.SaveLibrary(); // saving adds nothing: only loading does
+        Assert.DoesNotContain(seed.Profiles, p => p.ForFolders);
+
+        var store = new UserDataStore(dir.Path);
+        store.Load();
+
+        var folders = Assert.Single(store.Profiles, p => p.ForFolders);
+        Assert.Equal(("folders", "profile.folders"), (folders.Id, folders.NameKey));
+        Assert.Equal(["to-zip", "to-7z", "zip-all"], folders.PresetIds);
+        Assert.Empty(folders.Extensions);
+        Assert.Equal(store.Profiles.FindIndex(p => p.IsFallback) - 1, store.Profiles.IndexOf(folders));
+        Assert.Contains("\"forFolders\": true", File.ReadAllText(Path.Combine(dir.Path, "profiles.json")));
+        Assert.False(SettingsMigrations.AddMissingFolderProfile(store.Profiles)); // once
     }
 
     [Fact]

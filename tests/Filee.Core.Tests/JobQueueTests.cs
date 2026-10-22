@@ -496,6 +496,28 @@ public class JobQueueTests
     }
 
     [Fact]
+    public async Task A_folder_goes_into_an_archive_of_its_own_named_after_the_whole_folder()
+    {
+        // The folders donut: each folder its own archive next to it. A "v1.2" folder is no ".2" file.
+        using var dir = new TempDir();
+        var dotted = Directory.CreateDirectory(Path.Combine(dir.Path, "v1.2")).FullName;
+        var photos = Directory.CreateDirectory(Path.Combine(dir.Path, "photos")).FullName;
+        var combiner = new FakeCombiner();
+        await using var queue = new JobQueue(new ConverterCatalog([]), combiner: combiner);
+
+        var job = await Run(queue, [dotted, photos], new Preset { TargetFormat = "zip" });
+
+        Assert.Equal(JobState.Completed, job.State);
+        Assert.Equal(Path.Combine(dir.Path, "v1.2.zip"), Assert.Single(job.Files[0].Outputs));
+        Assert.Equal(Path.Combine(dir.Path, "photos.zip"), Assert.Single(job.Files[1].Outputs));
+        Assert.Equal(new[] { dotted, photos }.Order(), combiner.Inputs.Order());
+
+        var all = await Run(queue, [dotted],
+            new Preset { TargetFormat = "zip", Archive = { CombineIntoOne = true }, Output = { FileNamePattern = "{name}_files" } });
+        Assert.Equal(Path.Combine(dir.Path, "v1.2_files.zip"), Assert.Single(all.Files[0].Outputs));
+    }
+
+    [Fact]
     public async Task No_route_is_reported()
     {
         using var dir = new TempDir();
