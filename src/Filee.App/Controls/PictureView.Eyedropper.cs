@@ -102,10 +102,10 @@ public partial class PictureView
         Color? picked = null;
         using (var around = SampleAround(point.Position))
         {
-            // A pixel see-through altogether has no colour (it reads as black): nothing is picked, the eyedropper stays on.
-            using var pixels = around?.Image.PeekPixels();
-            if (pixels is not null && pixels.GetPixelColor(LensMiddle.X, LensMiddle.Y).Alpha > 0)
-                picked = around!.ColorAt(LensMiddle);
+            // A pixel see-through altogether has no colour (it reads as black, and the magnifier says "transparent"): nothing is
+            // picked, the eyedropper stays on.
+            if (around is not null && !around.IsClearAt(LensMiddle))
+                picked = around.ColorAt(LensMiddle);
         }
         if (picked is { } color)
             ColorPicked?.Invoke(color);

@@ -109,12 +109,31 @@ public sealed class Magnifier : Control
         context.DrawEllipse(null, Ring, circle.Center, Diameter / 2, Diameter / 2);
         context.DrawEllipse(null, RingEdge, circle.Center, Diameter / 2 + 2, Diameter / 2 + 2);
 
-        if (shot.ColorAt(_pixel) is not { } middle)
+        if (Caption is not { } caption)
             return;
-        var label = new Rect((Diameter - LabelWidth) / 2, Diameter + LabelGap, LabelWidth, LabelHeight);
-        context.DrawRectangle(LabelBack, null, label, LabelHeight / 2, LabelHeight / 2);
-        var text = new FormattedText(ColorCodes.Hex(middle.R, middle.G, middle.B), CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
+        var text = new FormattedText(caption, CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
             new Typeface(TextElement.GetFontFamily(this), FontStyle.Normal, FontWeight.SemiBold), 12, Brushes.White);
+        // As wide as the HEX code needs, or more for a longer word ("Transparente").
+        var width = Math.Min(Diameter, Math.Max(LabelWidth, text.Width + 20));
+        var label = new Rect((Diameter - width) / 2, Diameter + LabelGap, width, LabelHeight);
+        context.DrawRectangle(LabelBack, null, label, LabelHeight / 2, LabelHeight / 2);
         context.DrawText(text, new Point(label.Center.X - text.Width / 2, label.Center.Y - text.Height / 2));
     }
+
+    /// <summary>
+    /// What is written under the circle: the middle pixel's HEX code, or "transparent" where that pixel is see-through
+    /// altogether (a picture in the editor; it has no colour to pick, and its HEX would read as black); null off the picture.
+    /// </summary>
+    internal string? Caption
+    {
+        get
+        {
+            if (_shot is not { } shot || shot.ColorAt(_pixel) is not { } middle)
+                return null;
+            return shot.IsClearAt(_pixel) ? Transparent() : ColorCodes.Hex(middle.R, middle.G, middle.B);
+        }
+    }
+
+    private static string Transparent() =>
+        Application.Current?.TryGetResource("tool.eyedropper_clear", null, out var word) == true && word is string text ? text : "—";
 }

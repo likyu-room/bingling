@@ -29,6 +29,14 @@ public sealed record ScreenShot(SKImage Image, PixelRect Bounds, double Scaling)
         return Color.FromRgb(color.Red, color.Green, color.Blue);
     }
 
+    /// <summary>
+    /// The picture's <paramref name="pixel"/> is see-through altogether: it has no colour, though <see cref="ColorAt"/> reads it
+    /// as black. A screen never is; a picture in the editor can be.
+    /// </summary>
+    public bool IsClearAt(PixelPoint pixel) =>
+        _pixels.Handle != IntPtr.Zero && pixel.X >= 0 && pixel.Y >= 0 && pixel.X < Image.Width && pixel.Y < Image.Height
+        && _pixels.GetPixelColor(pixel.X, pixel.Y).Alpha == 0;
+
     /// <summary>A copy of the picture's <paramref name="area"/> (its pixels, inside it): one of its own, kept once the shot is let go of.</summary>
     public SKImage Crop(PixelRect area)
     {

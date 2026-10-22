@@ -143,6 +143,7 @@
   "tool.custom_color_tip": "Escribe un código de color y se aplica al momento",
   "tool.eyedropper": "Cuentagotas",
   "tool.eyedropper_tip": "Elige un color de la imagen (I). Esc para dejar de elegir",
+  "tool.eyedropper_clear": "Transparente",
   "tool.copy_color": "Copiar código",
   "tool.copy_color_tip": "Copia el código de color (HEX)",
   "tool.crop.keys": "Las teclas 1–7 también eligen la proporción",

@@ -18,6 +18,7 @@ using Filee.App.ViewModels;
 using Filee.App.Views;
 using Filee.Core.Platform;
 using Microsoft.Extensions.Logging;
+using SkiaSharp;
 
 namespace Filee.App.Tests;
 
@@ -172,6 +173,37 @@ public class ColorPickTests
         Assert.Equal(ScreenColor(199, 220), Pixel(frame, at + new Point(5.5 * cell, 6.5 * cell)));
         Assert.Equal(ScreenColor(200, 214), Pixel(frame, at + new Point(6.5 * cell, 0.6 * cell)));
         picker.Close();
+    }
+
+    [AvaloniaFact]
+    public void The_magnifier_says_transparent_over_a_pixel_with_no_colour_not_black()
+    {
+        TestServices.EnsureInitialized("ko");
+        ScreenShot Around(SKColor color)
+        {
+            using var surface = SKSurface.Create(new SKImageInfo(Magnifier.Cells, Magnifier.Cells));
+            surface.Canvas.Clear(color);
+            return new ScreenShot(surface.Snapshot(), new PixelRect(0, 0, Magnifier.Cells, Magnifier.Cells), 1);
+        }
+        var middle = new PixelPoint(Magnifier.Cells / 2, Magnifier.Cells / 2);
+        using var clear = Around(SKColors.Transparent);
+        using var black = Around(SKColors.Black);
+        using var half = Around(new SKColor(255, 0, 0, 128));
+        var lens = new Magnifier { Shot = clear, Pixel = middle };
+
+        Assert.Equal("투명", lens.Caption); // a picked pixel here picks nothing, so it does not read #000000
+        lens.Shot = black;
+        Assert.Equal("#000000", lens.Caption);
+        lens.Shot = half; // some colour, as it is drawn
+        Assert.NotEqual("투명", lens.Caption);
+        Assert.StartsWith("#", lens.Caption);
+        lens.Pixel = new PixelPoint(-3, 0); // off the picture: nothing is written
+        Assert.Null(lens.Caption);
+
+        TestServices.EnsureInitialized("en");
+        lens.Shot = clear;
+        lens.Pixel = middle;
+        Assert.Equal("Transparent", lens.Caption);
     }
 
     [AvaloniaFact]

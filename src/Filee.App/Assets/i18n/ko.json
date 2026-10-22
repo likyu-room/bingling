@@ -147,6 +147,7 @@
   "tool.custom_color_tip": "색 코드를 넣으면 바로 바뀌어요",
   "tool.eyedropper": "스포이트",
   "tool.eyedropper_tip": "그림에서 색을 찍어요 (I). Esc로 그만둬요",
+  "tool.eyedropper_clear": "투명",
   "tool.copy_color": "코드 복사",
   "tool.copy_color_tip": "색 코드(HEX)를 복사해요",
   "tool.crop.keys": "숫자 키 1~7로도 골라요",
