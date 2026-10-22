@@ -345,7 +345,7 @@ public sealed partial class JobViewModel : ObservableObject
         _copying = true;
         try
         {
-            if (!await ResultClipboard.CopyAsync(clipboard, storage, [.. Job.Outputs], _log))
+            if (!await ResultClipboard.CopyAsync(clipboard, storage, [.. Job.Outputs], _log, _platform))
                 return false;
         }
         finally

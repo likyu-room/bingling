@@ -38,7 +38,7 @@ public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools>
     public void StartCapture(PixelPoint cursor) => Start<CaptureWindow>(cursor, "screen capture", (window, shot) =>
         window.Open(new CaptureViewModel(shot, output)
         {
-            CopyPicture = picture => window.Clipboard is { } clipboard ? ResultClipboard.CopyPictureAsync(clipboard, picture, log) : Task.FromResult(false),
+            CopyPicture = picture => window.Clipboard is { } clipboard ? ResultClipboard.CopyPictureAsync(clipboard, picture, log, platform) : Task.FromResult(false),
         }, cursor));
 
     /// <summary>

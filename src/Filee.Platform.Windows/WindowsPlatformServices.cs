@@ -105,6 +105,11 @@ public sealed class WindowsPlatformServices : IPlatformServices
         }
     }
 
+    public bool SetsClipboardPictures => true;
+
+    /// <summary>On the Win32 clipboard itself (<see cref="WindowsClipboard"/>): Avalonia's bitmap there pastes black.</summary>
+    public bool SetClipboardPicture(byte[] png, byte[] dib) => WindowsClipboard.SetPicture(png, dib);
+
     /// <summary>Through Windows PowerShell 5.1 (<see cref="WindowsTextRecognition"/>), on a worker thread.</summary>
     public Task<RecognitionResult> RecognizeAsync(string imagePath, CancellationToken ct) =>
         Task.Run(() => WindowsTextRecognition.RecognizeAsync(imagePath, ct), CancellationToken.None);

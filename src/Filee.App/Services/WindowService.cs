@@ -239,7 +239,7 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
         // Annotate: throw the drawings away? Asked after "Cancel" or Esc, so it can't answer with another "Cancel".
         vm.Ask = question => ConfirmAsync(window, question, yes: loc["tool.discard"], no: loc["tool.keep_editing"]);
         vm.CopyPicture = (path, edit) =>
-            window.Clipboard is { } clipboard ? ResultClipboard.CopyEditedAsync(clipboard, path, edit, log) : Task.FromResult(false);
+            window.Clipboard is { } clipboard ? ResultClipboard.CopyEditedAsync(clipboard, path, edit, log, services.GetRequiredService<Filee.Core.Platform.IPlatformServices>()) : Task.FromResult(false);
         if (vm is ColorToolViewModel colors) // the copy button of the custom colour
             colors.SetClipboardText = text => window.Clipboard?.SetTextAsync(text) ?? throw new InvalidOperationException("The editor window has no clipboard");
         if (vm is RedactToolViewModel redact) // find what to hide: the text and faces, read on this PC

@@ -120,6 +120,87 @@ public class ResultClipboardTests
         top.Close();
     }
 
+    [AvaloniaFact]
+    public async Task On_windows_the_picture_goes_on_as_an_opaque_dib_and_a_png_not_through_avalonia()
+    {
+        // Avalonia's bitmap on the Windows clipboard was one bit a pixel: pasted black. 4 x 2: the top row two see-through
+        // pixels then two orange ones, the bottom row steel blue.
+        var top = Top();
+        var path = Path.Combine(Folder(), "logo.png");
+        using (var picture = new MagickImage(MagickColors.SteelBlue, 4, 2))
+        {
+            picture.Alpha(AlphaOption.Set);
+            using (var pixels = picture.GetPixels())
+                for (var x = 0; x < 4; x++)
+                    pixels.SetPixel(x, 0, x < 2 ? [255, 0, 0, 0] : [255, 122, 26, 255]);
+            picture.Write(path, MagickFormat.Png);
+        }
+        var platform = new PictureClipboard();
+        await top.Clipboard!.ClearAsync();
+
+        Assert.True(await ResultClipboard.CopyEditedAsync(top.Clipboard!, path, new ImageEdit(), new ListLogger(), platform));
+
+        var dib = platform.Dib!;
+        Assert.Equal((40, 4, 2, (short)1, (short)32, 0), (BitConverter.ToInt32(dib, 0), BitConverter.ToInt32(dib, 4), BitConverter.ToInt32(dib, 8),
+            BitConverter.ToInt16(dib, 12), BitConverter.ToInt16(dib, 14), BitConverter.ToInt32(dib, 16)));
+        Assert.Equal(40 + 4 * 2 * 4, dib.Length);
+        // Bottom-up, blue-green-red: the first row is the picture's bottom one; see-through turns white, as Paint shows it.
+        Assert.Equal(new byte[] { 180, 130, 70, 255 }, dib[40..44]);
+        Assert.Equal(new byte[] { 255, 255, 255, 255 }, dib[56..60]);
+        Assert.Equal(new byte[] { 26, 122, 255, 255 }, dib[68..72]);
+        using (var png = SkiaSharp.SKBitmap.Decode(platform.Png!))
+        {
+            Assert.Equal((4, 2), (png.Width, png.Height));
+            Assert.Equal(0, png.GetPixel(0, 0).Alpha); // the PNG keeps what is see-through
+            Assert.Equal(new SkiaSharp.SKColor(255, 122, 26), png.GetPixel(3, 0));
+        }
+        Assert.Null(await top.Clipboard!.TryGetBitmapAsync());
+        top.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task On_windows_a_capture_goes_on_as_an_opaque_dib_too()
+    {
+        var top = Top();
+        using var shot = new SkiaSharp.SKBitmap(new SkiaSharp.SKImageInfo(2, 1, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul));
+        shot.SetPixel(0, 0, new SkiaSharp.SKColor(70, 130, 180));
+        shot.SetPixel(1, 0, new SkiaSharp.SKColor(255, 122, 26));
+        using var image = SkiaSharp.SKImage.FromBitmap(shot);
+        var platform = new PictureClipboard();
+
+        Assert.True(await ResultClipboard.CopyPictureAsync(top.Clipboard!, image, new ListLogger(), platform));
+
+        Assert.Equal(new byte[] { 180, 130, 70, 255, 26, 122, 255, 255 }, platform.Dib![40..48]);
+        top.Close();
+    }
+
+    /// <summary>The Windows clipboard as <see cref="ResultClipboard"/> sees it: it keeps what it is handed.</summary>
+    private sealed class PictureClipboard : Filee.Core.Platform.IPlatformServices
+    {
+        public byte[]? Png { get; private set; }
+        public byte[]? Dib { get; private set; }
+        public bool SetsClipboardPictures => true;
+
+        public bool SetClipboardPicture(byte[] png, byte[] dib)
+        {
+            (Png, Dib) = (png, dib);
+            return true;
+        }
+
+        public bool IsFileManagerAt(int x, int y) => false;
+        public string? ProcessNameAt(int x, int y) => null;
+        public IReadOnlyList<string> GetFileManagerSelection() => [];
+        public int SystemDragThreshold => 4;
+        public bool PrefersReducedMotion => false;
+        public void SetStartWithSystem(bool enabled, string executablePath) { }
+        public void SetContextMenu(bool enabled, string executablePath, string label) { }
+        public Filee.Core.Platform.ModernContextMenuState GetModernContextMenuState(string executablePath) => Filee.Core.Platform.ModernContextMenuState.Unsupported;
+        public Task<Filee.Core.Platform.ModernContextMenuResult> SetModernContextMenuAsync(bool enabled, string executablePath) =>
+            Task.FromResult(new Filee.Core.Platform.ModernContextMenuResult(false));
+        public void RevealInFileManager(string path) { }
+        public void RaiseTopmost(nint windowHandle) { }
+    }
+
     /// <summary>The red, green and blue of one pixel of <paramref name="bitmap"/>.</summary>
     private static (int, int, int) Pixel(Avalonia.Media.Imaging.Bitmap bitmap, int x, int y)
     {

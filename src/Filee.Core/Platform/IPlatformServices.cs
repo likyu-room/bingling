@@ -110,6 +110,20 @@ public interface IPlatformServices
     /// an <see cref="OperationCanceledException"/>. Where the platform can't read text, <see cref="RecognitionResult.Empty"/>.
     /// </summary>
     Task<RecognitionResult> RecognizeAsync(string imagePath, CancellationToken ct) => Task.FromResult(RecognitionResult.Empty);
+
+    /// <summary>
+    /// True where <see cref="SetClipboardPicture"/> puts pictures on the clipboard (Windows); elsewhere the app's own
+    /// clipboard does.
+    /// </summary>
+    bool SetsClipboardPictures => false;
+
+    /// <summary>
+    /// Puts a picture on the clipboard in place of what was there: <paramref name="dib"/> (a BITMAPINFOHEADER and its
+    /// bottom-up 32-bit pixels, opaque), from which the system makes the bitmap most apps paste, and <paramref name="png"/>
+    /// with its transparency, for the apps that take a PNG. False when the clipboard stayed busy, or where the platform
+    /// doesn't (<see cref="SetsClipboardPictures"/>).
+    /// </summary>
+    bool SetClipboardPicture(byte[] png, byte[] dib) => false;
 }
 
 /// <summary>Whether "Convert with Filee" is in the top-level Windows 11 File Explorer menu (not just "Show more options").</summary>
