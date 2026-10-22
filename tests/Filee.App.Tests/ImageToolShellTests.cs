@@ -219,6 +219,26 @@ public class ImageToolShellTests
     }
 
     [AvaloniaFact]
+    public async Task Work_done_while_the_copy_is_made_keeps_the_window_open()
+    {
+        string[] files = [ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(300, 500)];
+        using var vm = (CropToolViewModel)ImageToolViewModel.Create(ImageToolKind.Crop, files, TestStore(), Loc())!;
+        vm.CopiedHold = TimeSpan.Zero;
+        vm.CopyPicture = (_, _) =>
+        {
+            vm.Aspect = vm.Aspects.Single(a => a.Value == "1:1"); // edited on: not in the copy, so not thrown away
+            return Task.FromResult(true);
+        };
+        var finished = 0;
+        vm.Finished += (_, _) => finished++;
+
+        await vm.CopyCommand.ExecuteAsync(null);
+
+        Assert.Equal((0, "복사"), (finished, vm.CopyText));
+        Assert.Null(vm.Result);
+    }
+
+    [AvaloniaFact]
     public async Task Annotate_copies_the_drawings_of_the_file_shown_or_the_file_as_it_is()
     {
         string[] files = [ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(400, 200)];
