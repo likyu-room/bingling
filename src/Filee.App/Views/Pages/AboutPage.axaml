@@ -40,7 +40,8 @@
         </WrapPanel>
       </StackPanel>
     </Border>
-    <Border Classes="card">
+    <!-- Its buttons go to the repository: a build without one would show a card of words with nothing to press -->
+    <Border Classes="card" IsVisible="{Binding HasRepository}">
       <StackPanel Spacing="10">
         <TextBlock Classes="h2" Text="{DynamicResource about.support_title}" />
         <TextBlock Classes="muted" TextWrapping="Wrap" Text="{DynamicResource about.support_text}" />
