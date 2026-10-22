@@ -219,6 +219,24 @@ internal static class ImageEncoder
             image.Flip();
     }
 
+    /// <summary>
+    /// The image tools' edit on a picture turned the way it is shown: its crop, then what is drawn on what is kept. Saving
+    /// and the tool window's Copy both go through here.
+    /// </summary>
+    internal static void ApplyEdit(IMagickImage<byte> image, ImageEdit edit)
+    {
+        // After the turn: the box is a fraction of the picture as it is shown (see CropRect).
+        if (edit.Crop is { } crop)
+        {
+            var (x, y, w, h) = CropMath.ToPixels(crop, (int)image.Width, (int)image.Height);
+            image.Crop(new MagickGeometry(x, y, (uint)w, (uint)h));
+            image.ResetPage(); // else the file keeps the cut-out's place on the old canvas
+        }
+        // After the crop: the boxes are fractions of what is kept.
+        if (edit.Draws)
+            EditBridge.Apply(image, edit);
+    }
+
     /// <summary>Applies resize / colour / metadata options to one frame.</summary>
     public static void ApplyOptions(IMagickImage<byte> image, ImageOptions options, string targetFormat)
     {
@@ -227,16 +245,9 @@ internal static class ImageEncoder
 
         // After AutoOrient, so a phone photo turns the way it looks, not the way its pixels are stored.
         Turn(image, options);
-        // After the turn: the box is a fraction of the picture as it is shown (see CropRect).
-        if (options.Edit?.Crop is { } crop)
-        {
-            var (x, y, w, h) = CropMath.ToPixels(crop, (int)image.Width, (int)image.Height);
-            image.Crop(new MagickGeometry(x, y, (uint)w, (uint)h));
-            image.ResetPage(); // else the file keeps the cut-out's place on the old canvas
-        }
-        // After the crop (the boxes are fractions of what is kept), before resizing (the edit is drawn at full size).
-        if (options.Edit is { Draws: true } edit)
-            EditBridge.Apply(image, edit);
+        // Before resizing: the edit is drawn at full size.
+        if (options.Edit is { } edit)
+            ApplyEdit(image, edit);
         // The small preview kept in the EXIF data still shows the picture as it was: Explorer and photo apps that
         // use it would show it unturned. As HeicWriter does, drop it once the pixels turned.
         if (turned && image.GetExifProfile() is { } exif && exif.ThumbnailLength > 0)

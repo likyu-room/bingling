@@ -280,6 +280,36 @@ public class ImageToolWindowTests
     }
 
     [AvaloniaFact]
+    public void Ctrl_C_copies_unless_a_box_is_being_typed_in_and_the_window_closes()
+    {
+        var (window, vm) = Open(TestImages.Png(400, 200));
+        vm.CopiedHold = TimeSpan.Zero;
+        var copies = 0;
+        vm.CopyPicture = (_, _) =>
+        {
+            copies++;
+            return Task.FromResult(true);
+        };
+        var copy = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.CopyCommand);
+        Assert.Equal("복사", copy.Content);
+        Assert.Equal("Ctrl+C", ToolTip.GetTip(copy));
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+
+        // A size being typed keeps Ctrl+C for its text.
+        Assert.True(window.GetVisualDescendants().OfType<TextBox>().First().Focus());
+        window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        Assert.Equal(0, copies);
+
+        Assert.True(window.GetVisualDescendants().OfType<PictureView>().Single().Focus());
+        window.KeyPressQwerty(PhysicalKey.C, RawInputModifiers.Control);
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(1, copies);
+        Assert.True(closed);
+        Assert.Null(vm.Result); // no file is written
+    }
+
+    [AvaloniaFact]
     public void A_typed_size_is_taken_on_enter_and_the_next_enter_saves()
     {
         var (window, vm) = Open(TestImages.Png(400, 200));

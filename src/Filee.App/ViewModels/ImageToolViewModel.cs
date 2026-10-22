@@ -1,5 +1,5 @@
 // What every image tool window shares (crop, add background, redact, annotate): the files it previews one at a time and
-// their preview, "1 of 3" and ‹ ›, undo and redo, Reset / Save / Cancel, and the result it hands back. A tool
+// their preview, "1 of 3" and ‹ ›, undo and redo, Reset / Cancel / Copy / Save, and the result it hands back. A tool
 // (ViewModels/Tools) adds its own state and panel and fills in what it saves, what Reset does and what an undo step holds.
 
 using Avalonia.Input;
@@ -97,6 +97,23 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// </summary>
     public Func<string, Task<bool>>? Ask { get; set; }
 
+    /// <summary>
+    /// Puts a file with an edit drawn on it on the clipboard; true when it did (the window service sets it: the window's
+    /// clipboard). Null: there is no clipboard, and Copy does nothing.
+    /// </summary>
+    public Func<string, ImageEdit, Task<bool>>? CopyPicture { get; set; }
+
+    /// <summary>How long Copy's button says "Copied", and so how long the window waits before it closes after a copy.</summary>
+    internal TimeSpan CopiedHold { get; set; } = TimeSpan.FromSeconds(0.7);
+
+    /// <summary>Copy's button: "Copy", or for a moment after a copy, "Copied".</summary>
+    public string CopyText => Loc[JustCopied ? "toast.copied" : "toast.copy"];
+
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(CopyText))]
+    private bool _justCopied;
+
+    private int _copiedRound;
+
     /// <summary>Size of the file shown, the way it stands (EXIF orientation applied); 0 when it can't be read.</summary>
     public int ImageWidth { get; private set; }
 
@@ -183,8 +200,12 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// <summary>A key the window doesn't use (1 to 7 for a ratio, say); true when the tool took it. Not called while typing.</summary>
     public virtual bool HandleKey(Key key, KeyModifiers modifiers) => false;
 
-    /// <summary>Call when <see cref="CanSave"/> may have changed, so the Save button follows.</summary>
-    protected void NotifyCanSaveChanged() => SaveCommand.NotifyCanExecuteChanged();
+    /// <summary>Call when <see cref="CanSave"/> may have changed, so the Save and Copy buttons follow.</summary>
+    protected void NotifyCanSaveChanged()
+    {
+        SaveCommand.NotifyCanExecuteChanged();
+        CopyCommand.NotifyCanExecuteChanged();
+    }
 
     /// <summary>Call before a change by the user: the state until now becomes one undo step.</summary>
     protected void RecordStep()
@@ -263,6 +284,52 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
         if (!CanSave)
             return;
         Result = BuildResult();
+        RememberChoices();
+        Finished?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// Puts the file shown, edited as the window shows it, on the clipboard instead of saving a file, and remembers the
+    /// tool's choices as Save does. Then the window closes, unless the user turned that off
+    /// (<see cref="ImageToolSettings.CloseAfterCopy"/>): it stays, to edit more or save a file too. A copy that failed (the
+    /// clipboard was busy) leaves it as it was.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanSave))]
+    private async Task Copy()
+    {
+        // Ctrl+C calls Execute, which does not ask CanExecute.
+        if (!CanSave || CopyPicture is null)
+            return;
+        var result = BuildResult();
+        var file = Files[Index];
+        // Annotate: a file shown without drawings of its own goes as it is, as the window shows it.
+        var edit = result?.Shared ?? result?.PerFile?.GetValueOrDefault(file) ?? new ImageEdit();
+        RememberChoices();
+        if (!await CopyPicture(file, edit))
+            return;
+        var round = ++_copiedRound;
+        JustCopied = true;
+        if (!Store.Settings.ImageTools.CloseAfterCopy)
+        {
+            _ = ForgetCopiedAsync(round);
+            return;
+        }
+        await Task.Delay(CopiedHold); // long enough to read "Copied"
+        // Closed meanwhile (Cancel, Save, the title bar's X): there is nothing more to do.
+        if (!_disposed && Result is null)
+            Finished?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>"Copy" again a moment later; a copy made meanwhile gets its own full moment.</summary>
+    private async Task ForgetCopiedAsync(int round)
+    {
+        await Task.Delay(CopiedHold);
+        if (round == _copiedRound)
+            JustCopied = false;
+    }
+
+    private void RememberChoices()
+    {
         try
         {
             Store.SaveSettings();
@@ -272,7 +339,6 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
             // A full disk or a locked settings file: the edit still runs, only the choices are not remembered on disk.
             Log?.LogWarning(ex, "Could not save the {Tool} tool's settings", Tool);
         }
-        Finished?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>Closes with nothing to run, once the tool agrees (<see cref="ConfirmCloseAsync"/>).</summary>

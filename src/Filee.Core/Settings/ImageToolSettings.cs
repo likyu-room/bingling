@@ -51,6 +51,12 @@ public sealed class ImageToolSettings
     [JsonConverter(typeof(LenientEnumJsonConverter<AnnotationKind>))]
     public AnnotationKind LastTool { get; set; }
 
+    /// <summary>
+    /// Whether a tool's window closes once Copy has put the picture on the clipboard (as after Save). Off: it stays open,
+    /// to edit more or save a file too.
+    /// </summary>
+    public bool CloseAfterCopy { get; set; } = true;
+
     public ImageToolSettings Clone()
     {
         var copy = (ImageToolSettings)MemberwiseClone();

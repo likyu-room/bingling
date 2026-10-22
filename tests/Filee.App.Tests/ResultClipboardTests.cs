@@ -1,5 +1,6 @@
 // The toast card's Copy button: what ends up on the clipboard for a result (the picture, a list of files, nothing) and what
-// the log says when there was nothing to copy. The window and the "Copied" label are in ToastWindowTests.
+// the log says when there was nothing to copy; and the image tool window's Copy, which draws its edit on the picture. The
+// window and the "Copied" label are in ToastWindowTests.
 
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
@@ -7,6 +8,7 @@ using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Platform.Storage;
 using Filee.App.Services;
+using Filee.Core.Presets;
 using ImageMagick;
 using Microsoft.Extensions.Logging;
 
@@ -75,6 +77,63 @@ public class ResultClipboardTests
         using var bitmap = await top.Clipboard!.TryGetBitmapAsync();
         Assert.Equal((100, 200), (bitmap!.PixelSize.Width, bitmap.PixelSize.Height));
         top.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task An_image_tool_copies_the_picture_the_way_its_window_shows_it()
+    {
+        // Shown 100 x 200 (EXIF orientation 6): the left half is kept, hidden under a box and set on a white backdrop
+        // 10 % of its short side (5 px) wide all round, as Save would draw it.
+        var top = Top();
+        var path = Path.Combine(Folder(), "phone.jpg");
+        using (var turned = new MagickImage(MagickColors.SteelBlue, 200, 100) { Orientation = OrientationType.RightTop })
+        {
+            var exif = new ExifProfile();
+            exif.SetValue(ExifTag.Orientation, (ushort)6);
+            turned.SetProfile(exif);
+            turned.Write(path, MagickFormat.Jpeg);
+        }
+        var edit = new ImageEdit
+        {
+            Crop = new CropRect { Width = .5 },
+            Redact = new RedactEdit { Boxes = [new EditRect { Width = 1, Height = 1 }] },
+            Background = new BackgroundEdit { Kind = BackgroundKind.Solid, Value = "#FFFFFF", Padding = .1, Corner = 0, Shadow = 0 },
+        };
+
+        Assert.True(await ResultClipboard.CopyEditedAsync(top.Clipboard!, path, edit, new ListLogger()));
+
+        using var bitmap = await top.Clipboard!.TryGetBitmapAsync();
+        Assert.Equal((60, 210), (bitmap!.PixelSize.Width, bitmap.PixelSize.Height));
+        Assert.Equal((0, 0, 0), Pixel(bitmap, 30, 105)); // the box
+        Assert.Equal((255, 255, 255), Pixel(bitmap, 2, 2)); // the backdrop
+        top.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task An_image_tool_copies_nothing_from_a_picture_that_is_gone()
+    {
+        var top = Top();
+        var log = new ListLogger();
+
+        Assert.False(await ResultClipboard.CopyEditedAsync(top.Clipboard!, Path.Combine(Folder(), "gone.png"), new ImageEdit(), log));
+        Assert.NotEmpty(log.Lines);
+        top.Close();
+    }
+
+    /// <summary>The red, green and blue of one pixel of <paramref name="bitmap"/>.</summary>
+    private static (int, int, int) Pixel(Avalonia.Media.Imaging.Bitmap bitmap, int x, int y)
+    {
+        var bytes = new byte[4];
+        var handle = System.Runtime.InteropServices.GCHandle.Alloc(bytes, System.Runtime.InteropServices.GCHandleType.Pinned);
+        try
+        {
+            bitmap.CopyPixels(new Avalonia.PixelRect(x, y, 1, 1), handle.AddrOfPinnedObject(), 4, 4);
+        }
+        finally
+        {
+            handle.Free();
+        }
+        return bitmap.Format == Avalonia.Platform.PixelFormats.Bgra8888 ? (bytes[2], bytes[1], bytes[0]) : (bytes[0], bytes[1], bytes[2]);
     }
 
     [AvaloniaFact]

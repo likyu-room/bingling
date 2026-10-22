@@ -15,6 +15,20 @@ without lines shows the English ones):
 - `recommended`: bug fixes. The card shows once per version.
 - `optional`: new features only. No card, the sidebar button only.
 
+## 1.2.0
+
+<!-- update
+level: optional
+ko: 사진 편집 창에서 파일을 만들지 않고 바로 복사할 수 있어요 (Ctrl+C)
+en: Copy from the picture editing windows without making a file (Ctrl+C)
+-->
+
+- **Copy from the editing windows**: Crop, Add background, Redact and Annotate have a **Copy** button next to Save
+  (<kbd>Ctrl</kbd>+<kbd>C</kbd>). It puts the picture shown, edited as the window shows it, on the clipboard without
+  writing a file, ready to paste into a chat or a document, and the window closes. With several pictures, it copies the
+  one shown. **Settings → General → Image tools → "Close the editing window after Copy"** keeps the window open
+  instead, to edit more or save a file too.
+
 ## 1.1.1
 
 <!-- update

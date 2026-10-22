@@ -53,6 +53,15 @@
       </StackPanel>
     </Border>
 
+    <!-- The image tools' windows (crop, add background, redact, annotate). -->
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <TextBlock Classes="h2" Text="{DynamicResource general.image_tools}" />
+        <ToggleSwitch Content="{DynamicResource general.close_after_copy}" IsChecked="{Binding CloseAfterCopy}" />
+        <TextBlock Classes="caption" TextWrapping="Wrap" Text="{DynamicResource general.close_after_copy_hint}" Margin="0,-6,0,0" />
+      </StackPanel>
+    </Border>
+
     <Border Classes="card">
       <StackPanel Spacing="12">
         <TextBlock Classes="h2" Text="{DynamicResource general.history}" />

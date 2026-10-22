@@ -234,6 +234,8 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
         var window = new ImageToolWindow { DataContext = vm };
         // Annotate: throw the drawings away? Asked after "Cancel" or Esc, so it can't answer with another "Cancel".
         vm.Ask = question => ConfirmAsync(window, question, yes: loc["tool.discard"], no: loc["tool.keep_editing"]);
+        vm.CopyPicture = (path, edit) =>
+            window.Clipboard is { } clipboard ? ResultClipboard.CopyEditedAsync(clipboard, path, edit, log) : Task.FromResult(false);
         window.PlaceNear(cursor);
         var closed = new TaskCompletionSource();
         window.Closed += (_, _) => closed.TrySetResult();

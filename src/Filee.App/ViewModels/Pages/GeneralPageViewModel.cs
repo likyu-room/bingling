@@ -40,6 +40,7 @@ public sealed partial class GeneralPageViewModel : ObservableObject, IDisposable
         _defaultSubfolder = output.SubfolderName;
         _defaultFolder = output.CustomFolder;
         _keepFileDates = store.Settings.KeepFileDates;
+        _closeAfterCopy = store.Settings.ImageTools.CloseAfterCopy;
         CloseChoices = Enum.GetValues<CloseAction>().Select(v => new Choice<CloseAction>(v, loc[$"general.close.{v}"])).ToList();
         _closeChoice = CloseChoices.First(c => c.Value == store.Settings.CloseAction);
         store.SettingsChanged += OnSettingsChanged;
@@ -102,6 +103,11 @@ public sealed partial class GeneralPageViewModel : ObservableObject, IDisposable
     public void Dispose() => _store.SettingsChanged -= OnSettingsChanged;
 
     partial void OnKeepFileDatesChanged(bool value) => Save(s => s.KeepFileDates = value);
+
+    /// <summary>An image tool's window closes after Copy (<see cref="ImageToolSettings.CloseAfterCopy"/>).</summary>
+    [ObservableProperty] private bool _closeAfterCopy;
+
+    partial void OnCloseAfterCopyChanged(bool value) => Save(s => s.ImageTools.CloseAfterCopy = value);
 
     [ObservableProperty] private Choice<string> _language;
     [ObservableProperty] private bool _startWithSystem;

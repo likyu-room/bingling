@@ -134,7 +134,10 @@ The **Tools** slot of the picture ring holds six tools. Rest on it and they fan 
 
 - The top left shows the tool and the file name (for example “Crop · beach.png”).
 - The buttons at the top right are **Undo**, **Redo** and **Fit to window**.
-- The buttons at the bottom are **Reset**, **Cancel** and **Save**. As the note beside them says, the original stays untouched: the result is saved next to it as a new file.
+- The buttons at the bottom are **Reset**, **Cancel**, **Copy** and **Save**. As the note beside them says, the original stays untouched: the result is saved next to it as a new file.
+- **Copy** (<kbd>Ctrl</kbd>+<kbd>C</kbd>) copies the edited picture without making a file, ready to paste into a chat or a document.
+  The window then closes. To keep it open, to edit more or save a file too, change it in **Settings → General → Image tools**.
+  With several pictures, Copy takes the one you are looking at.
 
 **Several files at once**
 
@@ -262,6 +265,7 @@ For the Crop, Add background, Redact and Annotate windows. Point at a button to 
 |---|---|
 | <kbd>Enter</kbd> | Save. While you type a size, it applies the number first. |
 | <kbd>Esc</kbd> | Cancel and close |
+| <kbd>Ctrl</kbd>+<kbd>C</kbd> | Copy without making a file. While you type a size, it copies that text. |
 | <kbd>Ctrl</kbd>+<kbd>Z</kbd> | Undo |
 | <kbd>Ctrl</kbd>+<kbd>Y</kbd> (or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd>) | Redo |
 | <kbd>Ctrl</kbd>+<kbd>0</kbd> | Fit to window |
@@ -414,6 +418,7 @@ There are three at first:
 
 Language, starting when you sign in, what closing the window does, the Explorer context menu, and the **Default save location**.
 The default save location is “Same folder as the source” at first.
+Under **Image tools**, turn off “Close the editing window after Copy” to keep an editing window open after you copy.
 
 ## FAQ
 

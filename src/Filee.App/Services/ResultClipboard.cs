@@ -1,5 +1,6 @@
 // Puts a finished job's results on the clipboard for the toast card's Copy button: one picture as a picture (to paste in a
-// chat or a document), anything else as files (to paste in a folder or an attachment).
+// chat or a document), anything else as files (to paste in a folder or an attachment). The image tool window's Copy puts
+// its edited picture there the same way, without writing a file.
 
 using Avalonia;
 using Avalonia.Input.Platform;
@@ -35,7 +36,7 @@ public static class ResultClipboard
             }
 
             // On a worker: a camera's photo takes a while to turn into pixels.
-            if (present is [var one] && await Task.Run(() => ReadPicture(one, log)) is { } picture)
+            if (present is [var one] && await Task.Run(() => ReadPicture(one, null, log)) is { } picture)
             {
                 // Not disposed: the clipboard reads the bitmap when something is pasted, and lets go of it when it is replaced.
                 // ponytail: not flushed either, so the picture leaves the clipboard if Filee is quit before the paste; flush
@@ -68,10 +69,36 @@ public static class ResultClipboard
     }
 
     /// <summary>
-    /// The picture at <paramref name="path"/>, upright, as a bitmap; null when it is no still picture the image engine can
-    /// read (an animation, a PDF, a damaged file), and the caller copies the file instead.
+    /// The image tool window's Copy: the picture at <paramref name="path"/> with <paramref name="edit"/> drawn on it, upright,
+    /// as the window shows it and Save would write it, goes on the clipboard as a picture. Never throws.
     /// </summary>
-    private static Bitmap? ReadPicture(string path, ILogger? log)
+    /// <returns>True when it was copied; false (and a line in <paramref name="log"/>) when the picture can't be read or the
+    /// clipboard is busy.</returns>
+    public static async Task<bool> CopyEditedAsync(IClipboard clipboard, string path, ImageEdit edit, ILogger? log)
+    {
+        try
+        {
+            if (await Task.Run(() => ReadPicture(path, edit, log)) is not { } picture)
+            {
+                log?.LogWarning("Nothing to copy: {Path} can't be read as a picture", path);
+                return false;
+            }
+            await clipboard.SetBitmapAsync(picture); // not disposed, as in CopyAsync
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log?.LogWarning(ex, "Could not copy the edited picture to the clipboard ({Path})", path);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// The picture at <paramref name="path"/>, upright and with <paramref name="edit"/> (if any) applied, as a bitmap; null
+    /// when it is no still picture the image engine can read (an animation, a PDF, a damaged file), and the caller copies
+    /// the file instead.
+    /// </summary>
+    private static Bitmap? ReadPicture(string path, ImageEdit? edit, ILogger? log)
     {
         if (FormatRegistry.Detect(path)?.Id is not { } format || ImageToolSupport.StillPictures([path]).Count == 0)
             return null;
@@ -80,6 +107,8 @@ public static class ResultClipboard
             using var frames = ImageReader.Read(path, format, new Preset(), firstFrameOnly: true);
             var image = frames[0];
             image.AutoOrient();
+            if (edit is not null)
+                ImageEncoder.ApplyEdit(image, edit);
             using var pixels = EditBridge.ToBitmap(image);
             return new Bitmap(PixelFormats.Rgba8888, AlphaFormat.Unpremul, pixels.GetPixels(), new PixelSize(pixels.Width, pixels.Height),
                 new Vector(96, 96), pixels.RowBytes);

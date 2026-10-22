@@ -1,5 +1,5 @@
 // The image tool window: puts in the tool's picture view and panel, opens near the cursor at the size of the picture,
-// and turns the keys into the view model's commands (Enter, Esc, undo, zoom, files); the tool's own keys go to it.
+// and turns the keys into the view model's commands (Enter, Esc, Ctrl+C, undo, zoom, files); the tool's own keys go to it.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -216,6 +216,9 @@ public partial class ImageToolWindow : Window
                 break;
             case Key.Escape:
                 vm.CancelCommand.Execute(null);
+                break;
+            case Key.C when ctrl && typing is null:
+                vm.CopyCommand.Execute(null);
                 break;
             case Key.Z when ctrl && shift:
             case Key.Y when ctrl:

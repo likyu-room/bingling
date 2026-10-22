@@ -168,6 +168,80 @@ public class ImageToolShellTests
         window.Close();
     }
 
+    [AvaloniaFact]
+    public async Task Copy_puts_the_file_shown_with_its_edit_on_the_clipboard_and_closes_without_saving()
+    {
+        string[] files = [ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(300, 500)];
+        using var vm = ImageToolViewModel.Create(ImageToolKind.Crop, files, TestStore(), Loc())!;
+        vm.CopiedHold = TimeSpan.Zero;
+        var copies = new List<(string Path, ImageEdit Edit)>();
+        vm.CopyPicture = (path, edit) =>
+        {
+            copies.Add((path, edit));
+            return Task.FromResult(true);
+        };
+        var finished = 0;
+        vm.Finished += (_, _) => finished++;
+        Assert.Equal("복사", vm.CopyText);
+        vm.NextCommand.Execute(null);
+
+        await vm.CopyCommand.ExecuteAsync(null);
+
+        var (path, edit) = Assert.Single(copies);
+        Assert.Equal(files[1], path); // the file shown, not the first
+        Assert.NotNull(edit.Crop);
+        Assert.Equal(1, finished);
+        Assert.Null(vm.Result); // nothing to run: no file is written
+        Assert.Equal("복사됨", vm.CopyText);
+    }
+
+    [AvaloniaFact]
+    public async Task Copy_leaves_the_window_open_when_that_is_turned_off_or_the_copy_failed()
+    {
+        var store = TestStore();
+        using var vm = ImageToolViewModel.Create(ImageToolKind.Crop, [ImageToolWindowTests.TestImages.Png(400, 200)], store, Loc())!;
+        vm.CopiedHold = TimeSpan.FromMinutes(1);
+        var copied = false;
+        vm.CopyPicture = (_, _) => Task.FromResult(copied);
+        var finished = 0;
+        vm.Finished += (_, _) => finished++;
+
+        await vm.CopyCommand.ExecuteAsync(null); // the clipboard was busy
+        Assert.Equal((0, "복사"), (finished, vm.CopyText));
+
+        store.Settings.ImageTools.CloseAfterCopy = false;
+        copied = true;
+        await vm.CopyCommand.ExecuteAsync(null);
+        Assert.Equal((0, "복사됨"), (finished, vm.CopyText)); // "Copy" again a moment later
+        vm.SaveCommand.Execute(null); // and a file can still be saved
+        Assert.Equal(1, finished);
+        Assert.NotNull(vm.Result);
+    }
+
+    [AvaloniaFact]
+    public async Task Annotate_copies_the_drawings_of_the_file_shown_or_the_file_as_it_is()
+    {
+        string[] files = [ImageToolWindowTests.TestImages.Png(400, 200), ImageToolWindowTests.TestImages.Png(400, 200)];
+        var store = TestStore();
+        store.Settings.ImageTools.CloseAfterCopy = false; // both files are copied in turn
+        using var vm = (AnnotateToolViewModel)ImageToolViewModel.Create(ImageToolKind.Annotate, files, store, Loc())!;
+        vm.CopiedHold = TimeSpan.FromMinutes(1);
+        var copies = new List<ImageEdit>();
+        vm.CopyPicture = (_, edit) =>
+        {
+            copies.Add(edit);
+            return Task.FromResult(true);
+        };
+        vm.Annotations = [new Annotation { Kind = AnnotationKind.Number, Number = 1, Points = [new EditPoint { X = .5, Y = .5 }] }];
+
+        await vm.CopyCommand.ExecuteAsync(null);
+        vm.NextCommand.Execute(null);
+        await vm.CopyCommand.ExecuteAsync(null); // the second file has no drawings: it goes as the window shows it
+
+        Assert.Equal(1, copies[0].Annotations!.Single().Number);
+        Assert.False(copies[1].Draws);
+    }
+
     /// <summary>Runs the UI thread until the preview, read on another thread, has arrived.</summary>
     private static void WaitForPreview(ImageToolViewModel vm)
     {

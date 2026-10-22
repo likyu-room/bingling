@@ -256,6 +256,20 @@ public class ImageToolPresetTests
     }
 
     [Fact]
+    public void An_image_tool_window_closes_after_Copy_unless_that_is_turned_off()
+    {
+        Assert.True(new ImageToolSettings().CloseAfterCopy);
+        Assert.True(new ImageToolSettings { CloseAfterCopy = true }.Clone().CloseAfterCopy);
+        // Settings saved before the switch existed keep its default.
+        var old = JsonSerializer.Deserialize("""{"imageTools":{"cropAspect":"16:9"}}""", FileeJsonContext.Default.AppSettings)!;
+        Assert.True(old.ImageTools.CloseAfterCopy);
+
+        var json = JsonSerializer.Serialize(new AppSettings { ImageTools = new ImageToolSettings { CloseAfterCopy = false } },
+            FileeJsonContext.Default.AppSettings);
+        Assert.False(JsonSerializer.Deserialize(json, FileeJsonContext.Default.AppSettings)!.ImageTools.CloseAfterCopy);
+    }
+
+    [Fact]
     public void The_image_tool_settings_remember_the_last_background_redaction_and_pen()
     {
         var settings = new ImageToolSettings();
