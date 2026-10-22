@@ -31,6 +31,18 @@ public class FolderDonutTests
         Assert.Equal("폴더 2개", vm.CenterTitle); // a folder's size is not added up
     }
 
+    [AvaloniaFact]
+    public void A_folder_never_goes_into_a_one_file_archive()
+    {
+        // GZ, BZ2 and XZ hold one file: on the folders donut such a slice is off, whatever 7-Zip can do.
+        TestServices.EnsureInitialized("ko");
+        var folder = Core.Profiles.ProfileSelector.DetectFormats([Folder("data")]);
+        var availability = AppHost.Get<PresetAvailability>();
+
+        Assert.NotNull(availability.Check(new Core.Presets.Preset { TargetFormat = "gz" }, folder));
+        Assert.Null(availability.Check(new Core.Presets.Preset { TargetFormat = "zip" }, folder));
+    }
+
     [Fact]
     public void A_dragged_folder_counts_as_something_to_drop()
     {

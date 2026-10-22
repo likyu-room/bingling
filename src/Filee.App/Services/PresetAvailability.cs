@@ -4,6 +4,7 @@ using Filee.Core.Conversion;
 using Filee.Core.Formats;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
+using Filee.Engines.Archives;
 
 namespace Filee.App.Services;
 
@@ -22,6 +23,9 @@ public sealed class PresetAvailability(ConverterCatalog catalog, ILocalizer loc,
             && FormatRegistry.FindById(preset.TargetFormat) is { Category: FormatCategory.Archive } archive
             && archive.Id != FormatRegistry.Folder)
         {
+            // GZ, BZ2 and XZ hold one file, never a folder.
+            if (onlyFolders && ArchivePacker.SingleFileFormats.Contains(archive.Id))
+                return loc["error.no_route"];
             return catalog.All.OfType<IFileCombiner>().Any(c => c.CanCombineInto(archive.Id)) ? null : loc["error.no_route"];
         }
 

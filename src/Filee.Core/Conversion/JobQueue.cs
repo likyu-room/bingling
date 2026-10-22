@@ -375,7 +375,29 @@ public sealed class JobQueue : IAsyncDisposable
             && FormatRegistry.FindById(job.Preset.TargetFormat) is { Category: FormatCategory.Archive } archive
             && archive.Id != FormatRegistry.Folder)
         {
-            await PackAsync(job, [file], index, workDir);
+            // As many at a time as the archive engine converts (7-Zip uses several threads of its own).
+            var gate = _combiner is IConverter engine ? GateFor(engine) : null;
+            try
+            {
+                if (gate is not null)
+                    await gate.WaitAsync(ct);
+            }
+            catch (OperationCanceledException)
+            {
+                file.State = FileState.Cancelled;
+                Notify(job);
+                return [];
+            }
+            try
+            {
+                await PackAsync(job, [file], index, workDir);
+            }
+            finally
+            {
+                gate?.Release();
+            }
+            if (job.Preset.Output.KeepDates && file.State == FileState.Done)
+                CopyDates(file.SourcePath, file.Outputs);
             return file.Outputs;
         }
         var source = FormatRegistry.Detect(file.SourcePath);

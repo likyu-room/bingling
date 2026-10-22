@@ -518,6 +518,20 @@ public class JobQueueTests
     }
 
     [Fact]
+    public async Task A_folders_archive_keeps_the_folders_dates_when_asked()
+    {
+        using var dir = new TempDir();
+        var folder = Directory.CreateDirectory(Path.Combine(dir.Path, "old")).FullName;
+        var then = new DateTime(2020, 5, 1, 12, 0, 0, DateTimeKind.Utc);
+        Directory.SetLastWriteTimeUtc(folder, then);
+        await using var queue = new JobQueue(new ConverterCatalog([]), combiner: new FakeCombiner());
+
+        var job = await Run(queue, [folder], new Preset { TargetFormat = "zip", Output = { KeepDates = true } });
+
+        Assert.Equal(then, File.GetLastWriteTimeUtc(Assert.Single(job.Files[0].Outputs)));
+    }
+
+    [Fact]
     public async Task No_route_is_reported()
     {
         using var dir = new TempDir();
