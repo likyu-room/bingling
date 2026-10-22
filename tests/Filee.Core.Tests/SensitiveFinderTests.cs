@@ -81,6 +81,85 @@ public class SensitiveFinderTests
         Assert.Equal((last.X + last.Width + 3) / 1000, spots[^1].Box.X + spots[^1].Box.Width, 6);
     }
 
+    /// <summary>
+    /// The words of <paramref name="line"/> after the first <paramref name="before"/> (which are no private number: a label,
+    /// an amount) with a digit in them that no spot's box holds whole: what of the numbers would still be read.
+    /// </summary>
+    private static IEnumerable<string> LeftShowing(RecognizedLine line, IReadOnlyList<SensitiveSpot> spots, int before = 0) =>
+        line.Words.Skip(before).Where(w => w.Text.Any(char.IsAsciiDigit) && !spots.Any(s =>
+                s.Box.X * 1000 <= w.X + 1e-6 && w.X + w.Width <= (s.Box.X + s.Box.Width) * 1000 + 1e-6))
+            .Select(w => w.Text);
+
+    [Theory]
+    [InlineData("010 9876 1002 4111 1111 1111 1111", 0)] // "9876 1002 4111 1111" passes for a card too
+    [InlineData("010-9876-1002 4111 1111 1111 1111", 0)]
+    [InlineData("합계 2226 4111 1111 1111 1111", 2)] // and "2226 4111 1111 1111"; the amount itself may show
+    [InlineData("서울특별시 강남구 테헤란로 123 010-1234 -5678", 0)] // the address reads "123 010-1234" as its number
+    public void A_number_right_after_another_is_hidden_whole_even_where_something_longer_reads_across_both(string text, int before)
+    {
+        var line = Line(text.Split(' '));
+        var spots = SensitiveFinder.Find(Text(line), 1000, 500);
+        Assert.Empty(LeftShowing(line, spots, before));
+        if (text.Contains("4111"))
+            Assert.Contains(spots, s => s.Kind == SensitiveKind.CardNumber && s.Text == "4111 1111 1111 1111"); // the card itself is offered
+        if (text.StartsWith("010"))
+            Assert.Contains(spots, s => s.Kind == SensitiveKind.Phone);
+    }
+
+    [Fact]
+    public void Whatever_four_digits_come_before_a_card_every_digit_of_both_is_hidden()
+    {
+        // Every last group of the phone number, and every group of four (an amount, which may show) before the card: about one
+        // in ten makes a card that passes its check across the two.
+        string[] cards = ["4111 1111 1111 1111", "5105 1051 0510 5100", "9410 1234 5678 9010"];
+        var showing = new List<string>();
+        for (var group = 1000; group <= 9999; group++)
+        {
+            var card = cards[group % 3];
+            foreach (var (text, before) in (ValueTuple<string, int>[])[($"010 9876 {group} {card}", 0), ($"010-9876-{group} {card}", 0), ($"{group} {card}", 1)])
+            {
+                var line = Line(text.Split(' '));
+                if (LeftShowing(line, SensitiveFinder.Find(Text(line), 1000, 500), before).Any())
+                    showing.Add(text);
+            }
+        }
+        Assert.Empty(showing);
+    }
+
+    [Fact]
+    public void A_number_after_one_that_is_not_whole_in_the_same_word_is_still_found()
+    {
+        // The first phone-like match starts inside the order number and is not one; the phone number after it is.
+        var spots = Find(Line("20261022-0001234/Tel:010-9876-5432"));
+        Assert.Contains(spots, s => s.Kind == SensitiveKind.Phone);
+    }
+
+    [Fact]
+    public void Full_width_digits_are_read_as_digits_and_other_digits_are_left_alone()
+    {
+        Assert.Equal("４１１１ １１１１ １１１１ １１１１", Assert.Single(Find(Line("４１１１", "１１１１", "１１１１", "１１１１")), s => s.Kind == SensitiveKind.CardNumber).Text);
+        Assert.Equal(SensitiveKind.Phone, Assert.Single(Find(Line("０１０－１２３４－５６７８"))).Kind);
+        // Arabic-Indic digits are no number here: nothing, and no error that would lose the face beside them.
+        var read = new RecognitionResult([Line("٤١١١", "١١١١", "١١١١", "١١١١"), Line("٤١١١١١١١١١١١١١١١")], [new PixelBox(10, 10, 50, 50)], TextAvailable: true);
+        Assert.Equal(SensitiveKind.Face, Assert.Single(SensitiveFinder.Find(read, 1000, 500)).Kind);
+    }
+
+    [Theory]
+    [InlineData("0504-1234-5678")] // a safe number (050X)
+    [InlineData("0505-123-4567")]
+    [InlineData("0504 1234 5678")]
+    [InlineData("+82 10 1234 5678")] // with the country code
+    [InlineData("+82-10-1234-5678")]
+    [InlineData("(02)123-4567")] // the area code in brackets, the brackets hidden too
+    [InlineData("(031) 123-4567")]
+    [InlineData("02)123-4567")]
+    public void Phone_numbers_in_other_forms_are_found_whole(string text)
+    {
+        var spot = Assert.Single(Find(Line(text.Split(' '))));
+        Assert.Equal(SensitiveKind.Phone, spot.Kind);
+        Assert.Equal(text, spot.Text);
+    }
+
     [Theory]
     [InlineData("010-1234-5678로 연락 주세요", SensitiveKind.Phone, "010-1234-5678로")] // the particle is written on to it
     [InlineData("Tel:010-1234-5678", SensitiveKind.Phone, "Tel:010-1234-5678")]
@@ -167,12 +246,12 @@ public class SensitiveFinderTests
         // "…도" and "…구" with no road and number after them: the address rule once took seconds on a line like this, and
         // twice as long for every few more letters.
         var words = "저도 친구와 함께 학교로 가는 길에 맛있는 음식을 먹었어요 서울시 강남구 가가가 정말 즐거운 하루였습니다".Split(' ');
-        var line = Line([.. Enumerable.Repeat(words, 5).SelectMany(w => w)]);
-        Assert.True(line.Text.Length >= 200, $"{line.Text.Length} letters");
+        var line = Line([.. Enumerable.Repeat(words, 7).SelectMany(w => w)]);
+        Assert.True(line.Text.Length >= 300, $"{line.Text.Length} letters");
         SensitiveFinder.Find(Text(Line("서울시 강남구")), 1000, 500); // the rules are made on first use
 
         var clock = Stopwatch.StartNew();
-        var spots = SensitiveFinder.Find(Text([.. Enumerable.Repeat(line, 10)]), 1000, 500);
+        var spots = SensitiveFinder.Find(Text([.. Enumerable.Repeat(line, 100)]), 1000, 500);
         clock.Stop();
 
         Assert.Empty(spots);

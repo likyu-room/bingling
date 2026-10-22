@@ -5,9 +5,11 @@
 // The OCR splits what people write as one: "010 1234 5678" comes back as three words, a hyphen may be a word of its own.
 // So a line's words are run together before the rules look at it, and a spot's box is the words its letters fall in. But
 // run together, two numbers side by side read as one long number ("010 1234 5678 010 9876 5432" holds sixteen digits that
-// read as a card number). So a number is looked for word by word, over the fewest words that hold it whole: it may begin
-// and end inside a word only where a label or a particle is written on to it ("Tel:010…", "…5678로"), never between two
-// digits, and where its words part, its format must have a place for a space (010 | 1234 | 5678, not 010 1 | 234 5678).
+// read as a card number). So a number is looked for from every word on, over the fewest words that hold it whole: it may
+// begin and end inside a word only where a label or a particle is written on to it ("Tel:010…", "…5678로"), never between
+// two digits, and where its words part, its format must have a place for a space (010 | 1234 | 5678, not 010 1 | 234 5678).
+// A false number can still read across two true ones; it is offered beside them, never instead of them, so that every
+// digit of a number found ends up in a box. Full-width digits read as digits.
 //
 // The rules run without backtracking: an ordinary line of Korean could otherwise keep the address rule busy for minutes.
 
@@ -75,10 +77,12 @@ public static partial class SensitiveFinder
     {
         var words = new Words(line.Words);
         var kept = new List<(SensitiveKind Kind, int Start, int End)>();
-        // Longest first; OrderBy is stable, so a tie keeps the rules' order.
+        // Longest first, and one that lies inside one kept already is left out (OrderBy is stable: of two alike, the rules'
+        // order wins). One that only overlaps another stays: where a long false match reads across two numbers ("9876 1002 4111
+        // 1111" between a phone and a card number), each number keeps its own box, so none is left half shown.
         foreach (var found in Rules.SelectMany(r => words.Matches(r.Kind, r.Rule)).OrderByDescending(m => m.End - m.Start))
         {
-            if (!kept.Any(k => found.Start < k.End && k.Start < found.End))
+            if (!kept.Any(k => k.Start <= found.Start && found.End <= k.End))
                 kept.Add(found);
         }
         foreach (var (kind, start, end) in kept.OrderBy(k => k.Start))
@@ -107,7 +111,7 @@ public static partial class SensitiveFinder
             var owners = new List<int>();
             for (var i = 0; i < words.Count; i++)
             {
-                var word = words[i].Text;
+                var word = new string([.. words[i].Text.Select(Ascii)]);
                 if (word.Length == 0)
                     continue;
                 if (text.Length > 0 && !Joins(text[^1], word[0]))
@@ -142,21 +146,48 @@ public static partial class SensitiveFinder
                 }
                 yield break;
             }
-            // A number: from each word on, the fewest words that hold one whole.
+            // A number: from every word on (also one inside a number found already: that may be a false one reading across
+            // two), the fewest words that hold one whole.
             for (var i = 0; i < _spans.Count; i++)
             {
                 for (var j = i; j < Math.Min(_spans.Count, i + MostWords); j++)
                 {
-                    var m = rule.Match(Text, _spans[i].Start, _spans[j].End - _spans[i].Start);
-                    if (m.Success && Owners[m.Index] == Owners[_spans[i].Start] && Owners[m.Index + m.Length - 1] == Owners[_spans[j].End - 1]
-                        && !CutsNumber(m.Index) && !CutsNumber(m.Index + m.Length) && SplitsFit(kind, m)
-                        && (kind != SensitiveKind.CardNumber || IsCardNumber(m.Value)))
+                    if (WholeNumber(kind, rule, i, j) is { } m)
                     {
                         yield return (kind, m.Index, m.Index + m.Length);
-                        i = j;
                         break;
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// The first match of <paramref name="rule"/> over words <paramref name="i"/> to <paramref name="j"/> that begins in word
+        /// i, ends in word j and is a number whole; a match that is not one ("0261022-0001" inside an order number) is passed
+        /// over for the next ("…/Tel:010-9876-5432"). Null for none.
+        /// </summary>
+        private Match? WholeNumber(SensitiveKind kind, Regex rule, int i, int j)
+        {
+            var (from, to) = (_spans[i].Start, _spans[j].End);
+            for (var m = rule.Match(Text, from, to - from); m.Success && m.Index < _spans[i].End; m = m.NextMatch())
+            {
+                if (IsWhole(kind, m, to))
+                    return m;
+            }
+            return null;
+        }
+
+        /// <summary>True when <paramref name="m"/> ends in the word that ends at <paramref name="to"/> and is a number whole.</summary>
+        private bool IsWhole(SensitiveKind kind, Match m, int to)
+        {
+            try
+            {
+                return Owners[m.Index + m.Length - 1] == Owners[to - 1] && !CutsNumber(m.Index) && !CutsNumber(m.Index + m.Length)
+                    && SplitsFit(kind, m) && (kind != SensitiveKind.CardNumber || IsCardNumber(m.Value));
+            }
+            catch (Exception ex) when (ex is IndexOutOfRangeException or ArgumentOutOfRangeException)
+            {
+                return false; // a case these checks did not foresee: this match is passed over, not the whole find
             }
         }
 
@@ -180,7 +211,7 @@ public static partial class SensitiveFinder
                     continue;
                 var fits = kind switch
                 {
-                    SensitiveKind.Phone => before is 2 or 3 || before == digits - 4,
+                    SensitiveKind.Phone => before is 2 or 3 or 4 || before == digits - 4, // 02, 010, 0504 (+82 10: after 82, 8210)
                     SensitiveKind.ResidentNumber => before == 6,
                     _ => before % 4 == 0,
                 };
@@ -195,12 +226,26 @@ public static partial class SensitiveFinder
         char.IsAsciiDigit(before) && char.IsAsciiDigit(after) || "-.@".Contains(before) || "-.@".Contains(after);
 
     /// <summary>
+    /// A full-width digit, hyphen or full stop (as Chinese, Japanese and Korean text may have them) as its ASCII one, letter for
+    /// letter, so the rules read them and every letter stays where it was. Other digits (Arabic-Indic, …) are no number here.
+    /// </summary>
+    private static char Ascii(char c) => c switch
+    {
+        >= '０' and <= '９' => (char)(c - '０' + '0'),
+        '－' => '-',
+        '．' => '.',
+        _ => c,
+    };
+
+    /// <summary>
     /// True for sixteen digits a card can have: a right Luhn check digit, and a card's first digits (3 to 6 or 9 — 9 for Korean
     /// domestic cards — or Mastercard's 2221 to 2720). Four years in a row ("2023 2024 2025 2026") pass Luhn, but no card begins 2023.
     /// </summary>
     private static bool IsCardNumber(string match)
     {
         var digits = match.Where(char.IsAsciiDigit).Select(c => c - '0').ToArray();
+        if (digits.Length != 16)
+            return false;
         var first = digits[0] * 1000 + digits[1] * 100 + digits[2] * 10 + digits[3];
         if (digits[0] is not (3 or 4 or 5 or 6 or 9) && first is not (>= 2221 and <= 2720))
             return false;
@@ -232,25 +277,30 @@ public static partial class SensitiveFinder
         return new EditRect { X = left / width, Y = top / height, Width = (right - left) / width, Height = (bottom - top) / height };
     }
 
-    /// <summary>010-1234-5678, 02.123.4567, 031 123 4567.</summary>
-    [GeneratedRegex(@"0\d{1,2}[-. ]?\d{3,4}[-. ]?\d{4}", RegexOptions.NonBacktracking)]
+    // Digits are [0-9], not \d: \d takes every script's digits, which the checks here can't read.
+
+    /// <summary>
+    /// 010-1234-5678, 02.123.4567, 031 123 4567, a safe number 0504-1234-5678, with the area code in brackets (02)123-4567,
+    /// with the country code +82 10-1234-5678.
+    /// </summary>
+    [GeneratedRegex(@"(?:\+82[-. ]?|\(?0)(?:50[0-9]|[0-9]{1,2})\)?[-. ]?[0-9]{3,4}[-. ]?[0-9]{4}", RegexOptions.NonBacktracking)]
     private static partial Regex PhoneRule();
 
     [GeneratedRegex(@"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", RegexOptions.NonBacktracking)]
     private static partial Regex EmailRule();
 
     /// <summary>A resident registration number: 900101-1234567.</summary>
-    [GeneratedRegex(@"\d{6}[- ]?[1-8]\d{6}", RegexOptions.NonBacktracking)]
+    [GeneratedRegex(@"[0-9]{6}[- ]?[1-8][0-9]{6}", RegexOptions.NonBacktracking)]
     private static partial Regex ResidentRule();
 
     /// <summary>1234-5678-9012-3456, 1234 5678 9012 3456.</summary>
-    [GeneratedRegex(@"\d{4}([- ]?\d{4}){3}", RegexOptions.NonBacktracking)]
+    [GeneratedRegex(@"[0-9]{4}([- ]?[0-9]{4}){3}", RegexOptions.NonBacktracking)]
     private static partial Regex CardRule();
 
     /// <summary>
     /// On one line: a city or province (…시, …도), a district or county (…구, …군), a road (…로, …길) and its number,
     /// with any words between them: 서울특별시 강남구 테헤란로 123, 경기도 성남시 분당구 판교역로 235.
     /// </summary>
-    [GeneratedRegex(@"[가-힣]+(?:시|도)(?: ?[가-힣]+)*?(?:구|군)(?: ?[가-힣\d]+)*(?:로|길) ?\d+(?:-\d+)?", RegexOptions.NonBacktracking)]
+    [GeneratedRegex(@"[가-힣]+(?:시|도)(?: ?[가-힣]+)*?(?:구|군)(?: ?[가-힣0-9]+)*(?:로|길) ?[0-9]+(?:-[0-9]+)?", RegexOptions.NonBacktracking)]
     private static partial Regex AddressRule();
 }
