@@ -131,13 +131,34 @@ public class ScreenShortcutTests
     }
 
     [AvaloniaFact]
+    public void A_drag_never_names_an_action_even_one_left_in_its_settings()
+    {
+        var drag = Chord(TriggerAction.PickColor);
+        drag.Kind = TriggerKind.Drag;
+        drag.Button = TriggerMouseButton.Left;
+
+        Assert.Equal("Ctrl + Alt + Left", GestureText.Describe(drag, Localizer("ko"))); // a drag opens the ring whatever it says
+    }
+
+    [AvaloniaFact]
+    public async Task A_screen_tool_that_fails_from_the_tray_does_not_end_Bingling()
+    {
+        TestServices.EnsureInitialized("en");
+        var tray = new TrayService(AppHost.Get<UserDataStore>(), AppHost.Get<ILocalizer>(), AppHost.Get<WindowService>(),
+            AppHost.Get<UpdateService>(), new RecordingScreenTools(), AppHost.Get<TriggerService>(), NullLogger<TrayService>.Instance);
+
+        // The menu item's handler is async void: an exception out of it would end the app.
+        await tray.StartAfterMenuClosesAsync(_ => throw new InvalidOperationException("no screen"));
+    }
+
+    [AvaloniaFact]
     public async Task The_tray_starts_a_screen_tool_after_its_menu_is_gone_at_the_last_cursor()
     {
         TestServices.EnsureInitialized("en");
         var triggers = new TriggerService(AppHost.Get<IPlatformServices>(), NullLogger<TriggerService>.Instance) { LastCursor = (120, 340) };
         var screen = new RecordingScreenTools();
         var tray = new TrayService(AppHost.Get<UserDataStore>(), AppHost.Get<ILocalizer>(), AppHost.Get<WindowService>(),
-            AppHost.Get<UpdateService>(), screen, triggers);
+            AppHost.Get<UpdateService>(), screen, triggers, NullLogger<TrayService>.Instance);
 
         var clock = Stopwatch.StartNew();
         await tray.StartAfterMenuClosesAsync(screen.StartCapture);
@@ -154,7 +175,7 @@ public class ScreenShortcutTests
     {
         TestServices.EnsureInitialized("ko");
         var tray = new TrayService(AppHost.Get<UserDataStore>(), AppHost.Get<ILocalizer>(), AppHost.Get<WindowService>(),
-            AppHost.Get<UpdateService>(), new RecordingScreenTools(), AppHost.Get<TriggerService>());
+            AppHost.Get<UpdateService>(), new RecordingScreenTools(), AppHost.Get<TriggerService>(), NullLogger<TrayService>.Instance);
         tray.Create(Application.Current!);
         try
         {

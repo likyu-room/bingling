@@ -1,0 +1,104 @@
+// The screen tools a shortcut or the tray starts (IScreenTools): the instant eyedropper and the colour card it leaves.
+// Their public methods never throw: the tray calls them from async void handlers. Where the platform takes no picture
+// of the screen (macOS, Linux) nothing opens; their shortcuts and tray items are Windows-only anyway.
+
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Media;
+using Filee.App.ViewModels;
+using Filee.App.Views;
+using Filee.Core.Platform;
+using Microsoft.Extensions.Logging;
+
+namespace Filee.App.Services;
+
+public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools> log) : IScreenTools
+{
+    // UI thread only.
+    private PickColorWindow? _picker;
+    private ColorCardWindow? _card;
+
+    /// <summary>The eyedropper's window while it is open.</summary>
+    internal PickColorWindow? Picker => _picker;
+
+    /// <summary>The colour card while it is open; one at a time.</summary>
+    internal ColorCardWindow? Card => _card;
+
+    public void StartCapture(PixelPoint cursor)
+    {
+        // The capture window comes in the next step (Bingling 1.3, task 4).
+    }
+
+    /// <summary>
+    /// Takes a picture of the screen under <paramref name="cursor"/> and covers it with the eyedropper; a click there copies
+    /// that pixel's HEX code and shows the colour card. While the eyedropper is open, starting it again does nothing; when
+    /// the screen can't be taken (or is black) nothing opens and the log says so.
+    /// </summary>
+    public void StartColorPick(PixelPoint cursor)
+    {
+        if (_picker is not null)
+            return;
+        PickColorWindow? picker = null;
+        ScreenShot? shot = null;
+        try
+        {
+            picker = new PickColorWindow();
+            shot = ScreenGrab.Grab(platform, picker.Screens, cursor);
+            if (shot is null)
+            {
+                log.LogInformation("No colour to pick: the screen at {Cursor} could not be taken, or came out black", cursor);
+                picker.Close();
+                return;
+            }
+            var taken = shot;
+            _picker = picker;
+            picker.Closed += (_, _) =>
+            {
+                _picker = null;
+                taken.Dispose();
+            };
+            picker.Picked += ShowCard;
+            picker.Open(shot, cursor);
+            RaiseTopmost(picker);
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            log.LogWarning(ex, "Could not start the colour picker at {Cursor}", cursor);
+            _picker = null;
+            picker?.Close();
+            shot?.Dispose();
+        }
+    }
+
+    /// <summary>The colour card for a colour picked <paramref name="at"/>; it puts the HEX code on the clipboard as it opens.</summary>
+    private async void ShowCard(PixelPoint at, Color color)
+    {
+        try
+        {
+            _card?.Close();
+            var card = new ColorCardWindow();
+            var vm = new ColorCardViewModel(color, card.SetTextAsync, log);
+            card.DataContext = vm;
+            _card = card;
+            card.Closed += (_, _) =>
+            {
+                if (_card == card)
+                    _card = null;
+            };
+            card.ShowNear(at);
+            RaiseTopmost(card);
+            await vm.CopyHexOnOpenAsync();
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            log.LogWarning(ex, "Could not show the colour card");
+        }
+    }
+
+    /// <summary>On top of every window, as the donut (Windows can push a topmost window below normal ones).</summary>
+    private void RaiseTopmost(Window window)
+    {
+        if (window.TryGetPlatformHandle()?.Handle is { } handle)
+            platform.RaiseTopmost(handle);
+    }
+}

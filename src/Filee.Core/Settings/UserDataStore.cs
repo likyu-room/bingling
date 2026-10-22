@@ -337,12 +337,14 @@ internal static class SettingsMigrations
     /// <summary>
     /// Offers the capture and colour-pick shortcuts (<see cref="TriggerGesture.ScreenShortcuts"/>) to settings from before
     /// them, once (<see cref="AppSettings.ScreenShortcutsAdded"/>, not a schema bump). One the user already has for that
-    /// action is kept as it is; one on a key chord the user already uses comes in switched off.
+    /// action is kept as it is; one on a key chord the user already uses comes in switched off. Windows only, where the
+    /// screen tools are: elsewhere nothing happens and the flag stays off, so they are offered once the tools come there.
     /// </summary>
+    /// <param name="windows">Whether the OS is Windows; the current OS's when not given (a test's choice).</param>
     /// <returns>True when a shortcut was added and the settings need saving (the flag alone goes out with the next save).</returns>
-    public static bool AddScreenShortcuts(AppSettings settings)
+    public static bool AddScreenShortcuts(AppSettings settings, bool? windows = null)
     {
-        if (settings.ScreenShortcutsAdded)
+        if (settings.ScreenShortcutsAdded || !(windows ?? OperatingSystem.IsWindows()))
             return false;
         settings.ScreenShortcutsAdded = true;
         var added = false;

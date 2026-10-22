@@ -1127,7 +1127,7 @@ public class UserDataStoreTests
         var settings = new AppSettings { Triggers = [new() { Kind = TriggerKind.Drag }] };
         Assert.False(settings.ScreenShortcutsAdded);
 
-        Assert.True(SettingsMigrations.AddScreenShortcuts(settings));
+        Assert.True(SettingsMigrations.AddScreenShortcuts(settings, windows: true));
 
         Assert.True(settings.ScreenShortcutsAdded);
         Assert.Equal([TriggerAction.Donut, TriggerAction.Capture, TriggerAction.PickColor], settings.Triggers.Select(g => g.Action));
@@ -1136,7 +1136,7 @@ public class UserDataStoreTests
 
         // A shortcut the user then deletes stays deleted.
         settings.Triggers.RemoveAt(1);
-        Assert.False(SettingsMigrations.AddScreenShortcuts(settings));
+        Assert.False(SettingsMigrations.AddScreenShortcuts(settings, windows: true));
         Assert.Equal(2, settings.Triggers.Count);
     }
 
@@ -1148,7 +1148,7 @@ public class UserDataStoreTests
             Triggers = [new() { Kind = TriggerKind.KeyChord, Modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt, Key = "S" }],
         };
 
-        SettingsMigrations.AddScreenShortcuts(settings);
+        SettingsMigrations.AddScreenShortcuts(settings, windows: true);
 
         Assert.True(settings.Triggers[0].Enabled); // theirs, untouched
         Assert.False(settings.Triggers.Single(g => g.Action == TriggerAction.Capture).Enabled);
@@ -1158,6 +1158,7 @@ public class UserDataStoreTests
     [Fact]
     public void Screen_shortcuts_are_not_added_twice_to_settings_that_have_them()
     {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "A new install has the screen shortcuts on Windows only");
         var defaults = new AppSettings(); // a new install's triggers already hold both
         Assert.False(SettingsMigrations.AddScreenShortcuts(defaults)); // nothing to add, nothing to save
         Assert.True(defaults.ScreenShortcutsAdded);
@@ -1172,6 +1173,7 @@ public class UserDataStoreTests
     [Fact]
     public void Load_adds_the_screen_shortcuts_to_settings_from_before_them_and_saves_them()
     {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "The screen shortcuts are Windows-only");
         using var dir = new TempDir();
         var path = Path.Combine(dir.Path, "settings.json");
         File.WriteAllText(path,
@@ -1195,6 +1197,7 @@ public class UserDataStoreTests
     [Fact]
     public void A_new_install_has_each_screen_shortcut_once()
     {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "The screen shortcuts are Windows-only");
         using var dir = new TempDir();
         var store = new UserDataStore(dir.Path);
         store.Load();
@@ -1202,5 +1205,16 @@ public class UserDataStoreTests
         Assert.Single(store.Settings.Triggers, g => g.Action == TriggerAction.Capture);
         Assert.Single(store.Settings.Triggers, g => g.Action == TriggerAction.PickColor);
         Assert.True(store.Settings.ScreenShortcutsAdded);
+    }
+
+    [Fact]
+    public void Outside_Windows_no_screen_shortcut_is_added_and_the_offer_stays_open()
+    {
+        var settings = new AppSettings { Triggers = [new() { Kind = TriggerKind.Drag }] };
+
+        Assert.False(SettingsMigrations.AddScreenShortcuts(settings, windows: false));
+
+        Assert.Single(settings.Triggers);
+        Assert.False(settings.ScreenShortcutsAdded); // still offered once the tools come to this platform
     }
 }

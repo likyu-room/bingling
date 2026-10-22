@@ -78,8 +78,8 @@ public static class GlassBackdrop
         return bitmap;
     }
 
-    /// <summary>True when the average of the colour channels is below 1 of 255.</summary>
-    private static bool IsBlack(ScreenCapture capture)
+    /// <summary>True when the average of the colour channels is below 1 of 255 (the screen grab's test too).</summary>
+    internal static bool IsBlack(ScreenCapture capture)
     {
         var bytes = capture.Bgra;
         long sum = 0;

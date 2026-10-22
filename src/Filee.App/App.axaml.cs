@@ -107,8 +107,28 @@ public partial class App : Application
             }
         };
         var screen = AppHost.Get<IScreenTools>();
-        triggers.CaptureRequested += (_, e) => screen.StartCapture(new PixelPoint(e.X, e.Y));
-        triggers.ColorPickRequested += (_, e) => screen.StartColorPick(new PixelPoint(e.X, e.Y));
+        triggers.CaptureRequested += (_, e) =>
+        {
+            try
+            {
+                screen.StartCapture(new PixelPoint(e.X, e.Y));
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                log.LogWarning(ex, "Could not start the screen capture");
+            }
+        };
+        triggers.ColorPickRequested += (_, e) =>
+        {
+            try
+            {
+                screen.StartColorPick(new PixelPoint(e.X, e.Y));
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                log.LogWarning(ex, "Could not start the colour picker");
+            }
+        };
         triggers.Start();
         log.LogInformation("Bingling {Version} started", UpdateService.CurrentVersion);
         // macOS: ask for Accessibility with the system's own alert when the user opened Filee (not at sign-in) and

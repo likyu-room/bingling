@@ -12,15 +12,3 @@ public interface IScreenTools
     /// <summary>Lets the user pick a colour from the screen the cursor is on.</summary>
     void StartColorPick(PixelPoint cursor);
 }
-
-/// <summary>Where the screen tools aren't available (and until they are built): does nothing.</summary>
-public sealed class NoScreenTools : IScreenTools
-{
-    public void StartCapture(PixelPoint cursor)
-    {
-    }
-
-    public void StartColorPick(PixelPoint cursor)
-    {
-    }
-}

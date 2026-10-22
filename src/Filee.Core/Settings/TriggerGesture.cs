@@ -111,7 +111,11 @@ public sealed class TriggerGesture
     ];
 
     /// <summary>Default gestures for the current OS.</summary>
-    public static List<TriggerGesture> Defaults()
+    public static List<TriggerGesture> Defaults() => Defaults(OperatingSystem.IsWindows());
+
+    /// <inheritdoc cref="Defaults()"/>
+    /// <param name="windows">Whether the OS is Windows (a test's choice): only there are the screen tools.</param>
+    internal static List<TriggerGesture> Defaults(bool windows)
     {
         // On macOS Ctrl+click means right-click, and Option already means "copy" in Finder.
         var dragModifier = OperatingSystem.IsMacOS() ? ModifierKeys.Alt : ModifierKeys.Ctrl;
@@ -122,9 +126,10 @@ public sealed class TriggerGesture
         ];
         // Windows also lists Shift + drag, last and switched off: one tick in Settings turns it on, and the hint and the
         // tray tooltip show the first enabled drag, which stays Ctrl. macOS and Linux keep their single drag default.
-        if (OperatingSystem.IsWindows())
-            defaults.Add(new() { Kind = TriggerKind.Drag, Modifiers = ModifierKeys.Shift, Button = TriggerMouseButton.Left, Enabled = false });
-        // After the donut's own, so their places in the list stay.
+        if (!windows)
+            return defaults;
+        defaults.Add(new() { Kind = TriggerKind.Drag, Modifiers = ModifierKeys.Shift, Button = TriggerMouseButton.Left, Enabled = false });
+        // After the donut's own, so their places in the list stay. Windows only: elsewhere they would do nothing.
         defaults.AddRange(ScreenShortcuts());
         return defaults;
     }

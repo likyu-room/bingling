@@ -20,7 +20,7 @@ public class TriggerDefaultsTests
     [Fact]
     public void Defaults_add_capture_and_colour_pick_shortcuts_anywhere()
     {
-        var d = TriggerGesture.Defaults();
+        var d = TriggerGesture.Defaults(windows: true);
         var capture = Assert.Single(d, g => g.Action == TriggerAction.Capture);
         var pick = Assert.Single(d, g => g.Action == TriggerAction.PickColor);
         Assert.Equal((TriggerKind.KeyChord, ModifierKeys.Ctrl | ModifierKeys.Alt, "S", TriggerScope.Anywhere, true),
@@ -31,6 +31,14 @@ public class TriggerDefaultsTests
         Assert.Contains(d, g => g.Kind == TriggerKind.Drag && g.Action == TriggerAction.Donut);
         Assert.Contains(d, g => g.Kind == TriggerKind.KeyChord && g.Key == "Space" && g.Action == TriggerAction.Donut);
         Assert.Equal(TriggerAction.Capture, capture.Clone().Action);
+    }
+
+    [Fact]
+    public void Outside_Windows_the_defaults_have_no_screen_shortcuts()
+    {
+        // The screen tools are Windows-only: elsewhere the shortcuts would do nothing and only crowd Settings › Shortcuts.
+        Assert.All(TriggerGesture.Defaults(windows: false), g => Assert.Equal(TriggerAction.Donut, g.Action));
+        Assert.Equal(OperatingSystem.IsWindows(), TriggerGesture.Defaults().Any(g => g.Action == TriggerAction.PickColor));
     }
 
     [Fact]

@@ -1,0 +1,58 @@
+<!--
+  The colour card the instant eyedropper leaves beside the picked point: the colour, its HEX code large, RGB and HSL, and a
+  button to copy each code. The HEX code is on the clipboard already ("Copied the HEX code"). It goes after 6 seconds, on
+  Esc, or when a click lands outside it (the window loses the focus).
+-->
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Filee.App.ViewModels"
+        x:Class="Filee.App.Views.ColorCardWindow"
+        x:DataType="vm:ColorCardViewModel"
+        Title="{DynamicResource tray.pick_color}"
+        SizeToContent="WidthAndHeight"
+        WindowDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False"
+        CanResize="False">
+  <Window.Styles>
+    <Style Selector="Button">
+      <Setter Property="Padding" Value="10,4" />
+      <Setter Property="Margin" Value="0,0,6,6" />
+    </Style>
+  </Window.Styles>
+  <Border Classes="card" Margin="12" Padding="12,12,6,6" Width="300">
+    <Grid ColumnDefinitions="56,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="10">
+      <Border Width="56" Height="56" CornerRadius="10" Background="{Binding Swatch}" BorderBrush="#26000000" BorderThickness="1"
+              VerticalAlignment="Top" />
+      <StackPanel Grid.Column="1" VerticalAlignment="Center">
+        <TextBlock Text="{Binding Hex}" FontFamily="Consolas, Menlo, monospace" FontSize="19" FontWeight="Bold" />
+        <TextBlock Classes="caption" Text="{Binding Rgb}" />
+        <TextBlock Classes="caption" Text="{Binding Hsl}" />
+        <TextBlock Classes="caption" Text="{DynamicResource colorcard.copied_hex}" IsVisible="{Binding SaysHexCopied}"
+                   Foreground="{DynamicResource AccentBrush}" FontWeight="SemiBold" />
+      </StackPanel>
+      <WrapPanel Grid.Row="1" Grid.ColumnSpan="2">
+        <Button Command="{Binding CopyHexCommand}">
+          <Panel>
+            <TextBlock Text="{DynamicResource colorcard.copy_hex}" IsVisible="{Binding !HexCopied}" />
+            <TextBlock Text="{DynamicResource toast.copied}" IsVisible="{Binding HexCopied}" />
+          </Panel>
+        </Button>
+        <Button Command="{Binding CopyRgbCommand}">
+          <Panel>
+            <TextBlock Text="{DynamicResource colorcard.copy_rgb}" IsVisible="{Binding !RgbCopied}" />
+            <TextBlock Text="{DynamicResource toast.copied}" IsVisible="{Binding RgbCopied}" />
+          </Panel>
+        </Button>
+        <Button Command="{Binding CopyHslCommand}">
+          <Panel>
+            <TextBlock Text="{DynamicResource colorcard.copy_hsl}" IsVisible="{Binding !HslCopied}" />
+            <TextBlock Text="{DynamicResource toast.copied}" IsVisible="{Binding HslCopied}" />
+          </Panel>
+        </Button>
+      </WrapPanel>
+    </Grid>
+  </Border>
+</Window>

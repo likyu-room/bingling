@@ -8,11 +8,12 @@ using Filee.App.Services.Triggers;
 using Filee.Core;
 using Filee.Core.Localization;
 using Filee.Core.Settings;
+using Microsoft.Extensions.Logging;
 
 namespace Filee.App.Services;
 
 public sealed class TrayService(UserDataStore store, ILocalizer loc, WindowService windows, UpdateService updates,
-    IScreenTools screen, TriggerService triggers)
+    IScreenTools screen, TriggerService triggers, ILogger<TrayService> log)
 {
     private TrayIcon? _tray;
     private NativeMenuItem? _open, _capture, _pickColor, _pause, _quit, _update;
@@ -98,9 +99,17 @@ public sealed class TrayService(UserDataStore store, ILocalizer loc, WindowServi
     /// </summary>
     internal async Task StartAfterMenuClosesAsync(Action<PixelPoint> start)
     {
-        await Task.Delay(150);
-        var (x, y) = triggers.LastCursor;
-        start(new PixelPoint(x, y));
+        try
+        {
+            await Task.Delay(150);
+            var (x, y) = triggers.LastCursor;
+            start(new PixelPoint(x, y));
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException)
+        {
+            // The menu item's handler is async void: what gets out of here would end Bingling.
+            log.LogWarning(ex, "Could not start the screen tool from the tray menu");
+        }
     }
 
     public void Dispose() => _tray?.Dispose();
