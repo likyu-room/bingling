@@ -14,7 +14,6 @@
     <ResourceDictionary>
       <ResourceDictionary.MergedDictionaries>
         <ResourceInclude Source="avares://Bingling/Styles/Icons.axaml" />
-        <ResourceInclude Source="avares://Bingling/Styles/Brands.axaml" />
       </ResourceDictionary.MergedDictionaries>
     </ResourceDictionary>
   </Application.Resources>

@@ -119,8 +119,7 @@ public partial class LocalizationTests
         foreach (var code in new[] { "en", "ko", "es", "hi", "pl", "zh-CN" })
         {
             var strings = Load(code);
-            Assert.DoesNotContain(strings.Keys, k => k is "about.sponsor" or "sponsor.title" or "sponsor.lead" or "sponsor.star"
-                                                      || k.StartsWith("sponsor.note.", StringComparison.Ordinal));
+            Assert.DoesNotContain(strings.Keys, k => k == "about.sponsor" || k.StartsWith("sponsor.", StringComparison.Ordinal));
             Assert.Contains(strings["app.name"], strings["about.support_title"]);
             Assert.Contains(strings["app.name"], strings["about.support_text"]);
         }

@@ -49,8 +49,8 @@ public class RenderTests
     }
 
     /// <summary>
-    /// Nothing in the sidebar or on the About page offers sponsoring (the old links led to the original author's
-    /// accounts), and the GitHub button under the menu is alone in its row, filling it.
+    /// Nothing in the sidebar or on the About page offers or mentions sponsoring (the old links led to the original
+    /// author's accounts), and the GitHub button under the menu is alone in its row, filling it.
     /// </summary>
     [AvaloniaTheory]
     [InlineData("ko", "후원")]
@@ -64,10 +64,12 @@ public class RenderTests
         window.Show();
         Pump();
 
-        var buttons = window.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible).ToList();
-        Assert.DoesNotContain(buttons, b => b.GetVisualDescendants().OfType<TextBlock>()
-            .Any(t => t.Text?.Contains(word, StringComparison.OrdinalIgnoreCase) == true));
+        // Every text on the page counts: the buttons, the cards, the third-party notices (markdown text is in inlines).
+        var texts = window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible)
+            .Select(t => t.Inlines?.Text ?? t.Text ?? "").ToList();
+        Assert.DoesNotContain(texts, t => t.Contains(word, StringComparison.OrdinalIgnoreCase));
 
+        var buttons = window.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible).ToList();
         var links = buttons.Where(b => b.Classes.Contains("navlink")).ToList();
         Assert.Equal(UpdateService.HasRepository ? 1 : 0, links.Count);
         if (links.Count == 1)
@@ -667,36 +669,6 @@ public class RenderTests
         Pump();
         Save(window, "window-libreoffice-options-ko.png");
         window.Close();
-    }
-
-    [AvaloniaFact]
-    public void About_page_with_supporters_renders()
-    {
-        TestServices.EnsureInitialized("en");
-        var vm = new MainWindowViewModel(AppHost.Services, AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<UpdateService>());
-        vm.Navigate("about");
-        var main = new MainWindow { DataContext = vm, Width = 1080, Height = 820 };
-        main.Show();
-        Pump();
-        var about = main.GetVisualDescendants().OfType<Filee.App.Views.Pages.AboutPage>().Single();
-        about.Supporters.Show(new SupporterList(
-            [new Supporter("Acme", "https://acme.example", "acme.png"), new Supporter("Globex", "https://globex.example")],
-            [new("Kim"), new("Lee"), new("Park")]), _ => Logo());
-        Pump();
-        Save(main, "page-about-supporters-en.png");
-        main.Close();
-
-        // A stand-in logo: a wide coloured mark like a company's.
-        static Avalonia.Media.Imaging.Bitmap Logo()
-        {
-            var bitmap = new Avalonia.Media.Imaging.RenderTargetBitmap(new Avalonia.PixelSize(120, 32));
-            using (var context = bitmap.CreateDrawingContext())
-            {
-                context.DrawRectangle(new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#3B6FD8")), null, new Avalonia.Rect(0, 4, 24, 24), 6, 6);
-                context.DrawRectangle(new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.Parse("#7A8699")), null, new Avalonia.Rect(32, 10, 84, 12), 3, 3);
-            }
-            return bitmap;
-        }
     }
 
     [AvaloniaTheory]

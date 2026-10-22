@@ -195,7 +195,7 @@
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="BorderThickness" Value="0" />
   </Style>
-  <!-- Small links at the bottom of the navigation (GitHub, Sponsor) -->
+  <!-- The small link at the bottom of the navigation (GitHub) -->
   <Style Selector="Button.navlink">
     <Setter Property="Padding" Value="8,6" />
     <Setter Property="FontSize" Value="12" />
