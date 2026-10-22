@@ -339,11 +339,14 @@ internal static class SettingsMigrations
     /// <summary>
     /// Offers the capture and colour-pick shortcuts (<see cref="TriggerGesture.ScreenShortcuts"/>) to settings from before
     /// them, once (<see cref="AppSettings.ScreenShortcutsAdded"/>, not a schema bump). One the user already has for that
-    /// action is kept as it is; one on a key chord the user already uses comes in switched off. Windows only, where the
-    /// screen tools are: elsewhere nothing happens and the flag stays off, so they are offered once the tools come there.
+    /// action is kept as it is; one on a key chord the user already uses comes in switched off. A ring shortcut on exactly
+    /// a screen shortcut's keys and scope is that shortcut after a round trip through a Bingling from before the actions
+    /// (it saves the settings without the action and without the flag): it gets its action back, on or off as it was,
+    /// instead of a second card. Windows only, where the screen tools are: elsewhere nothing happens and the flag stays
+    /// off, so they are offered once the tools come there.
     /// </summary>
     /// <param name="windows">Whether the OS is Windows; the current OS's when not given (a test's choice).</param>
-    /// <returns>True when a shortcut was added and the settings need saving (the flag alone goes out with the next save).</returns>
+    /// <returns>True when a shortcut was added or given its action back and the settings need saving (the flag alone goes out with the next save).</returns>
     public static bool AddScreenShortcuts(AppSettings settings, bool? windows = null)
     {
         if (settings.ScreenShortcutsAdded || !(windows ?? OperatingSystem.IsWindows()))
@@ -352,9 +355,15 @@ internal static class SettingsMigrations
         var added = false;
         foreach (var shortcut in TriggerGesture.ScreenShortcuts().Where(s => settings.Triggers.All(g => g.Action != s.Action)))
         {
-            shortcut.Enabled = !settings.Triggers.Any(g => g.Kind == TriggerKind.KeyChord && g.Modifiers == shortcut.Modifiers
-                && string.Equals(g.Key, shortcut.Key, StringComparison.OrdinalIgnoreCase));
-            settings.Triggers.Add(shortcut);
+            var onItsKeys = settings.Triggers.Where(g => g.Kind == TriggerKind.KeyChord && g.Modifiers == shortcut.Modifiers
+                && string.Equals(g.Key, shortcut.Key, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (onItsKeys.FirstOrDefault(g => g.Action == TriggerAction.Donut && g.Scope == shortcut.Scope) is { } lost)
+                lost.Action = shortcut.Action;
+            else
+            {
+                shortcut.Enabled = onItsKeys.Count == 0;
+                settings.Triggers.Add(shortcut);
+            }
             added = true;
         }
         return added;

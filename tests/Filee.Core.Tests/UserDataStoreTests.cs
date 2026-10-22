@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using Filee.Core.Presets;
 using Filee.Core.Profiles;
 using Filee.Core.Settings;
@@ -1304,6 +1305,60 @@ public class UserDataStoreTests
         var reloaded = new UserDataStore(dir.Path);
         reloaded.Load();
         Assert.DoesNotContain(reloaded.Settings.Triggers, g => g.Action == TriggerAction.Capture);
+    }
+
+    [Fact]
+    public void A_ring_shortcut_on_the_keys_of_a_screen_shortcut_gets_its_action_back_instead_of_a_second_card()
+    {
+        // What a Bingling from before the actions leaves after saving: both screen shortcuts as ring shortcuts on their
+        // keys (everywhere), one of them switched off, and the flag gone.
+        var settings = new AppSettings
+        {
+            Triggers =
+            [
+                new() { Kind = TriggerKind.Drag },
+                new() { Kind = TriggerKind.KeyChord, Modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt, Button = TriggerMouseButton.None, Key = "s", Scope = TriggerScope.Anywhere },
+                new() { Kind = TriggerKind.KeyChord, Modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt, Button = TriggerMouseButton.None, Key = "C", Scope = TriggerScope.Anywhere, Enabled = false },
+            ],
+        };
+
+        Assert.True(SettingsMigrations.AddScreenShortcuts(settings, windows: true));
+
+        Assert.Equal([TriggerAction.Donut, TriggerAction.Capture, TriggerAction.PickColor], settings.Triggers.Select(g => g.Action));
+        Assert.Equal([true, true, false], settings.Triggers.Select(g => g.Enabled)); // on or off as it was
+        Assert.True(settings.ScreenShortcutsAdded);
+    }
+
+    [Fact]
+    public void A_round_trip_through_a_Bingling_that_does_not_know_the_actions_keeps_the_screen_shortcuts()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "The screen shortcuts are Windows-only");
+        using var dir = new TempDir();
+        var path = Path.Combine(dir.Path, "settings.json");
+        var first = new UserDataStore(dir.Path);
+        first.Load();
+        first.Settings.Triggers.Single(g => g.Action == TriggerAction.PickColor).Enabled = false;
+        first.SaveSettings();
+        var before = first.Settings.Triggers.Select(g => (g.Kind, g.Key, g.Scope, g.Action, g.Enabled)).ToList();
+        Assert.Equal(5, before.Count);
+
+        // 1.2.x saves its settings without what it doesn't know: each gesture's action, and the flag.
+        var json = JsonNode.Parse(File.ReadAllText(path))!.AsObject();
+        Assert.True(json.Remove("screenShortcutsAdded"));
+        foreach (var gesture in json["triggers"]!.AsArray())
+            Assert.True(gesture!.AsObject().Remove("action"));
+        File.WriteAllText(path, json.ToJsonString());
+
+        var again = new UserDataStore(dir.Path);
+        again.Load();
+
+        Assert.Equal(before, again.Settings.Triggers.Select(g => (g.Kind, g.Key, g.Scope, g.Action, g.Enabled)));
+        Assert.True(again.Settings.ScreenShortcutsAdded);
+        Assert.Contains("\"action\": \"Capture\"", File.ReadAllText(path)); // saved with the fix, once
+
+        var third = new UserDataStore(dir.Path);
+        third.Load();
+        Assert.Equal(before, third.Settings.Triggers.Select(g => (g.Kind, g.Key, g.Scope, g.Action, g.Enabled)));
     }
 
     [Fact]
