@@ -430,8 +430,9 @@ public sealed class RadialController(
             JobState.Cancelled => DonutProgressOutcome.Cancelled,
             _ => DonutProgressOutcome.Failed,
         };
-        // The toast explains what went wrong, or why a file was left out ("not smaller", "the file exists").
-        if (outcome == DonutProgressOutcome.Failed || job.Job.Files.Any(f => f.State == FileState.Skipped))
+        // The toast explains what went wrong, or why a file was left out ("not smaller", "the file exists"), and shows a
+        // picture made, to see, copy or open it.
+        if (outcome == DonutProgressOutcome.Failed || job.Job.Files.Any(f => f.State == FileState.Skipped) || job.HasPictureResult)
             conversions.ShowInToast(job);
         DetachProgress();
         donut.CompleteProgress(outcome, HideWindow);

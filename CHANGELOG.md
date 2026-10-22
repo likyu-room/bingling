@@ -15,6 +15,18 @@ without lines shows the English ones):
 - `recommended`: bug fixes. The card shows once per version.
 - `optional`: new features only. No card, the sidebar button only.
 
+## 1.2.1
+
+<!-- update
+level: optional
+ko: 링으로 사진을 바꾸면 금방 끝나도 결과 미리보기 카드가 떠요
+en: A picture made from the ring shows on the result card, even a quick one
+-->
+
+- **See the picture you made**: when a conversion from the ring makes a picture (PNG → JPG, 50 % smaller, …), the
+  result card now shows it even when the ring finished at once. Its thumbnail opens the result, and **Copy** puts it
+  on the clipboard. Other results that finish at once still show only the ✓ in the ring.
+
 ## 1.2.0
 
 <!-- update

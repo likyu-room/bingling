@@ -715,6 +715,26 @@ public class ToastWindowTests
         Assert.True(done());
     }
 
+    [AvaloniaFact]
+    public async Task A_picture_made_by_the_ring_at_once_goes_on_a_card_too()
+    {
+        // RadialController shows such a job in the toast (HasPictureResult): its picture, to see, copy or open it.
+        using var dir = new TempFolder();
+        var picture = await RunToTheEnd(dir.NoisyPicture("photo.png", 600, 400), "to-jpg");
+        Assert.True(picture.HasPictureResult);
+
+        var pdf = AppHost.Get<ConversionService>().Start([dir.NoisyPicture("page.png", 300, 200)],
+            AppHost.Get<UserDataStore>().FindPreset("to-pdf")!, showInToast: false)!;
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (pdf.Job.State is JobState.Queued or JobState.Running && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(25);
+            Pump();
+        }
+        Assert.Equal(JobState.Completed, pdf.Job.State);
+        Assert.False(pdf.HasPictureResult); // no picture to show: the ring's ✓ says enough
+    }
+
     /// <summary>Converts <paramref name="source"/> with a real job and waits until its card has the size.</summary>
     private static async Task<JobViewModel> RunToTheEnd(string source, string presetId, bool showInToast = false)
     {

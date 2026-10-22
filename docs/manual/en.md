@@ -95,6 +95,7 @@ well, delete the `%LocalAppData%\Bingling` folder too.
 
 After the drop the ring turns into a small progress ring, and a ✓ shows when it is done.
 If it takes longer than 5 seconds, the [result card](#the-result-card) in the bottom-right corner takes over.
+When the result is a picture, the card shows it even if the conversion finished at once.
 
 <p align="center"><img src="images/progress.png" width="300" alt="The progress ring and the finished check mark"></p>
 
@@ -314,11 +315,12 @@ A card appears in the bottom-right corner of the screen when a conversion finish
 **When the card appears**
 
 - When you save with a picture tool (Crop, Add background, Redact, Annotate)
+- When a conversion from the ring makes a picture (even a quick one, so you can see and copy it at once)
 - When a conversion from the ring takes longer than 5 seconds
 - When a file failed or was skipped
 - When a watch folder converts files
 
-A conversion from the ring that finishes quickly only shows the ✓ in the ring.
+A quick conversion from the ring to something other than a picture, such as a PDF, only shows the ✓ in the ring.
 
 **What you can do on the card**
 

@@ -121,6 +121,13 @@ public sealed partial class JobViewModel : ObservableObject
     /// </summary>
     public bool CanCopy => IsSucceeded && Thumbnail is not null;
 
+    /// <summary>
+    /// Done without a problem and its first result is a picture: a job the donut finished at once still goes on a card
+    /// (RadialController), so the picture can be seen, copied or opened without looking for the file.
+    /// </summary>
+    public bool HasPictureResult => Job.State == JobState.Completed && Job.Outputs.FirstOrDefault() is { } first
+                                    && FormatRegistry.Detect(first)?.Category == FormatCategory.Image;
+
     /// <summary>True for a moment after the results were copied: the Copy button says "Copied" and then goes back.</summary>
     [ObservableProperty] private bool _justCopied;
 
