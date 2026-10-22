@@ -74,7 +74,7 @@ public partial class LocalizationTests
     [MemberData(nameof(Languages))]
     public void No_string_still_calls_this_app_Filee_Plus(string code)
     {
-        // Keys about the original Filee (the "Filee classic" look, the support and sponsor texts) say "Filee" on purpose;
+        // The one key about the original Filee (the "Filee classic" look) says "Filee" on purpose;
         // none of them ever said "Filee Plus", so no key needs an exception.
         var old = Load(code).Where(p => p.Value.Contains("Filee Plus", StringComparison.OrdinalIgnoreCase)).Select(p => p.Key);
         Assert.Empty(old);
@@ -85,14 +85,12 @@ public partial class LocalizationTests
     [MemberData(nameof(Languages))]
     public void Only_texts_about_the_original_Filee_say_Filee(string code)
     {
-        // The "Filee classic" look, the support card and the sponsor window name the original Filee; nothing else
-        // names Filee, and the command line is "bingling".
+        // The "Filee classic" look names the original Filee; nothing else names Filee, and the command line is "bingling".
         foreach (var language in new[] { code, "en" })
         {
             var other = Load(language)
                 .Where(p => p.Value.Contains("filee", StringComparison.OrdinalIgnoreCase))
-                .Where(p => p.Key != "theme.style.Classic" && !p.Key.StartsWith("about.support_", StringComparison.Ordinal)
-                            && !p.Key.StartsWith("sponsor.", StringComparison.Ordinal))
+                .Where(p => p.Key != "theme.style.Classic")
                 .Select(p => p.Key);
             Assert.Empty(other);
             Assert.Contains("bingling watch ", Load(language)["watch.cli_hint"]);
@@ -110,10 +108,26 @@ public partial class LocalizationTests
         {
             var strings = Load(code);
             Assert.Contains("Filee", strings["theme.style.Classic"]);
-            Assert.Contains("Filee", strings["about.support_title"]);
-            Assert.Contains("Filee", strings["sponsor.title"]);
             Assert.Contains("{0}", strings["about.based_on"]);
         }
+    }
+
+    [Fact]
+    public void Sponsoring_is_not_offered_and_the_support_card_is_about_Bingling()
+    {
+        // The sponsor links led to the original author's accounts; they come back when Bingling has its own.
+        foreach (var code in new[] { "en", "ko", "es", "hi", "pl", "zh-CN" })
+        {
+            var strings = Load(code);
+            Assert.DoesNotContain(strings.Keys, k => k is "about.sponsor" or "sponsor.title" or "sponsor.lead" or "sponsor.star"
+                                                      || k.StartsWith("sponsor.note.", StringComparison.Ordinal));
+            Assert.Contains(strings["app.name"], strings["about.support_title"]);
+            Assert.Contains(strings["app.name"], strings["about.support_text"]);
+        }
+
+        var ko = Load("ko");
+        Assert.Equal("빙글링 응원하기", ko["about.support_title"]);
+        Assert.Equal("빙글링은 무료 오픈소스예요.\nGitHub 별, 버그 신고, 기능 제안 모두 큰 힘이 돼요.", ko["about.support_text"]);
     }
 
     [Fact]

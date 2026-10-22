@@ -87,7 +87,6 @@ dotnet test tests/Filee.Core.Tests
 ## 원작
 
 빙글링은 KnifeLemon의 [Filee](https://github.com/KnifeLemon/Filee)(MIT 라이선스) 1.12.0을 바탕으로 만들었어요.
-원작이 마음에 드셨다면 원작자도 응원해 주세요: [GitHub Sponsors](https://github.com/sponsors/KnifeLemon)
 
 ## 라이선스
 

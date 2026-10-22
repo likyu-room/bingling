@@ -93,7 +93,6 @@ The code projects keep the original names (`Filee.*`). The program is `Bingling.
 ## Credits
 
 Bingling is based on [Filee](https://github.com/KnifeLemon/Filee) 1.12.0 by KnifeLemon (MIT license).
-If you like the original, please support its author too: [GitHub Sponsors](https://github.com/sponsors/KnifeLemon)
 
 ## License
 

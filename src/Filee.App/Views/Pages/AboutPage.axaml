@@ -55,12 +55,6 @@
         <WrapPanel>
           <Button Classes="accent" Click="OnStar" Margin="0,0,8,0" Content="{DynamicResource feedback.star}" IsVisible="{Binding HasRepository}" />
           <Button Click="OnIssue" Content="{DynamicResource feedback.issue}" Margin="0,0,8,0" IsVisible="{Binding HasRepository}" />
-          <Button Click="OnSponsor">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <PathIcon Width="13" Height="13" Data="{StaticResource Icon.Heart}" Foreground="#D4537E" />
-              <TextBlock Text="{DynamicResource about.sponsor}" />
-            </StackPanel>
-          </Button>
         </WrapPanel>
       </StackPanel>
     </Border>

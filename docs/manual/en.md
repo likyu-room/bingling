@@ -478,4 +478,3 @@ With the first settings, most results go into the same folder as the original. *
 ## Credits
 
 Bingling is based on [Filee](https://github.com/KnifeLemon/Filee) 1.12.0 by KnifeLemon, released under the MIT license.
-If you like the original, please support its author too: [GitHub Sponsors](https://github.com/sponsors/KnifeLemon)

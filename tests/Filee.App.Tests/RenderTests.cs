@@ -49,26 +49,30 @@ public class RenderTests
     }
 
     /// <summary>
-    /// The GitHub and Sponsor buttons under the menu share their row; without a repository (a build with no fork) only
-    /// Sponsor shows, and it takes the whole row instead of sitting alone in its right half.
+    /// Nothing in the sidebar or on the About page offers sponsoring (the old links led to the original author's
+    /// accounts), and the GitHub button under the menu is alone in its row, filling it.
     /// </summary>
-    [AvaloniaFact]
-    public void The_link_buttons_share_their_row_and_a_lone_sponsor_button_fills_it()
+    [AvaloniaTheory]
+    [InlineData("ko", "후원")]
+    [InlineData("en", "Sponsor")]
+    public void The_sidebar_and_the_About_page_offer_no_sponsoring(string language, string word)
     {
-        TestServices.EnsureInitialized("ko");
+        TestServices.EnsureInitialized(language);
         var vm = new MainWindowViewModel(AppHost.Services, AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<UpdateService>());
+        vm.Navigate("about");
         var window = new MainWindow { DataContext = vm, Width = 1080, Height = 820 };
         window.Show();
         Pump();
 
-        var row = window.FindControl<UniformGrid>("LinkButtons")!;
-        var shown = row.Children.Where(b => b.IsVisible).ToList();
-        Assert.Equal(UpdateService.HasRepository ? 2 : 1, shown.Count);
-        var width = (row.Bounds.Width - row.ColumnSpacing * (shown.Count - 1)) / shown.Count;
-        // Layout rounding snaps each half to whole pixels (93.5 → 94).
-        Assert.All(shown, b => Assert.Equal(width, b.Bounds.Width, tolerance: 1.0));
-        Assert.Equal(0, shown[0].Bounds.X, 1);
-        Save(window, "sidebar-links-ko.png");
+        var buttons = window.GetVisualDescendants().OfType<Button>().Where(b => b.IsEffectivelyVisible).ToList();
+        Assert.DoesNotContain(buttons, b => b.GetVisualDescendants().OfType<TextBlock>()
+            .Any(t => t.Text?.Contains(word, StringComparison.OrdinalIgnoreCase) == true));
+
+        var links = buttons.Where(b => b.Classes.Contains("navlink")).ToList();
+        Assert.Equal(UpdateService.HasRepository ? 1 : 0, links.Count);
+        if (links.Count == 1)
+            Assert.Equal(((Control)links[0].Parent!).Bounds.Width, links[0].Bounds.Width, 1);
+        Save(window, $"sidebar-links-{language}.png");
         window.Close();
     }
 
@@ -665,33 +669,10 @@ public class RenderTests
         window.Close();
     }
 
-    [AvaloniaTheory]
-    [InlineData("en")]
-    [InlineData("ko")]
-    public void Sponsor_window_renders(string language)
-    {
-        TestServices.EnsureInitialized(language);
-        var window = Filee.App.Views.SponsorWindow.Create(AppHost.Get<Filee.Core.Localization.ILocalizer>());
-        window.Show();
-        Pump();
-        Save(window, $"window-sponsor-{language}.png");
-        window.Close();
-    }
-
     [AvaloniaFact]
-    public void Sponsor_window_with_supporters_renders()
+    public void About_page_with_supporters_renders()
     {
         TestServices.EnsureInitialized("en");
-        var window = Filee.App.Views.SponsorWindow.Create(AppHost.Get<Filee.Core.Localization.ILocalizer>());
-        var view = window.Supporters;
-        view.Show(new SupporterList(
-            [new Supporter("Acme", "https://acme.example", "acme.png"), new Supporter("Globex", "https://globex.example")],
-            [new("Kim"), new("Lee"), new("Park")]), _ => Logo());
-        window.Show();
-        Pump();
-        Save(window, "window-sponsor-supporters-en.png");
-        window.Close();
-
         var vm = new MainWindowViewModel(AppHost.Services, AppHost.Get<Filee.Core.Localization.ILocalizer>(), AppHost.Get<UpdateService>());
         vm.Navigate("about");
         var main = new MainWindow { DataContext = vm, Width = 1080, Height = 820 };

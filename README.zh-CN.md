@@ -87,7 +87,6 @@ dotnet test tests/Filee.Core.Tests
 ## 致谢
 
 Bingling 基于 KnifeLemon 的 [Filee](https://github.com/KnifeLemon/Filee) 1.12.0（MIT 许可证）制作。
-如果你喜欢原作，也请支持原作者：[GitHub Sponsors](https://github.com/sponsors/KnifeLemon)
 
 ## 许可证
 
