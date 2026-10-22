@@ -93,7 +93,12 @@ public class ColorPickTests
         Assert.Equal("what was there before", await ClipboardText());
 
         tools.StartColorPick(new PixelPoint(100, 100));
-        tools.Picker!.MouseDown(new Point(30, 40), MouseButton.Right);
+        picker = tools.Picker!;
+        picker.MouseDown(new Point(30, 40), MouseButton.Right);
+        // Still up while the button is down: closed now, the release would reach the app below and open its menu.
+        Assert.True(picker.IsVisible);
+        picker.MouseUp(new Point(30, 40), MouseButton.Right);
+        Assert.False(picker.IsVisible);
         Assert.Null(tools.Picker);
         Assert.Null(tools.Card);
     }
@@ -106,6 +111,7 @@ public class ColorPickTests
         var bounds = new PixelRect(1920, 0, 400, 300);
         using var shot = ScreenGrab.Grab(new FakeScreen(), bounds, 2)!;
         var picker = new PickColorWindow();
+        picker.SetRenderScaling(2); // the window's on that screen
         (PixelPoint At, Color Color)? picked = null;
         picker.Picked += (at, color) => picked = (at, color);
 
@@ -117,6 +123,29 @@ public class ColorPickTests
         Assert.Equal(new PixelPoint(1981, 80), picked?.At);
         Assert.Equal(ScreenColor(1981, 80), picked?.Color);
         Assert.False(picker.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void A_window_that_renders_at_another_scale_than_its_screen_said_still_covers_it_and_picks_the_pixel_under_the_click()
+    {
+        TestServices.EnsureInitialized("en");
+        // The screen said 100 %, but the window over it renders at 200 % (a second screen of another scale).
+        var bounds = new PixelRect(1920, 0, 400, 300);
+        using var shot = ScreenGrab.Grab(new FakeScreen(), bounds, 1)!;
+        var picker = new PickColorWindow();
+        picker.SetRenderScaling(2);
+        (PixelPoint At, Color Color)? picked = null;
+        picker.Picked += (at, color) => picked = (at, color);
+
+        picker.Open(shot, new PixelPoint(1920 + 100, 100));
+
+        Assert.Equal((200, 150), ((int)picker.Width, (int)picker.Height)); // all of the 400 × 300 pixels, no more
+        Assert.Equal(new PixelPoint(100, 100), picker.Lens.Pixel); // the magnifier under the cursor's pixel too
+        picker.MouseMove(new Point(50.2, 20.7));
+        Assert.Equal(new PixelPoint(100, 41), picker.Lens.Pixel);
+        picker.MouseDown(new Point(30.6, 40.2), MouseButton.Left);
+        Assert.Equal(new PixelPoint(1981, 80), picked?.At);
+        Assert.Equal(ScreenColor(1981, 80), picked?.Color);
     }
 
     [AvaloniaFact]
@@ -192,6 +221,7 @@ public class ColorPickTests
         var card = tools.Card!;
         await Until(() => ((ColorCardViewModel)card.DataContext!).SaysHexCopied);
         tools.StartColorPick(new PixelPoint(100, 100));
+        await Until(() => tools.Picker is not null);
         tools.Picker!.MouseDown(new Point(20, 20), MouseButton.Left);
 
         Assert.False(card.IsVisible); // the earlier card went
@@ -199,6 +229,28 @@ public class ColorPickTests
         Assert.Equal("#14147A", ((ColorCardViewModel)tools.Card!.DataContext!).Hex);
         tools.Card.Close();
         Assert.Null(tools.Card);
+    }
+
+    [AvaloniaFact]
+    public async Task A_card_still_up_is_off_the_screen_before_the_next_picture_is_taken()
+    {
+        TestServices.EnsureInitialized("en");
+        ColorCardWindow? card = null;
+        var screen = new FakeScreen { Watch = () => card?.IsVisible == true };
+        var tools = new ScreenTools(screen, new ToolsLog());
+        tools.StartColorPick(new PixelPoint(100, 100));
+        tools.Picker!.MouseDown(new Point(10, 10), MouseButton.Left);
+        card = tools.Card!;
+        Assert.True(card.IsVisible);
+
+        // Within its 6 seconds: the shortcut again, twice (the second press while the card is going does nothing).
+        tools.StartColorPick(new PixelPoint(100, 100));
+        tools.StartColorPick(new PixelPoint(100, 100));
+        await Until(() => tools.Picker is not null);
+
+        Assert.False(card.IsVisible);
+        Assert.Equal([false, false], screen.WatchedAtCapture); // in neither picture, so its colours can't be picked
+        tools.Picker!.Close();
     }
 
     [AvaloniaFact]
@@ -299,9 +351,15 @@ public class ColorPickTests
         public int Captures { get; private set; }
         public PixelRect? Captured { get; private set; }
 
+        /// <summary>Asked at every capture; the answers go to <see cref="WatchedAtCapture"/>.</summary>
+        public Func<bool>? Watch { get; init; }
+        public List<bool> WatchedAtCapture { get; } = [];
+
         public ScreenCapture? CaptureScreen(int x, int y, int width, int height)
         {
             Captures++;
+            if (Watch is not null)
+                WatchedAtCapture.Add(Watch());
             Captured = new PixelRect(x, y, width, height);
             if (Throws)
                 throw new InvalidOperationException("GDI is gone");

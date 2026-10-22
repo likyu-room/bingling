@@ -28,8 +28,11 @@ public partial class PickColorWindow : Window
         (Width, Height) = (shot.Bounds.Width / shot.Scaling, shot.Bounds.Height / shot.Scaling);
         Position = shot.Bounds.Position;
         Show();
-        Position = shot.Bounds.Position; // again, in case showing changed the DPI scale
-        MoveLens(new Point((cursor.X - shot.Bounds.X) / shot.Scaling, (cursor.Y - shot.Bounds.Y) / shot.Scaling));
+        // Again at the scale the window really has there (a screen of another scale than the one it was made on): it
+        // covers the screen's pixels exactly, and the pixels under the pointer come from where it really is.
+        Position = shot.Bounds.Position;
+        (Width, Height) = (shot.Bounds.Width / RenderScaling, shot.Bounds.Height / RenderScaling);
+        MoveLens(this.PointToClient(cursor));
         Activate(); // for Esc
     }
 
@@ -42,7 +45,7 @@ public partial class PickColorWindow : Window
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        e.Handled = true;
+        e.Handled = true; // a right press closes on its release (OnPointerReleased)
         var point = e.GetCurrentPoint(this);
         if (point.Properties.IsLeftButtonPressed && _shot is { } shot && shot.ColorAt(PixelAt(point.Position)) is { } color)
         {
@@ -50,8 +53,15 @@ public partial class PickColorWindow : Window
             Close();
             Picked?.Invoke(at, color);
         }
-        else if (point.Properties.IsRightButtonPressed)
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        // On the release, not the press: closed on the press, the release would go to the app below and open its menu.
+        if (e.InitialPressMouseButton == MouseButton.Right)
         {
+            e.Handled = true;
             Close();
         }
     }
@@ -66,13 +76,17 @@ public partial class PickColorWindow : Window
         }
     }
 
-    /// <summary>The picture's pixel under a point of the window (DIPs), kept on the picture.</summary>
+    /// <summary>
+    /// The picture's pixel under a point of the window (DIPs), kept on the picture: the screen pixel the window says is
+    /// there, less the screen's corner, so it holds whatever scale the window has.
+    /// </summary>
     private PixelPoint PixelAt(Point p)
     {
         var shot = _shot!;
+        var screen = this.PointToScreen(p);
         return new PixelPoint(
-            Math.Clamp((int)Math.Floor(p.X * shot.Scaling), 0, shot.Bounds.Width - 1),
-            Math.Clamp((int)Math.Floor(p.Y * shot.Scaling), 0, shot.Bounds.Height - 1));
+            Math.Clamp(screen.X - shot.Bounds.X, 0, shot.Bounds.Width - 1),
+            Math.Clamp(screen.Y - shot.Bounds.Y, 0, shot.Bounds.Height - 1));
     }
 
     private void MoveLens(Point cursor)

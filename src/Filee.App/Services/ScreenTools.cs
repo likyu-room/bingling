@@ -14,9 +14,13 @@ namespace Filee.App.Services;
 
 public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools> log) : IScreenTools
 {
+    /// <summary>How long a colour card still up gets to leave the screen before the eyedropper takes its picture.</summary>
+    private static readonly TimeSpan CardGoneAfter = TimeSpan.FromMilliseconds(150);
+
     // UI thread only.
     private PickColorWindow? _picker;
     private ColorCardWindow? _card;
+    private bool _starting; // waiting for a card to go: the shortcut again does nothing meanwhile
 
     /// <summary>The eyedropper's window while it is open.</summary>
     internal PickColorWindow? Picker => _picker;
@@ -31,17 +35,26 @@ public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools>
 
     /// <summary>
     /// Takes a picture of the screen under <paramref name="cursor"/> and covers it with the eyedropper; a click there copies
-    /// that pixel's HEX code and shows the colour card. While the eyedropper is open, starting it again does nothing; when
-    /// the screen can't be taken (or is black) nothing opens and the log says so.
+    /// that pixel's HEX code and shows the colour card. A card still up closes first, a moment before the picture. While the
+    /// eyedropper is open (or waiting for the card), starting it again does nothing; when the screen can't be taken (or is
+    /// black) nothing opens and the log says so.
     /// </summary>
-    public void StartColorPick(PixelPoint cursor)
+    public async void StartColorPick(PixelPoint cursor)
     {
-        if (_picker is not null)
+        if (_picker is not null || _starting)
             return;
+        _starting = true;
         PickColorWindow? picker = null;
         ScreenShot? shot = null;
         try
         {
+            // A card still up would be in the picture, and its colours picked where the screen no longer shows it: it goes
+            // first, and the compositor gets a moment to take it off the screen (as the tray waits for its menu).
+            if (_card is { } card)
+            {
+                card.Close();
+                await Task.Delay(CardGoneAfter);
+            }
             picker = new PickColorWindow();
             shot = ScreenGrab.Grab(platform, picker.Screens, cursor);
             if (shot is null)
@@ -67,6 +80,10 @@ public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools>
             _picker = null;
             picker?.Close();
             shot?.Dispose();
+        }
+        finally
+        {
+            _starting = false;
         }
     }
 

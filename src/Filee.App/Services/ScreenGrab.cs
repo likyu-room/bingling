@@ -17,10 +17,13 @@ public sealed record ScreenShot(SKImage Image, PixelRect Bounds, double Scaling)
 {
     private readonly SKPixmap _pixels = Image.PeekPixels();
 
-    /// <summary>The colour of the picture's <paramref name="pixel"/> (0, 0 is the screen's top-left one); null off the picture.</summary>
+    /// <summary>
+    /// The colour of the picture's <paramref name="pixel"/> (0, 0 is the screen's top-left one); null off the picture, and
+    /// once it is let go of (a window still drawing it would otherwise read freed memory).
+    /// </summary>
     public Color? ColorAt(PixelPoint pixel)
     {
-        if (pixel.X < 0 || pixel.Y < 0 || pixel.X >= Image.Width || pixel.Y >= Image.Height)
+        if (_pixels.Handle == IntPtr.Zero || pixel.X < 0 || pixel.Y < 0 || pixel.X >= Image.Width || pixel.Y >= Image.Height)
             return null;
         var color = _pixels.GetPixelColor(pixel.X, pixel.Y);
         return Color.FromRgb(color.Red, color.Green, color.Blue);
