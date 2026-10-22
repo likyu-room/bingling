@@ -19,12 +19,12 @@ without lines shows the English ones):
 
 <!-- update
 level: optional
-ko: 빙글링 자체 화면 캡처(Ctrl+Alt+S)와 바로 스포이트(Ctrl+Alt+C)가 생겼어요
+ko: 빙글링 자체 화면 캡처(Ctrl+Alt+S, 편집·가리기·복사·저장)와 바로 스포이트(Ctrl+Alt+C)가 생겼어요
 ko: 가리기에 흐림과 "가릴 곳 찾기"(전화번호·이메일·주민등록번호·카드번호·주소·얼굴)가 생겼어요
 ko: 그리기에 스포트라이트와 스포이트가, 배경 넣기에도 스포이트가 생겼어요
 ko: 사진 링에 지난번 배경을 창 없이 바로 넣는 "배경 바로" 칸이 생겼어요
 ko: 후원 창과 후원 링크를 뺐어요
-en: Bingling's own screen capture (Ctrl+Alt+S) and an instant eyedropper (Ctrl+Alt+C)
+en: Bingling's own screen capture (Ctrl+Alt+S: edit, redact, copy, save) and an instant eyedropper (Ctrl+Alt+C)
 en: Redact can blur, and "Find what to hide" spots phone numbers, e-mails, IDs, cards, addresses and faces
 en: Annotate has a spotlight, and Annotate and Add background have an eyedropper
 en: A "Quick frame" slot on the picture ring puts your last backdrop on pictures without a window
@@ -32,8 +32,9 @@ en: The Sponsor window and the sponsor links are gone
 -->
 
 - **Screen capture**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>S</kbd> (or **Capture the screen** in the tray menu) freezes the
-  screen under the pointer. Drag over an area, then **Edit** it in the Annotate window, **Copy** it to the clipboard or
-  **Save** it as a PNG in Pictures\Bingling, named `Capture 2026-10-22 131500.png`. The top bar switches to the full
+  screen under the pointer. Drag over an area, then **Edit** it in the Annotate window, **Redact** it in the Redact window
+  (to hide what the screen showed), **Copy** it to the clipboard or **Save** it as a PNG in Pictures\Bingling, named
+  `Capture 2026-10-22 131500.png`. The top bar switches to the full
   screen or to the eyedropper. It captures one monitor at a time (the one with the pointer); there is no window, scrolling or video capture.
 - **Instant eyedropper**: <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd> (**Pick a color** in the tray menu) shows a
   magnifier next to the pointer over the frozen screen. A click copies the HEX code and opens a card with the HEX, RGB

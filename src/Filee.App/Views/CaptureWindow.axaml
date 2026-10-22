@@ -1,6 +1,6 @@
 <!--
   The capture window (ScreenTools.StartCapture): covers the screen the cursor is on with the picture taken of it, frozen and
-  dimmed. A drag picks an area, shown bright with its size in pixels above it and Edit / Copy / Save below it. The toolbar
+  dimmed. A drag picks an area, shown bright with its size in pixels above it and Edit / Redact / Copy / Save below it. The toolbar
   at the top picks an area, the whole screen or the eyedropper (the magnifier on the frozen screen), or closes.
   Esc or a right click closes it; Enter or Ctrl+C copies, Ctrl+S saves.
 -->
@@ -36,6 +36,7 @@
       <Border x:Name="Actions" Classes="card" Padding="6">
         <StackPanel Orientation="Horizontal" Spacing="6">
           <Button Classes="accent" Content="{DynamicResource capture.edit}" Command="{Binding EditCommand}" />
+          <Button Content="{DynamicResource tool.redact.title}" Command="{Binding RedactCommand}" />
           <Button Content="{DynamicResource toast.copy}" Command="{Binding CopyCommand}" ToolTip.Tip="Enter, Ctrl+C" />
           <Button Content="{DynamicResource tool.save}" Command="{Binding SaveCommand}" ToolTip.Tip="Ctrl+S" />
         </StackPanel>

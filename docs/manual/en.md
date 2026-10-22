@@ -377,6 +377,7 @@ You can [change the shortcuts](#shortcuts) under **Settings → Shortcuts**. Wit
    | Button | Key | What it does |
    |---|---|---|
    | **Edit** | | Opens the [Annotate](#annotate) window. After you mark it up, **Save** puts it in the folder below under the same name. Save stays off until you have drawn something. |
+   | **Redact** | | Opens the [Redact](#redact) window (black box, mosaic, blur, Find what to hide) right away. After you hide something, **Save** puts it in the folder below under the same name. Save stays off until you have hidden something. |
    | **Copy** | <kbd>Enter</kbd>, <kbd>Ctrl</kbd>+<kbd>C</kbd> | Copies the picture. “Copied” shows for a moment, then it closes. |
    | **Save** | <kbd>Ctrl</kbd>+<kbd>S</kbd> | Saves a PNG file and shows the [result card](#the-result-card). |
 

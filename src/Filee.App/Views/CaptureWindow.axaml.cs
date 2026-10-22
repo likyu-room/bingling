@@ -165,7 +165,7 @@ public partial class CaptureWindow : ScreenCoverWindow
     }
 
     /// <summary>
-    /// Where the Edit / Copy / Save <paramref name="buttons"/> of an <paramref name="area"/> go on a <paramref name="screen"/>
+    /// Where the Edit / Redact / Copy / Save <paramref name="buttons"/> of an <paramref name="area"/> go on a <paramref name="screen"/>
     /// (DIPs): under its left end; above it where the screen ends below it; inside its bottom when it is as high as the
     /// screen; and never off the screen.
     /// </summary>

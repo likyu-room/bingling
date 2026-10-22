@@ -33,7 +33,7 @@ public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools>
 
     /// <summary>
     /// Takes a picture of the screen under <paramref name="cursor"/> and covers it with the capture window, the picture
-    /// frozen: a drag picks an area to edit, copy or save, and its eyedropper picks a colour as the instant one does.
+    /// frozen: a drag picks an area to edit, redact, copy or save, and its eyedropper picks a colour as the instant one does.
     /// </summary>
     public void StartCapture(PixelPoint cursor) => Start<CaptureWindow>(cursor, "screen capture", (window, shot) =>
         window.Open(new CaptureViewModel(shot, output)

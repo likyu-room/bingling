@@ -13,6 +13,7 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Filee.App.Services;
 using Filee.App.ViewModels;
+using Filee.App.ViewModels.Tools;
 using Filee.App.Views;
 using Filee.Core.Conversion;
 using Filee.Core.Localization;
@@ -144,6 +145,9 @@ public class CaptureWindowTests
         Assert.False(window.Actions.IsVisible); // not while dragging
         window.MouseUp(new Point(300, 200), MouseButton.Left);
         Assert.True(window.Actions.IsVisible);
+        var buttons = Assert.IsType<StackPanel>(window.Actions.Child).Children.Cast<Button>().ToArray();
+        Assert.Equal(["Edit", "Redact", "Copy", "Save"], buttons.Select(b => b.Content));
+        Assert.Equal<object?>([vm.EditCommand, vm.RedactCommand, vm.CopyCommand, vm.SaveCommand], buttons.Select(b => b.Command));
 
         window.MouseMove(new Point(500, 400)); // no button down: no drag
         Assert.Equal(new PixelRect(100, 100, 201, 101), vm.Selection);
@@ -258,7 +262,7 @@ public class CaptureWindowTests
         var (_, output, windows) = Start("ko", _ => throw new IOException("disk full"));
         using var shot = ScreenGrab.Grab(new FakeScreen(), new PixelRect(0, 0, 100, 50), 1)!;
 
-        await output.EditAsync(shot.Crop(new PixelRect(0, 0, 100, 50)), new PixelPoint(50, 25));
+        await output.EditAsync(shot.Crop(new PixelRect(0, 0, 100, 50)), new PixelPoint(50, 25), ImageToolKind.Annotate);
 
         Assert.Equal(["캡처를 저장하지 못했어요: disk full"], windows.Messages);
         Assert.False(Directory.Exists(Path.GetDirectoryName(Assert.Single(windows.Opened).Files[0]))); // nothing to retry: it goes
@@ -318,6 +322,48 @@ public class CaptureWindowTests
         var saved = Assert.Single(Directory.GetFiles(output.Folder));
         Assert.Equal(Path.GetFileName(temp), Path.GetFileName(saved));
         Assert.Equal([saved], job.Job.Outputs);
+        job.DismissCommand.Execute(null);
+    }
+
+    [AvaloniaFact]
+    public async Task Redact_opens_the_redact_window_on_the_area_and_saves_what_it_hides_in_the_capture_folder()
+    {
+        var conversions = AppHost.Get<ConversionService>();
+        bool? findIsOn = null;
+        var (tools, output, windows) = Start("ko", temp =>
+        {
+            using var redact = Assert.IsType<RedactToolViewModel>(
+                ImageToolViewModel.Create(ImageToolKind.Redact, [temp], AppHost.Get<Filee.Core.Settings.UserDataStore>(), AppHost.Get<ILocalizer>()));
+            findIsOn = redact.FindCommand.CanExecute(null); // one file: "find what to hide" works
+            return new ToolResult(new ImageEdit { Redact = new RedactEdit { Mode = RedactMode.Black, Boxes = [new EditRect { Width = .5, Height = 1 }] } }, null);
+        });
+        var window = Open(tools);
+        Drag(window, new Point(30, 40), new Point(129, 89));
+
+        await window.ViewModel.RedactCommand.ExecuteAsync(null);
+
+        Assert.False(window.IsVisible);
+        var opened = Assert.Single(windows.Opened);
+        Assert.Equal(ImageToolKind.Redact, opened.Tool);
+        var temp = Assert.Single(opened.Files);
+        Assert.Matches(@"^캡처 \d{4}-\d\d-\d\d \d{6}\.png$", Path.GetFileName(temp));
+        Assert.Equal(new PixelPoint(80, 65), opened.Cursor); // the area's middle
+        Assert.Equal("사진\\Bingling 폴더에 저장해요", opened.Footer);
+        Assert.True(findIsOn);
+        var job = conversions.ToastJobs[0];
+        Assert.Equal([temp], job.Job.Sources);
+        await Until(() => !job.IsRunning && !File.Exists(temp), 30);
+
+        var saved = Assert.Single(Directory.GetFiles(output.Folder));
+        Assert.Equal(Path.GetFileName(temp), Path.GetFileName(saved));
+        Assert.Equal([saved], job.Job.Outputs);
+        using (var image = new MagickImage(saved))
+        {
+            Assert.Equal((100u, 50u), (image.Width, image.Height));
+            Assert.Equal([0, 0, 0], image.GetPixels().ToByteArray(0, 0, 1, 1, "RGB")); // hidden
+            Assert.Equal([129, 89, 0x7A], image.GetPixels().ToByteArray(99, 49, 1, 1, "RGB")); // as the screen showed it
+        }
+        Assert.False(Directory.Exists(Path.GetDirectoryName(temp)));
         job.DismissCommand.Execute(null);
     }
 

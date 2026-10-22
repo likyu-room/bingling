@@ -1,7 +1,8 @@
-// Where the capture window's Save and Edit put the area it took: a PNG in Pictures\Bingling. The picture goes to a
-// temporary PNG first, as the job and the annotate window take files; Save runs a PNG conversion of it (so its card shows
-// in the toast, to see, copy or open), Edit opens the annotate window on it and runs what that saves. The temporary file
-// goes once the window has closed and the job has completed; a job that failed keeps it for its Retry, for a day.
+// Where the capture window's Save, Edit and Redact put the area it took: a PNG in Pictures\Bingling. The picture goes to a
+// temporary PNG first, as the job and the annotate and redact windows take files; Save runs a PNG conversion of it (so its
+// card shows in the toast, to see, copy or open), Edit and Redact open their window on it and run what that saves. The
+// temporary file goes once the window has closed and the job has completed; a job that failed keeps it for its Retry, for
+// a day.
 
 using System.Globalization;
 using Avalonia;
@@ -50,15 +51,16 @@ public sealed class CaptureOutput(ConversionService conversions, WindowService w
         RunAsync(picture, "save", temp => Task.FromResult(conversions.Start([temp], new Preset { TargetFormat = "png", Output = SavedHere() })));
 
     /// <summary>
-    /// Opens the annotate window on <paramref name="picture"/> near <paramref name="cursor"/> (physical pixels), and lets go
-    /// of it; what the window saves goes to <see cref="Folder"/>, its Copy to the clipboard as always. Never throws.
+    /// Opens the window of <paramref name="tool"/> (annotate, or redact) on <paramref name="picture"/> near
+    /// <paramref name="cursor"/> (physical pixels), and lets go of it; what the window saves goes to <see cref="Folder"/>,
+    /// its Copy to the clipboard as always. Never throws.
     /// </summary>
-    public Task EditAsync(SKImage picture, PixelPoint cursor) =>
+    public Task EditAsync(SKImage picture, PixelPoint cursor, ImageToolKind tool) =>
         RunAsync(picture, "edit", async temp =>
-            await windows.EditImageAsync(ImageToolKind.Annotate, [temp], cursor, loc["capture.saves_to"]) is { } result
+            await windows.EditImageAsync(tool, [temp], cursor, loc["capture.saves_to"]) is { } result
                 ? conversions.StartTool([temp], new Preset
                 {
-                    NameKey = "preset.annotate", TargetFormat = "png", Kind = PresetKind.Tool, Tool = ImageToolKind.Annotate, Output = SavedHere(),
+                    NameKey = "preset." + tool.ToString().ToLowerInvariant(), TargetFormat = "png", Kind = PresetKind.Tool, Tool = tool, Output = SavedHere(),
                 }, result)
                 : null);
 

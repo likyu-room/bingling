@@ -1,10 +1,11 @@
 // The capture window's state: the frozen screen, the area dragged over it (in the screen's pixels) and what the toolbar
-// is on (an area, the whole screen or the eyedropper); Edit, Copy and Save take the area and close the window.
+// is on (an area, the whole screen or the eyedropper); Edit, Redact, Copy and Save take the area and close the window.
 
 using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Filee.App.Services;
+using Filee.Core.Presets;
 using SkiaSharp;
 
 namespace Filee.App.ViewModels;
@@ -18,7 +19,7 @@ public enum CaptureMode
 }
 
 /// <param name="shot">The screen's picture; whoever opened the window lets go of it when the window closes.</param>
-/// <param name="output">Saves the area, or opens it to draw on.</param>
+/// <param name="output">Saves the area, or opens it to draw on or to hide parts of.</param>
 public sealed partial class CaptureViewModel(ScreenShot shot, CaptureOutput output) : ObservableObject
 {
     /// <summary>An area narrower or lower than this (pixels) was a click, not one to capture.</summary>
@@ -26,7 +27,7 @@ public sealed partial class CaptureViewModel(ScreenShot shot, CaptureOutput outp
 
     private static readonly TimeSpan CopiedFor = TimeSpan.FromSeconds(0.6);
 
-    private bool _finishing; // Edit, Copy or Save took the area: the others do nothing
+    private bool _finishing; // Edit, Redact, Copy or Save took the area: the others do nothing
 
     public ScreenShot Shot => shot;
 
@@ -61,7 +62,7 @@ public sealed partial class CaptureViewModel(ScreenShot shot, CaptureOutput outp
     /// <summary>"1200 × 675": the area's size in the screen's pixels.</summary>
     public string SizeText => Selection is { } area ? $"{area.Width} × {area.Height}" : "";
 
-    /// <summary>Edit / Copy / Save beside the area.</summary>
+    /// <summary>Edit / Redact / Copy / Save beside the area.</summary>
     public bool ShowsActions => HasSelection && !Dragging && !SaysCopied;
 
     /// <summary>"Drag over what to capture", until there is an area.</summary>
@@ -121,10 +122,16 @@ public sealed partial class CaptureViewModel(ScreenShot shot, CaptureOutput outp
 
     /// <summary>Closes and opens the area in the annotate window, centred on where it was.</summary>
     [RelayCommand]
-    private Task Edit()
+    private Task Edit() => OpenIn(ImageToolKind.Annotate);
+
+    /// <summary>Closes and opens the area in the redact window (black box, mosaic, blur; find what to hide), centred on where it was.</summary>
+    [RelayCommand]
+    private Task Redact() => OpenIn(ImageToolKind.Redact);
+
+    private Task OpenIn(ImageToolKind tool)
     {
         var middle = Selection is { } area ? shot.Bounds.Position + new PixelPoint(area.X + area.Width / 2, area.Y + area.Height / 2) : default;
-        return Take() is { } picture ? output.EditAsync(picture, middle) : Task.CompletedTask;
+        return Take() is { } picture ? output.EditAsync(picture, middle, tool) : Task.CompletedTask;
     }
 
     [RelayCommand]
