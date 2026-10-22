@@ -531,7 +531,7 @@ There are five at first:
 When you update from an earlier version, the screen capture and eyedropper shortcuts are added once. If you already used one of those keys, it is added switched off.
 
 - The switch at the top left of each card turns it on or off. Change the keys under **Modifier keys** (Ctrl, Alt, Shift, Win).
-- **Action**: on a keyboard shortcut card, choose **Open the donut toolbar**, **Capture the screen** or **Pick a color**. To change the keys, click **Record** and press the new keys.
+- **Action**: on a keyboard shortcut card, choose **Open the donut toolbar (selected files)**, **Capture the screen** or **Pick a color**. To change the keys, click **Record** and press the new keys.
   Choosing **Capture the screen** or **Pick a color** sets **Active in** to “Everywhere”.
 - A <kbd>Ctrl</kbd>+<kbd>Alt</kbd> shortcut pressed with the right <kbd>Alt</kbd> (AltGr) is not treated as a shortcut, so a shortcut doesn't break typing letters with AltGr on your keyboard. Use the left <kbd>Alt</kbd>.
 - **Active in**: “File managers and desktop” opens the ring only in File Explorer and on the desktop. You can choose “Everywhere” instead.
@@ -552,6 +552,7 @@ Only a watch folder set to “Move the original to "originals"” moves the orig
 
 **Are my files uploaded anywhere?**
 No. Every conversion and edit happens on your PC, and so do screen capture and Redact's “Find what to hide”. Bingling only goes online to download engines and to check for updates.
+Bingling uploads nothing itself, but if OneDrive backs up your Pictures folder, OneDrive can upload the captures saved in **Pictures\Bingling**.
 
 **Can it convert old .doc and .ppt files?**
 Yes, with the **LibreOffice** engine. Without it the slot is dimmed, and pointing at it tells you to install it.
