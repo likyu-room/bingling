@@ -263,6 +263,8 @@
   "preset.crop.short": "Przytnij",
   "preset.add_background": "Dodaj tło",
   "preset.add_background.short": "Tło",
+  "preset.quick_background": "Szybkie tło",
+  "preset.quick_background.short": "Szybkie tło",
   "preset.redact": "Zasłoń",
   "preset.redact.short": "Zasłoń",
   "preset.annotate": "Dodaj adnotacje",

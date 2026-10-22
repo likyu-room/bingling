@@ -836,7 +836,7 @@ public class UserDataStoreTests
     {
         var seed = new UserDataStore(directory);
         seed.Load();
-        seed.Presets.RemoveAll(p => NewTools.Contains(p.Id));
+        seed.Presets.RemoveAll(p => NewTools.Contains(p.Id) || p.Id == "quick-background");
         seed.Presets.Single(p => p.Id == "tools").SubPresetIds = [.. toolsGroup];
         seed.SaveLibrary(); // saving adds nothing: only loading does
         Assert.All(NewTools, id => Assert.Null(seed.FindPreset(id)));
@@ -859,9 +859,10 @@ public class UserDataStoreTests
             Assert.Single(store.Presets, p => p.Id == id);
             Assert.Equal(PresetKind.Tool, store.FindPreset(id)!.Kind);
         }
-        // Where a new library has them in the preset list, and saved right away so the next start finds them there.
-        Assert.Equal(["crop", "add-background", "redact", "annotate", "compress-image"],
-            store.Presets.Select(p => p.Id).SkipWhile(id => id != "crop").Take(5));
+        // Where a new library has them in the preset list (the quick background comes with them, after add-background),
+        // and saved right away so the next start finds them there.
+        Assert.Equal(["crop", "add-background", "quick-background", "redact", "annotate", "compress-image"],
+            store.Presets.Select(p => p.Id).SkipWhile(id => id != "crop").Take(6));
         Assert.Contains("\"id\": \"redact\"", File.ReadAllText(Path.Combine(dir.Path, "presets.json")));
 
         // The user takes "Redact" off the ring: the preset stays, so it is not offered again.
@@ -908,6 +909,89 @@ public class UserDataStoreTests
         Assert.Equal(store.Profiles.FindIndex(p => p.IsFallback) - 1, store.Profiles.IndexOf(folders));
         Assert.Contains("\"forFolders\": true", File.ReadAllText(Path.Combine(dir.Path, "profiles.json")));
         Assert.False(SettingsMigrations.AddMissingFolderProfile(store.Profiles)); // once
+    }
+
+    /// <summary>A library as 1.2 left it: no quick background preset, no slice for it. <paramref name="arrange"/> changes the images donut before it is saved.</summary>
+    private static UserDataStore SeedWithoutQuickBackground(string directory, Action<ToolbarProfile>? arrange = null)
+    {
+        var seed = new UserDataStore(directory);
+        seed.Load();
+        seed.Presets.RemoveAll(p => p.Id == "quick-background");
+        var images = seed.Profiles.Single(p => p.Id == "images");
+        images.PresetIds.Remove("quick-background");
+        arrange?.Invoke(images);
+        seed.SaveLibrary(); // saving adds nothing: only loading does
+        Assert.Null(seed.FindPreset("quick-background"));
+        return seed;
+    }
+
+    [Fact]
+    public void A_library_from_before_the_quick_background_gains_it_once_at_the_end_of_the_images_donut()
+    {
+        using var dir = new TempDir();
+        var before = SeedWithoutQuickBackground(dir.Path).Profiles.Single(p => p.Id == "images").PresetIds.ToList();
+        Assert.Equal(ToolbarProfile.MaxSlices - 1, before.Count);
+
+        var store = new UserDataStore(dir.Path);
+        store.Load();
+
+        var quick = Assert.Single(store.Presets, p => p.Id == "quick-background");
+        Assert.True(quick.RunWithLastChoices);
+        Assert.Equal("add-background", store.Presets[store.Presets.IndexOf(quick) - 1].Id); // where a new library has it
+        Assert.Equal([.. before, "quick-background"], store.Profiles.Single(p => p.Id == "images").PresetIds);
+        // Saved at once, so the next start finds both there.
+        Assert.Contains("\"id\": \"quick-background\"", File.ReadAllText(Path.Combine(dir.Path, "presets.json")));
+        Assert.Contains("\"quick-background\"", File.ReadAllText(Path.Combine(dir.Path, "profiles.json")));
+
+        // The user takes the slice off the donut: the preset stays, so the slice is not put back.
+        store.Profiles.Single(p => p.Id == "images").PresetIds.Remove("quick-background");
+        store.SaveLibrary();
+        var again = new UserDataStore(dir.Path);
+        again.Load();
+        Assert.DoesNotContain("quick-background", again.Profiles.Single(p => p.Id == "images").PresetIds);
+        Assert.Single(again.Presets, p => p.Id == "quick-background");
+        Assert.False(SettingsMigrations.AddQuickBackground(again.Presets, again.Profiles));
+    }
+
+    [Fact]
+    public void The_quick_background_is_not_squeezed_onto_a_full_images_donut_but_is_still_a_preset_to_add()
+    {
+        using var dir = new TempDir();
+        var full = SeedWithoutQuickBackground(dir.Path, images => images.PresetIds.Add("to-gif")).Profiles.Single(p => p.Id == "images").PresetIds.ToList();
+        Assert.Equal(ToolbarProfile.MaxSlices, full.Count); // a 12th slice of the user's own
+
+        var store = new UserDataStore(dir.Path);
+        store.Load();
+
+        Assert.Equal(full, store.Profiles.Single(p => p.Id == "images").PresetIds);
+        Assert.Single(store.Presets, p => p.Id == "quick-background");
+    }
+
+    [Fact]
+    public void The_quick_background_slice_is_added_only_for_a_new_preset_a_donut_that_exists_and_has_room()
+    {
+        Assert.False(SettingsMigrations.AddQuickBackground(BuiltInData.CreatePresets(), BuiltInData.CreateProfiles())); // a complete library is left alone
+
+        var presets = BuiltInData.CreatePresets();
+        presets.RemoveAll(p => p.Id == "quick-background");
+        var profiles = BuiltInData.CreateProfiles();
+        var images = profiles.Single(p => p.Id == "images");
+        images.PresetIds.Remove("quick-background");
+
+        // No images donut (the user deleted it): nothing to put it on.
+        Assert.False(SettingsMigrations.AddQuickBackground(presets, [.. profiles.Where(p => p.Id != "images")]));
+
+        // It runs before AddMissingToolPresets, which is what makes the preset: the slice goes on while the id is still missing.
+        Assert.True(SettingsMigrations.AddQuickBackground(presets, profiles));
+        Assert.Equal("quick-background", images.PresetIds[^1]);
+        Assert.DoesNotContain(presets, p => p.Id == "quick-background");
+        Assert.True(SettingsMigrations.AddMissingToolPresets(presets));
+        Assert.Single(presets, p => p.Id == "quick-background");
+
+        // Its id is on the donut already (the profiles were read, the presets were not): once.
+        presets.RemoveAll(p => p.Id == "quick-background");
+        Assert.False(SettingsMigrations.AddQuickBackground(presets, profiles));
+        Assert.Single(images.PresetIds, id => id == "quick-background");
     }
 
     [Fact]

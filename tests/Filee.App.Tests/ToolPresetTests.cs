@@ -26,11 +26,11 @@ public class ToolPresetTests
         var store = Store();
         var presets = new PresetsPageViewModel(store, AppHost.Get<ILocalizer>(), AppHost.Get<WindowService>());
         Assert.Contains(presets.Presets, p => p.Preset.Id == "compress-image");
-        Assert.DoesNotContain(presets.Presets, p => p.Preset.Id is "crop" or "add-background" or "redact" or "annotate" or "tools");
+        Assert.DoesNotContain(presets.Presets, p => p.Preset.Id is "crop" or "add-background" or "quick-background" or "redact" or "annotate" or "tools");
 
         using var watch = new WatchFoldersPageViewModel(store, AppHost.Get<WatchFolderService>(), AppHost.Get<ILocalizer>());
         Assert.Contains(watch.Presets, p => p.Value == "strip-metadata");
-        Assert.DoesNotContain(watch.Presets, p => p.Value is "crop" or "add-background" or "redact" or "annotate" or "tools");
+        Assert.DoesNotContain(watch.Presets, p => p.Value is "crop" or "add-background" or "quick-background" or "redact" or "annotate" or "tools");
     }
 
     [AvaloniaFact]

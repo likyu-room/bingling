@@ -254,6 +254,8 @@
   "preset.crop.short": "Recortar",
   "preset.add_background": "Añadir fondo",
   "preset.add_background.short": "Fondo",
+  "preset.quick_background": "Fondo rápido",
+  "preset.quick_background.short": "Fondo rápido",
   "preset.redact": "Ocultar",
   "preset.redact.short": "Ocultar",
   "preset.annotate": "Anotar",

@@ -263,6 +263,8 @@
   "preset.crop.short": "자르기",
   "preset.add_background": "배경 넣기",
   "preset.add_background.short": "배경",
+  "preset.quick_background": "배경 바로",
+  "preset.quick_background.short": "배경 바로",
   "preset.redact": "가리기",
   "preset.redact.short": "가리기",
   "preset.annotate": "그리기",

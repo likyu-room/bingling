@@ -4,6 +4,7 @@
 using System.Text.Json;
 using Filee.Core.Conversion;
 using Filee.Core.Presets;
+using Filee.Core.Profiles;
 using Filee.Core.Settings;
 
 namespace Filee.Core.Tests;
@@ -63,12 +64,47 @@ public class ImageToolPresetTests
     }
 
     [Fact]
-    public void The_image_donut_has_the_tools_slice_before_half_size_and_still_fits()
+    public void The_image_donut_has_the_tools_slice_before_half_size_the_quick_slice_last_and_still_fits()
     {
         var images = BuiltInData.CreateProfiles().Single(p => p.Id == "images");
-        Assert.Equal(11, images.PresetIds.Count);
+        Assert.Equal(ToolbarProfile.MaxSlices, images.PresetIds.Count); // the 12th slice is the quick background
         Assert.Equal("tools", images.PresetIds[images.PresetIds.IndexOf("half-size") - 1]);
-        Assert.True(images.PresetIds.Count <= 12);
+        Assert.Equal("quick-background", images.PresetIds[^1]);
+    }
+
+    [Fact]
+    public void Quick_background_is_the_add_background_tool_that_needs_no_window()
+    {
+        var quick = P("quick-background");
+        var add = P("add-background");
+        Assert.Equal(
+            (PresetKind.Tool, ImageToolKind.AddBackground, "preset.quick_background", "png", "{name} with background", 95, true),
+            (quick.Kind, quick.Tool, quick.NameKey, quick.TargetFormat, quick.Output.FileNamePattern, quick.Image.Quality, quick.RunWithLastChoices));
+        // It saves where and as add-background saves.
+        Assert.Equal((add.Output.FileNamePattern, add.Output.Location, add.Output.SubfolderName, add.Image.KeepMetadata),
+            (quick.Output.FileNamePattern, quick.Output.Location, quick.Output.SubfolderName, quick.Image.KeepMetadata));
+        Assert.False(quick.IsConversion); // like every tool: not offered where a conversion is picked
+        Assert.Null(quick.Image.Edit);    // the last background is read when it runs, not stored here
+        Assert.False(add.RunWithLastChoices); // the window one still opens its window
+        Assert.False(new Preset().RunWithLastChoices);
+        // Right after it in the preset list, and not in the Tools group (which is full).
+        var ids = BuiltInData.CreatePresets().Select(p => p.Id).ToList();
+        Assert.Equal(ids.IndexOf("add-background") + 1, ids.IndexOf("quick-background"));
+        Assert.DoesNotContain("quick-background", P("tools").SubPresetIds);
+    }
+
+    [Fact]
+    public void Run_with_last_choices_survives_a_clone_and_a_round_trip_and_an_older_file_reads_false()
+    {
+        var quick = P("quick-background");
+        Assert.True(quick.Clone().RunWithLastChoices);
+        var json = JsonSerializer.Serialize(quick, FileeJsonContext.Default.Preset);
+        Assert.Contains("\"runWithLastChoices\": true", json);
+        Assert.True(JsonSerializer.Deserialize(json, FileeJsonContext.Default.Preset)!.RunWithLastChoices);
+
+        // A preset saved before the property existed (or by a Filee that dropped it) opens the window.
+        var old = JsonSerializer.Deserialize("""{ "id": "x", "kind": "Tool", "tool": "AddBackground", "targetFormat": "png" }""", FileeJsonContext.Default.Preset)!;
+        Assert.False(old.RunWithLastChoices);
     }
 
     [Fact]

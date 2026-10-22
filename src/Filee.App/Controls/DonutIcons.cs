@@ -20,6 +20,7 @@ public static class DonutIcons
     {
         "crop" => "Crop",
         "add-background" => "AddBackground",
+        "quick-background" => "QuickBackground",
         "redact" => "Redact",
         "annotate" => "Annotate",
         "compress-image" => "Compress",

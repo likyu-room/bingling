@@ -330,7 +330,11 @@ public sealed class RadialController(
 
         if (preset.Kind == PresetKind.Tool)
         {
-            OpenTool(preset, files);
+            // Quick background: the add background tool without its window (only that tool keeps choices to run with).
+            if (preset is { RunWithLastChoices: true, Tool: ImageToolKind.AddBackground })
+                RunWithLastBackground(preset, files);
+            else
+                OpenTool(preset, files);
             return;
         }
 
@@ -348,9 +352,8 @@ public sealed class RadialController(
     /// <summary>
     /// A tool slice (crop): the donut closes and the tool's window opens where the donut was; the conversion starts with
     /// the edit it made, one for every file or each file's own (none: closed without applying, nothing runs). It shows
-    /// in the toast, not on a ring. The donut looked into the first files only
-    /// (<see cref="ImageToolSupport.LookedIntoOnOpen"/>): now all of them are, and what is not a still picture is left
-    /// out, with a note that says so (no window when nothing is left).
+    /// in the toast, not on a ring. The pictures are looked at as <see cref="StillPicturesAsync"/> says (no window when
+    /// nothing is left).
     /// </summary>
     private void OpenTool(Preset preset, IReadOnlyList<string> files)
     {
@@ -366,18 +369,7 @@ public sealed class RadialController(
         {
             try
             {
-                var picked = await Task.Run(() => ImageToolSupport.StillPictures(dropped));
-                if (picked.Count < dropped.Count)
-                {
-                    var left = dropped.Except(picked, FileSystemPaths.Comparer).Select(Path.GetFileName).ToList();
-                    log.LogInformation("The {Tool} tool leaves out {Count} file(s) that are not still pictures", preset.Tool, left.Count);
-                    // ponytail: the first five names, the count says the rest; a list window if people crop hundreds.
-                    var lines = new List<string?> { loc.Format("tool.skipped_not_still", left.Count) };
-                    lines.AddRange(left.Take(5));
-                    if (left.Count > 5)
-                        lines.Add("…");
-                    await windows.MessageAsync(null, string.Join(Environment.NewLine, lines));
-                }
+                var picked = await StillPicturesAsync(preset, dropped);
                 if (picked.Count == 0 || await windows.EditImageAsync(preset.Tool, picked, cursor) is not { } result)
                     return;
                 conversions.StartTool(picked, preset, result);
@@ -387,6 +379,70 @@ public sealed class RadialController(
                 log.LogError(ex, "The {Tool} tool failed", preset.Tool);
             }
         });
+    }
+
+    /// <summary>
+    /// A tool slice that needs no window (quick background): the pictures go on the backdrop the add background window was
+    /// last left on (a copy, so the run changes nothing in the settings; never left on yet, the window's own start), and
+    /// the donut turns into the progress ring, then the card, as for a conversion. The pictures are looked at first, as a
+    /// tool does, so it waits for the next turn of the UI thread, not inside a drop handler. A donut that is gone by then
+    /// (Esc, a click elsewhere, another gesture) leaves the job to the toast.
+    /// </summary>
+    private void RunWithLastBackground(Preset preset, IReadOnlyList<string> files)
+    {
+        if (_converted)
+            return; // a second click while the first still looks at the pictures
+        var dropped = files.ToList();
+        var shown = viewModel.Files; // this donut's own list: still the one on screen afterwards, or another gesture has the window
+        log.LogInformation("Running tool {Tool} on {Count} file(s) with its last choices", preset.Tool, dropped.Count);
+        _converted = true;
+        Dispatcher.UIThread.Post(async () =>
+        {
+            try
+            {
+                var picked = await StillPicturesAsync(preset, dropped);
+                var onRing = _visible && _window is { } window && ReferenceEquals(viewModel.Files, shown) && !window.DonutControl.IsInProgressMode;
+                JobViewModel? job = null;
+                if (picked.Count > 0)
+                {
+                    var run = preset.Clone();
+                    run.Image.Edit = new ImageEdit { Background = store.Settings.ImageTools.Background.Clone() };
+                    job = conversions.Start(picked, run, showInToast: !onRing);
+                }
+                if (!onRing)
+                    return;
+                if (job is null)
+                    Close(); // nothing was left to run
+                else
+                    ShowProgress(job);
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "The {Tool} tool failed", preset.Tool);
+            }
+        });
+    }
+
+    /// <summary>
+    /// The files of <paramref name="dropped"/> a tool can work on: single, still pictures of a format the tools write back.
+    /// The donut looked into the first files only (<see cref="ImageToolSupport.LookedIntoOnOpen"/>): now all of them are,
+    /// off the UI thread, and what is not a still picture is left out, with a note that says how many and which.
+    /// </summary>
+    private async Task<List<string>> StillPicturesAsync(Preset preset, List<string> dropped)
+    {
+        var picked = await Task.Run(() => ImageToolSupport.StillPictures(dropped));
+        if (picked.Count < dropped.Count)
+        {
+            var left = dropped.Except(picked, FileSystemPaths.Comparer).Select(Path.GetFileName).ToList();
+            log.LogInformation("The {Tool} tool leaves out {Count} file(s) that are not still pictures", preset.Tool, left.Count);
+            // ponytail: the first five names, the count says the rest; a list window if people crop hundreds.
+            var lines = new List<string?> { loc.Format("tool.skipped_not_still", left.Count) };
+            lines.AddRange(left.Take(5));
+            if (left.Count > 5)
+                lines.Add("…");
+            await windows.MessageAsync(null, string.Join(Environment.NewLine, lines));
+        }
+        return picked;
     }
 
     // ───────── Progress ring ─────────

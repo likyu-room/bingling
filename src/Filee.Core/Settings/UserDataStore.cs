@@ -81,6 +81,8 @@ public sealed class UserDataStore
         var settingsChanged = SettingsMigrations.AddScreenShortcuts(Settings);
         var libraryChanged = File.Exists(ProfilesPath) && SettingsMigrations.ApplyToLibrary(schema, Presets, Profiles);
         // Whatever the schema: a tool added after the library was made comes in on every load (and only while its id is missing).
+        // The quick background's slice first: it goes on the images donut only while its preset is still missing.
+        libraryChanged |= SettingsMigrations.AddQuickBackground(Presets, Profiles);
         libraryChanged |= SettingsMigrations.AddMissingToolPresets(Presets);
         libraryChanged |= SettingsMigrations.AddMissingFolderProfile(Profiles);
         EnsureConsistency();
@@ -625,6 +627,24 @@ internal static class SettingsMigrations
                 group.SubPresetIds.Insert(group.SubPresetIds.FindLastIndex(id => ring.IndexOf(id) is var r && r >= 0 && r < rank) + 1, tool.Id);
         }
         return changed;
+    }
+
+    /// <summary>
+    /// Puts the quick background ("quick-background") slice at the end of the images donut the one time the preset is new
+    /// to a library, when that donut has room (under <see cref="ToolbarProfile.MaxSlices"/>): the slice is a gift of the
+    /// version, not something to push out one of the user's. Once the preset is there it never comes back: a slice the user
+    /// took off stays off. So this runs <b>before</b> <see cref="AddMissingToolPresets"/>, which makes the preset and so
+    /// ends "the id is missing"; it only touches the donut, never the presets.
+    /// </summary>
+    /// <returns>True when the slice was added.</returns>
+    public static bool AddQuickBackground(List<Preset> presets, List<ToolbarProfile> profiles)
+    {
+        const string id = "quick-background";
+        if (presets.Any(p => p.Id == id) || profiles.FirstOrDefault(p => p.Id == "images") is not { } images
+            || images.PresetIds.Contains(id) || images.PresetIds.Count >= ToolbarProfile.MaxSlices)
+            return false;
+        images.PresetIds.Add(id);
+        return true;
     }
 
     /// <summary>

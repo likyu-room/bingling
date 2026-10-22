@@ -51,7 +51,7 @@ public partial class LocalizationTests
         var named = Filee.Core.Presets.BuiltInData.CreatePresets().Where(p => p.NameKey is not null).ToList();
         Assert.All(named, p => Assert.True(english.ContainsKey(p.NameKey!), $"{p.Id}: {p.NameKey}"));
         // Shown on the ring the "Tools" group fans out, where the group's name already gives the context.
-        foreach (var id in new[] { "crop", "add-background", "redact", "annotate", "compress-image", "strip-metadata" })
+        foreach (var id in new[] { "crop", "add-background", "quick-background", "redact", "annotate", "compress-image", "strip-metadata" })
             Assert.True(english.ContainsKey(named.Single(p => p.Id == id).NameKey + ".short"), id);
     }
 

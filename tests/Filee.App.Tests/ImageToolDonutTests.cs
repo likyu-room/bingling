@@ -10,6 +10,7 @@ using Avalonia.Threading;
 using Filee.App.Controls;
 using Filee.App.Services;
 using Filee.App.ViewModels;
+using Filee.Core.Conversion;
 using Filee.Core.Formats;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
@@ -94,8 +95,27 @@ public class ImageToolDonutTests
         Assert.True(tools.IsAccent && tools.IsEnabled);
         Assert.Equal(["crop", "add-background", "redact", "annotate", "compress-image", "strip-metadata"], tools.Children!.Select(c => c.Id));
         Assert.All(tools.Children!, c => Assert.True(c.IsAccent && c.IsEnabled));
-        Assert.DoesNotContain(vm.Items.Where(i => i.Id != "tools"), i => i.IsAccent);
+        // The quick background is a tool too (the 12th slice of the ring itself); nothing else on the ring is.
+        Assert.DoesNotContain(vm.Items.Where(i => i.Id is not ("tools" or "quick-background")), i => i.IsAccent);
         Assert.Matches(@"^PNG 2개 · \d+\u00A0B$", vm.CenterTitle);
+    }
+
+    [AvaloniaFact]
+    public void The_quick_background_is_the_last_slice_of_the_image_donut_a_tool_that_is_off_where_tools_are()
+    {
+        var vm = Load(TestImages.Png(1));
+        var quick = vm.Items[^1];
+        Assert.Equal("quick-background", quick.Id);
+        Assert.Equal(("배경 바로", true, true), (quick.Label, quick.IsAccent, quick.IsEnabled));
+        Assert.Null(quick.Children);
+
+        // As the other tools: not for an animation or an icon.
+        foreach (var file in new[] { TestImages.AnimatedGif(), TestImages.Write("s.ico", MagickFormat.Icon) })
+        {
+            quick = Load(file).Items.Single(i => i.Id == "quick-background");
+            Assert.False(quick.IsEnabled);
+            Assert.False(string.IsNullOrEmpty(quick.DisabledReason));
+        }
     }
 
     [AvaloniaFact]
@@ -240,8 +260,8 @@ public class ImageToolDonutTests
         return (ClickTool(files, windows, slice: 0, beforeClick), windows);
     }
 
-    /// <summary>Opens the donut on <paramref name="files"/> with <paramref name="windows"/> and clicks slice <paramref name="slice"/> of its tools ring (0: crop).</summary>
-    private static RadialController ClickTool(string[] files, WindowService windows, int slice, Action? beforeClick = null)
+    /// <summary>A donut of its own on <paramref name="files"/>, at (400, 400), that opens its tool windows with <paramref name="windows"/>.</summary>
+    private static RadialController OpenDonut(string[] files, WindowService windows)
     {
         TestServices.EnsureInitialized("ko");
         var radial = new RadialController(AppHost.Get<RadialViewModel>(), AppHost.Get<ConversionService>(), windows,
@@ -249,6 +269,13 @@ public class ImageToolDonutTests
             AppHost.Get<Microsoft.Extensions.Logging.ILogger<RadialController>>(), AppHost.Get<ILocalizer>());
         radial.ShowForFiles(400, 400, files);
         Dispatcher.UIThread.RunJobs();
+        return radial;
+    }
+
+    /// <summary>Opens the donut on <paramref name="files"/> with <paramref name="windows"/> and clicks slice <paramref name="slice"/> of its tools ring (0: crop).</summary>
+    private static RadialController ClickTool(string[] files, WindowService windows, int slice, Action? beforeClick = null)
+    {
+        var radial = OpenDonut(files, windows);
         beforeClick?.Invoke();
         var donut = radial.Window!.DonutControl;
         var group = donut.Items!.ToList().FindIndex(i => i.Id == "tools");
@@ -365,5 +392,156 @@ public class ImageToolDonutTests
         Assert.Contains("p1.png", Assert.Single(windows.Messages));
         Assert.Empty(windows.Opened);
         Assert.Equal(jobs, conversions.Jobs.Count);
+    }
+
+    /// <summary>Opens the donut on <paramref name="files"/> and clicks its quick background slice (a slice of the ring itself, not of a group).</summary>
+    private static RadialController ClickQuick(string[] files, WindowService windows, Action? beforeClick = null)
+    {
+        var radial = OpenDonut(files, windows);
+        beforeClick?.Invoke();
+        var donut = radial.Window!.DonutControl;
+        var slice = donut.Items!.ToList().FindIndex(i => i.Id == "quick-background");
+        var onSlice = DonutGeometry.PointAt(new Point(donut.Bounds.Width / 2, donut.Bounds.Height / 2),
+            donut.OuterRadius * 0.6, DonutGeometry.MidAngle(slice, donut.Items!.Count));
+        donut.SetExternalHit(donut.HitTest(onSlice), onSlice);
+        donut.HandleKey(Key.Enter); // and click it
+        return radial;
+    }
+
+    /// <summary>Runs the UI thread until <paramref name="job"/> has finished and its card shows it.</summary>
+    private static void WaitUntilDone(JobViewModel job) =>
+        RunUntil(() => job.Job.State is not (JobState.Queued or JobState.Running) && !job.IsRunning);
+
+    [AvaloniaFact]
+    public void The_quick_slice_puts_the_last_background_on_the_pictures_without_a_window_and_shows_the_ring_and_the_card()
+    {
+        TestServices.EnsureInitialized("ko");
+        var store = AppHost.Get<Filee.Core.Settings.UserDataStore>();
+        var last = store.Settings.ImageTools.Background;
+        // What the add background window was last left on; no shadow and no rounding, so a corner of the result is the backdrop.
+        store.Settings.ImageTools.Background = new BackgroundEdit { Kind = BackgroundKind.Solid, Value = "#112233", Padding = .4, Corner = 0, Shadow = 0 };
+        var files = TestImages.Png(2);
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        var windows = new FakeToolWindows(null);
+        try
+        {
+            var radial = ClickQuick(files, windows);
+            RunUntil(() => conversions.Jobs.Count > jobs);
+
+            Assert.Empty(windows.Opened);   // no window opened,
+            Assert.Empty(windows.Messages); // nothing to say: both are still pictures,
+            Assert.True(radial.IsVisible && radial.Window!.DonutControl.IsInProgressMode); // and the donut turns into the ring, as for a conversion
+            var job = conversions.Jobs[0];
+            Assert.Equal(files, job.Job.Sources);
+            var ran = job.Job.Preset.Image.Edit!.Background!;
+            Assert.Equal((BackgroundKind.Solid, "#112233", .4), (ran.Kind, ran.Value, ran.Padding));
+            Assert.NotSame(store.Settings.ImageTools.Background, ran); // a copy: the run changes nothing in the settings
+            Assert.Null(store.FindPreset("quick-background")!.Image.Edit);
+
+            WaitUntilDone(job);
+            // Finished: the card with the picture comes up from the ring, as it does for any conversion that makes a picture.
+            Assert.True(job.HasPictureResult);
+            Assert.Contains(job, conversions.ToastJobs);
+            // Saved where and as add background saves, with the backdrop around the picture.
+            foreach (var file in files)
+            {
+                var saved = Path.Combine(Path.GetDirectoryName(file)!, Path.GetFileNameWithoutExtension(file) + " with background.png");
+                Assert.Contains(saved, job.Job.Outputs);
+                using var result = new MagickImage(saved);
+                Assert.True(result.Width > 8 && result.Height > 8);
+                var corner = result.GetPixels().GetPixel(0, 0).ToColor()!;
+                Assert.Equal((0x11, 0x22, 0x33), (corner.R, corner.G, corner.B));
+            }
+            job.DismissCommand.Execute(null);
+        }
+        finally
+        {
+            store.Settings.ImageTools.Background = last;
+        }
+    }
+
+    [AvaloniaFact]
+    public void A_second_click_on_the_quick_slice_before_its_pictures_are_looked_at_starts_no_second_job()
+    {
+        TestServices.EnsureInitialized("ko");
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        var radial = ClickQuick(TestImages.Png(1), new FakeToolWindows(null));
+
+        radial.Window!.DonutControl.HandleKey(Key.Enter); // again, at once: the first has not started its job yet
+        RunUntil(() => conversions.Jobs.Count > jobs);
+        for (var i = 0; i < 20; i++) // long enough for a second job to show up, were there one
+        {
+            Thread.Sleep(25);
+            Dispatcher.UIThread.RunJobs();
+        }
+
+        Assert.Equal(jobs + 1, conversions.Jobs.Count);
+        var job = conversions.Jobs[0];
+        WaitUntilDone(job);
+        job.DismissCommand.Execute(null);
+    }
+
+    [AvaloniaFact]
+    public void The_quick_slice_leaves_out_what_is_not_a_still_picture_with_the_note_the_tools_give()
+    {
+        TestServices.EnsureInitialized("ko");
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        // As for crop, the donut opens only the first files: the 28th, an animation, comes up when the slice is picked.
+        string[] files = [.. TestImages.Png(27), TestImages.AnimatedGif(), .. TestImages.Png(2)];
+        var windows = new FakeToolWindows(null);
+
+        ClickQuick(files, windows);
+        RunUntil(() => conversions.Jobs.Count > jobs);
+
+        Assert.Empty(windows.Opened);
+        var notice = Assert.Single(windows.Messages);
+        Assert.StartsWith("1개 건너뜀 (한 장짜리 사진이 아님)", notice);
+        Assert.Contains("anim.gif", notice);
+        var job = conversions.Jobs[0];
+        Assert.Equal(files.Where((_, i) => i != 27), job.Job.Sources);
+        WaitUntilDone(job);
+        job.DismissCommand.Execute(null);
+    }
+
+    [AvaloniaFact]
+    public void The_quick_slice_runs_nothing_and_closes_the_donut_when_no_file_is_left()
+    {
+        TestServices.EnsureInitialized("ko");
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        var files = TestImages.Png(1);
+        var windows = new FakeToolWindows(null);
+
+        // Gone after the donut looked at it: by the time the slice is picked nothing is left.
+        var radial = ClickQuick(files, windows, beforeClick: () => File.Delete(files[0]));
+        RunUntil(() => windows.Messages.Count > 0);
+        Dispatcher.UIThread.RunJobs();
+
+        Assert.Contains("p1.png", Assert.Single(windows.Messages));
+        Assert.Empty(windows.Opened);
+        Assert.Equal(jobs, conversions.Jobs.Count);
+        Assert.False(radial.IsVisible);
+    }
+
+    [AvaloniaFact]
+    public void The_quick_slice_hands_the_job_to_the_toast_when_the_donut_is_gone_before_the_files_are_looked_at()
+    {
+        TestServices.EnsureInitialized("ko");
+        var conversions = AppHost.Get<ConversionService>();
+        var jobs = conversions.Jobs.Count;
+        var windows = new FakeToolWindows(null);
+
+        var radial = ClickQuick(TestImages.Png(1), windows);
+        radial.Close(animate: false); // the files are looked at on another thread: Esc or a click elsewhere comes first
+        RunUntil(() => conversions.Jobs.Count > jobs);
+
+        var job = conversions.Jobs[0];
+        Assert.Contains(job, conversions.ToastJobs); // no ring to show it on
+        Assert.False(radial.Window!.DonutControl.IsInProgressMode);
+        WaitUntilDone(job);
+        job.DismissCommand.Execute(null);
     }
 }

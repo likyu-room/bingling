@@ -263,6 +263,8 @@
   "preset.crop.short": "裁剪",
   "preset.add_background": "添加背景",
   "preset.add_background.short": "背景",
+  "preset.quick_background": "快速背景",
+  "preset.quick_background.short": "快速背景",
   "preset.redact": "遮挡",
   "preset.redact.short": "遮挡",
   "preset.annotate": "标注",

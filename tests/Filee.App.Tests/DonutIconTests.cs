@@ -47,6 +47,7 @@ public class DonutIconTests
     [AvaloniaTheory]
     [InlineData("crop", "Icon.Donut.Crop")]
     [InlineData("add-background", "Icon.Donut.AddBackground")]
+    [InlineData("quick-background", "Icon.Donut.QuickBackground")]
     [InlineData("redact", "Icon.Donut.Redact")]
     [InlineData("annotate", "Icon.Donut.Annotate")]
     [InlineData("compress-image", "Icon.Donut.Compress")]
@@ -82,6 +83,19 @@ public class DonutIconTests
         var expected = Icon(key);
         Assert.NotNull(expected);
         Assert.Same(expected, DonutIcons.For(Find(presetId)));
+    }
+
+    [AvaloniaFact]
+    public void The_quick_background_looks_different_from_add_background_even_though_it_is_the_same_tool()
+    {
+        TestServices.EnsureInitialized("en");
+        var quick = DonutIcons.For(Find("quick-background"));
+        var add = DonutIcons.For(Find("add-background"));
+        Assert.NotNull(quick);
+        Assert.NotNull(add);
+        Assert.NotSame(add, quick);
+        Assert.NotEqual(add.Bounds, quick.Bounds); // not a copy of the other picture
+        Assert.Equal(Find("quick-background").Tool, Find("add-background").Tool); // the id tells them apart, not the tool
     }
 
     [AvaloniaTheory]

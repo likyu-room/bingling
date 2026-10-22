@@ -293,6 +293,14 @@ public static class BuiltInData
             Id = "add-background", NameKey = "preset.add_background", TargetFormat = "png", Kind = PresetKind.Tool,
             Tool = ImageToolKind.AddBackground, Image = { Quality = 95 }, Output = { FileNamePattern = "{name} with background" },
         },
+        // The same, without the window: the backdrop add background was last left on (RunWithLastChoices). On the 12th slice
+        // of the images donut, not in the Tools group (full); SettingsMigrations.AddQuickBackground puts it there for older libraries.
+        new()
+        {
+            Id = "quick-background", NameKey = "preset.quick_background", TargetFormat = "png", Kind = PresetKind.Tool,
+            Tool = ImageToolKind.AddBackground, RunWithLastChoices = true, Image = { Quality = 95 },
+            Output = { FileNamePattern = "{name} with background" },
+        },
         new()
         {
             Id = "redact", NameKey = "preset.redact", TargetFormat = SameAsSource, Kind = PresetKind.Tool, Tool = ImageToolKind.Redact,
@@ -362,7 +370,7 @@ public static class BuiltInData
         {
             Id = "images", NameKey = "profile.images",
             Extensions = ExtensionsOf(FormatCategory.Image),
-            PresetIds = ["to-png", "to-jpg", "to-webp", "to-pdf", "trace-svg", "trace-line-art", "to-tiff", "to-bmp", "to-ico", "tools", "half-size"],
+            PresetIds = ["to-png", "to-jpg", "to-webp", "to-pdf", "trace-svg", "trace-line-art", "to-tiff", "to-bmp", "to-ico", "tools", "half-size", "quick-background"],
         },
         new()
         {

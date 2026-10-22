@@ -114,6 +114,13 @@ public sealed class Preset
     [JsonConverter(typeof(LenientEnumJsonConverter<ImageToolKind>))]
     public ImageToolKind Tool { get; set; }
 
+    /// <summary>
+    /// <see cref="PresetKind.Tool"/>: runs with what the tool's window was last left on, instead of opening it ("quick
+    /// background" sets the picture on the last backdrop). Added after 1.2: an older Filee doesn't know it, reads false
+    /// and opens the tool's window.
+    /// </summary>
+    public bool RunWithLastChoices { get; set; }
+
     /// <summary>Most presets one group fans out: more slices would get too narrow to hit.</summary>
     public const int MaxSubPresets = 6;
 
@@ -170,6 +177,7 @@ public sealed class Preset
         Output = Output.Clone(),
         Kind = Kind,
         Tool = Tool,
+        RunWithLastChoices = RunWithLastChoices,
         SubPresetIds = [.. SubPresetIds],
     };
 }
