@@ -132,6 +132,57 @@ public sealed class TriggerServiceLifecycleTests
         Assert.Equal((60, 60), service.LastCursor);
     }
 
+    [AvaloniaFact]
+    public void A_key_chord_raises_the_event_of_its_action()
+    {
+        var provider = new DelayedProvider();
+        provider.AllowExit.Set();
+        using var service = Create(provider, () => { });
+        service.Apply(new AppSettings { Triggers = [Chord("Space", TriggerAction.Donut), Chord("S", TriggerAction.Capture), Chord("C", TriggerAction.PickColor)] });
+        var raised = new List<string>();
+        service.SelectionGesture += (_, e) => raised.Add("ring " + e.Gesture!.Key);
+        service.CaptureRequested += (_, e) => raised.Add("capture " + e.Gesture!.Key);
+        service.ColorPickRequested += (_, e) => raised.Add("pick " + e.Gesture!.Key);
+        service.Start();
+        Assert.True(SpinWait.SpinUntil(() => provider.Runs == 1, 2000));
+
+        foreach (var key in new[] { KeyCode.VcSpace, KeyCode.VcS, KeyCode.VcC })
+            provider.PressKey(key, EventMask.LeftCtrl | EventMask.LeftAlt);
+
+        Assert.True(SpinWait.SpinUntil(() => { Dispatcher.UIThread.RunJobs(); return raised.Count >= 3; }, 2000));
+        Assert.Equal(["ring Space", "capture S", "pick C"], raised);
+    }
+
+    [AvaloniaFact]
+    public void A_screen_shortcut_does_not_open_the_ring()
+    {
+        var provider = new DelayedProvider();
+        provider.AllowExit.Set();
+        using var service = Create(provider, () => { });
+        service.Apply(new AppSettings { Triggers = [Chord("S", TriggerAction.Capture)] });
+        var ring = 0;
+        var captures = 0;
+        service.SelectionGesture += (_, _) => ring++;
+        service.CaptureRequested += (_, _) => captures++;
+        service.Start();
+        Assert.True(SpinWait.SpinUntil(() => provider.Runs == 1, 2000));
+
+        provider.PressKey(KeyCode.VcS, EventMask.LeftCtrl | EventMask.LeftAlt);
+
+        Assert.True(SpinWait.SpinUntil(() => { Dispatcher.UIThread.RunJobs(); return captures == 1; }, 2000));
+        Assert.Equal(0, ring);
+    }
+
+    private static TriggerGesture Chord(string key, TriggerAction action) => new()
+    {
+        Kind = TriggerKind.KeyChord,
+        Modifiers = ModifierKeys.Ctrl | ModifierKeys.Alt,
+        Button = TriggerMouseButton.None,
+        Key = key,
+        Scope = TriggerScope.Anywhere,
+        Action = action,
+    };
+
     private static (DelayedProvider Provider, TriggerService Service, Func<GestureEventArgs?> Started) StartGesture(bool wayland)
     {
         var provider = new DelayedProvider();
@@ -208,11 +259,11 @@ public sealed class TriggerServiceLifecycleTests
             }
         }
 
-        public void PressKey()
+        public void PressKey(KeyCode code = KeyCode.VcA, EventMask mask = EventMask.None)
         {
             lock (_gate)
             {
-                var e = new UioHookEvent { Type = EventType.KeyPressed, Keyboard = new KeyboardEventData { KeyCode = KeyCode.VcA } };
+                var e = new UioHookEvent { Type = EventType.KeyPressed, Mask = mask, Keyboard = new KeyboardEventData { KeyCode = code } };
                 _callback?.Invoke(ref e, _data);
             }
         }

@@ -97,6 +97,14 @@
                 </StackPanel>
               </Grid>
 
+              <!-- What a key shortcut does: open the donut, capture the screen or pick a colour -->
+              <Grid ColumnDefinitions="*,16,*" IsVisible="{Binding UsesAction}">
+                <StackPanel>
+                  <TextBlock Classes="label" Text="{DynamicResource triggers.action}" />
+                  <ComboBox ItemsSource="{Binding Actions}" SelectedItem="{Binding Action}" HorizontalAlignment="Stretch" />
+                </StackPanel>
+              </Grid>
+
               <StackPanel IsVisible="{Binding UsesThreshold}">
                 <DockPanel>
                   <TextBlock DockPanel.Dock="Right" Text="{Binding ThresholdText}" FontWeight="SemiBold" />

@@ -43,7 +43,7 @@ public sealed class TriggerService : IDisposable
         _detector.DragStarted += (g, x, y) => Post(() => DragStarted?.Invoke(this, new GestureEventArgs(g, x, y)));
         _detector.DragEnded += (x, y) => Post(() => DragEnded?.Invoke(this, new GestureEventArgs(null, x, y)));
         _detector.HoldTriggered += (g, x, y) => Post(() => SelectionGesture?.Invoke(this, new GestureEventArgs(g, x, y)));
-        _detector.KeyChordTriggered += (g, x, y) => Post(() => SelectionGesture?.Invoke(this, new GestureEventArgs(g, x, y)));
+        _detector.KeyChordTriggered += (g, x, y) => Post(() => RaiseKeyChord(new GestureEventArgs(g, x, y)));
         _detector.HoldTimerRequested += (token, ms) =>
             _ = Task.Delay(ms).ContinueWith(_ => _detector.HoldElapsed(token), TaskScheduler.Default);
     }
@@ -57,8 +57,30 @@ public sealed class TriggerService : IDisposable
     /// <summary>A hold or keyboard gesture: open the donut for the file manager's current selection.</summary>
     public event EventHandler<GestureEventArgs>? SelectionGesture;
 
+    /// <summary>A key shortcut whose action is to capture the screen.</summary>
+    public event EventHandler<GestureEventArgs>? CaptureRequested;
+
+    /// <summary>A key shortcut whose action is to pick a colour from the screen.</summary>
+    public event EventHandler<GestureEventArgs>? ColorPickRequested;
+
+    private void RaiseKeyChord(GestureEventArgs e)
+    {
+        switch (e.Gesture!.Action)
+        {
+            case TriggerAction.Capture:
+                CaptureRequested?.Invoke(this, e);
+                break;
+            case TriggerAction.PickColor:
+                ColorPickRequested?.Invoke(this, e);
+                break;
+            default:
+                SelectionGesture?.Invoke(this, e);
+                break;
+        }
+    }
+
     /// <summary>Last known cursor position (physical pixels).</summary>
-    public (int X, int Y) LastCursor { get; private set; }
+    public (int X, int Y) LastCursor { get; internal set; }
 
     public bool IsRunning => _hook?.IsRunning == true;
     public string? Error { get; private set; }

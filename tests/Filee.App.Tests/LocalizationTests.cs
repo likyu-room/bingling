@@ -131,6 +131,25 @@ public partial class LocalizationTests
         Assert.Equal("빙글링이 관리자 권한으로 실행 중이에요", ko["elevation.notice_title"]);
     }
 
+    [Fact]
+    public void The_screen_actions_and_their_tray_items_have_a_name_in_every_language()
+    {
+        var ko = Load("ko");
+        Assert.Equal("동작", ko["triggers.action"]);
+        Assert.Equal("링 열기", ko["triggers.action.Donut"]);
+        Assert.Equal("화면 캡처", ko["triggers.action.Capture"]);
+        Assert.Equal("색 찍기", ko["triggers.action.PickColor"]);
+        Assert.Equal("화면 캡처", ko["tray.capture"]);
+        Assert.Equal("색 찍기", ko["tray.pick_color"]);
+
+        foreach (var code in new[] { "en", "ko", "es", "hi", "pl", "zh-CN" })
+        {
+            var strings = Load(code);
+            foreach (var key in new[] { "triggers.action", "triggers.action.Donut", "triggers.action.Capture", "triggers.action.PickColor", "tray.capture", "tray.pick_color" })
+                Assert.False(string.IsNullOrWhiteSpace(strings[key]), $"{code}:{key}");
+        }
+    }
+
     /// <summary>The name followed by a particle that belongs after a vowel.</summary>
     [GeneratedRegex("빙글링(?:를|가|는|와|로|랑|라)")]
     internal static partial Regex WrongParticle();

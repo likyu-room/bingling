@@ -106,6 +106,9 @@ public partial class App : Application
                 _selectionPending = false;
             }
         };
+        var screen = AppHost.Get<IScreenTools>();
+        triggers.CaptureRequested += (_, e) => screen.StartCapture(new PixelPoint(e.X, e.Y));
+        triggers.ColorPickRequested += (_, e) => screen.StartColorPick(new PixelPoint(e.X, e.Y));
         triggers.Start();
         log.LogInformation("Bingling {Version} started", UpdateService.CurrentVersion);
         // macOS: ask for Accessibility with the system's own alert when the user opened Filee (not at sign-in) and

@@ -19,14 +19,17 @@ namespace Filee.App.ViewModels.Pages;
 public sealed partial class TriggerGestureViewModel : ObservableObject
 {
     private readonly TriggerGesture _gesture;
+    private readonly ILocalizer _loc;
     private readonly Action _save;
     private bool _loading = true;
 
     public TriggerGestureViewModel(TriggerGesture gesture, ILocalizer loc, Action save)
     {
         _gesture = gesture;
+        _loc = loc;
         _save = save;
         Kinds = Enum.GetValues<TriggerKind>().Select(k => new Choice<TriggerKind>(k, loc[$"triggers.kind.{k}"])).ToList();
+        Actions = Enum.GetValues<TriggerAction>().Select(a => new Choice<TriggerAction>(a, loc[$"triggers.action.{a}"])).ToList();
         Buttons = Enum.GetValues<TriggerMouseButton>().Where(b => b != TriggerMouseButton.None)
             .Select(b => new Choice<TriggerMouseButton>(b, loc[$"triggers.button.{b}"])).ToList();
         // The file manager has its own name on each system: Explorer, Finder, the Linux desktop's file manager.
@@ -40,6 +43,7 @@ public sealed partial class TriggerGestureViewModel : ObservableObject
 
         Enabled = gesture.Enabled;
         Kind = Kinds.First(k => k.Value == gesture.Kind);
+        Action = Actions.First(a => a.Value == gesture.Action);
         Ctrl = gesture.Modifiers.HasFlag(ModifierKeys.Ctrl);
         Alt = gesture.Modifiers.HasFlag(ModifierKeys.Alt);
         Shift = gesture.Modifiers.HasFlag(ModifierKeys.Shift);
@@ -54,6 +58,7 @@ public sealed partial class TriggerGestureViewModel : ObservableObject
 
     public TriggerGesture Gesture => _gesture;
     public IReadOnlyList<Choice<TriggerKind>> Kinds { get; }
+    public IReadOnlyList<Choice<TriggerAction>> Actions { get; }
     public IReadOnlyList<Choice<TriggerMouseButton>> Buttons { get; }
     public IReadOnlyList<Choice<TriggerScope>> Scopes { get; }
     public string RecordLabel { get; }
@@ -63,8 +68,10 @@ public sealed partial class TriggerGestureViewModel : ObservableObject
 
     [ObservableProperty] private bool _enabled;
 
-    [ObservableProperty, NotifyPropertyChangedFor(nameof(UsesMouse), nameof(UsesKey), nameof(UsesThreshold), nameof(UsesHold))]
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(UsesMouse), nameof(UsesKey), nameof(UsesAction), nameof(UsesThreshold), nameof(UsesHold))]
     private Choice<TriggerKind> _kind = null!;
+
+    [ObservableProperty] private Choice<TriggerAction> _action = null!;
 
     [ObservableProperty] private bool _ctrl;
     [ObservableProperty] private bool _alt;
@@ -79,14 +86,33 @@ public sealed partial class TriggerGestureViewModel : ObservableObject
 
     public bool UsesMouse => Kind.Value != TriggerKind.KeyChord;
     public bool UsesKey => Kind.Value == TriggerKind.KeyChord;
+
+    /// <summary>Only a key shortcut can do something else than open the donut, and capturing is Windows-only for now.</summary>
+    public bool UsesAction => Kind.Value == TriggerKind.KeyChord && OperatingSystem.IsWindows();
     public bool UsesThreshold => Kind.Value == TriggerKind.Drag;
     public bool UsesHold => Kind.Value == TriggerKind.Hold;
     public string KeyText => IsRecording ? RecordingLabel : string.IsNullOrEmpty(Key) ? "—" : Key;
     public string ThresholdText => DragThreshold == 0 ? SystemLabel : $"{DragThreshold}px";
-    public string Summary => GestureText.Describe(_gesture);
+    public string Summary => GestureText.Describe(_gesture, _loc);
 
     // Runs before OnPropertyChanged below, which reads every choice.
-    partial void OnKindChanged(Choice<TriggerKind>? oldValue, Choice<TriggerKind> newValue) => Choices.Restore(oldValue, newValue, v => Kind = v);
+    partial void OnKindChanged(Choice<TriggerKind>? oldValue, Choice<TriggerKind> newValue)
+    {
+        if (Choices.Restore(oldValue, newValue, v => Kind = v))
+            return;
+        // The action is chosen for key shortcuts only: a drag or hold always opens the donut.
+        if (!_loading && newValue.Value != TriggerKind.KeyChord)
+            Action = Actions.First(a => a.Value == TriggerAction.Donut);
+    }
+
+    partial void OnActionChanged(Choice<TriggerAction>? oldValue, Choice<TriggerAction> newValue)
+    {
+        if (Choices.Restore(oldValue, newValue, v => Action = v))
+            return;
+        // Capturing and picking a colour are for any window; the file-manager-only default would leave them silent.
+        if (!_loading && newValue.Value != TriggerAction.Donut)
+            Scope = Scopes.First(s => s.Value == TriggerScope.Anywhere);
+    }
     partial void OnButtonChanged(Choice<TriggerMouseButton>? oldValue, Choice<TriggerMouseButton> newValue) => Choices.Restore(oldValue, newValue, v => Button = v);
     partial void OnScopeChanged(Choice<TriggerScope>? oldValue, Choice<TriggerScope> newValue) => Choices.Restore(oldValue, newValue, v => Scope = v);
 
@@ -94,11 +120,12 @@ public sealed partial class TriggerGestureViewModel : ObservableObject
     {
         base.OnPropertyChanged(e);
         if (_loading || e.PropertyName is nameof(IsRecording) or nameof(KeyText) or nameof(ThresholdText) or nameof(Summary)
-            or nameof(UsesMouse) or nameof(UsesKey) or nameof(UsesThreshold) or nameof(UsesHold))
+            or nameof(UsesMouse) or nameof(UsesKey) or nameof(UsesAction) or nameof(UsesThreshold) or nameof(UsesHold))
             return;
 
         _gesture.Enabled = Enabled;
         _gesture.Kind = Kind.Value;
+        _gesture.Action = Action.Value;
         _gesture.Modifiers = (Ctrl ? ModifierKeys.Ctrl : 0) | (Alt ? ModifierKeys.Alt : 0) |
                              (Shift ? ModifierKeys.Shift : 0) | (Meta ? ModifierKeys.Meta : 0);
         _gesture.Button = Kind.Value == TriggerKind.KeyChord ? TriggerMouseButton.None : Button.Value;

@@ -1,25 +1,31 @@
-// System tray icon: open settings, pause gestures, install a new version, quit.
+// System tray icon: open settings, capture the screen, pick a colour, pause gestures, install a new version, quit.
 
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform;
+using Filee.App.Services.Triggers;
 using Filee.Core;
 using Filee.Core.Localization;
 using Filee.Core.Settings;
 
 namespace Filee.App.Services;
 
-public sealed class TrayService(UserDataStore store, ILocalizer loc, WindowService windows, UpdateService updates)
+public sealed class TrayService(UserDataStore store, ILocalizer loc, WindowService windows, UpdateService updates,
+    IScreenTools screen, TriggerService triggers)
 {
     private TrayIcon? _tray;
-    private NativeMenuItem? _open, _pause, _quit, _update;
+    private NativeMenuItem? _open, _capture, _pickColor, _pause, _quit, _update;
 
     public void Create(Application app)
     {
         using var iconStream = AssetLoader.Open(new Uri("avares://Bingling/Assets/Icons/filee.ico"));
         _open = new NativeMenuItem();
         _open.Click += (_, _) => windows.ShowMain();
+        _capture = new NativeMenuItem();
+        _capture.Click += async (_, _) => await StartAfterMenuClosesAsync(screen.StartCapture);
+        _pickColor = new NativeMenuItem();
+        _pickColor.Click += async (_, _) => await StartAfterMenuClosesAsync(screen.StartColorPick);
         _pause = new NativeMenuItem();
         _pause.Click += (_, _) =>
         {
@@ -39,6 +45,12 @@ public sealed class TrayService(UserDataStore store, ILocalizer loc, WindowServi
             Menu = new NativeMenu { Items = { _open, _pause, new NativeMenuItemSeparator(), _quit } },
             IsVisible = true,
         };
+        // The screen tools are Windows-only for now.
+        if (OperatingSystem.IsWindows())
+        {
+            _tray.Menu.Items.Insert(1, _capture);
+            _tray.Menu.Items.Insert(2, _pickColor);
+        }
         _tray.Clicked += (_, _) => windows.ShowMain();
         TrayIcon.SetIcons(app, [_tray]);
 
@@ -70,12 +82,25 @@ public sealed class TrayService(UserDataStore store, ILocalizer loc, WindowServi
             menu.Items.Remove(_update!);
         }
         _open!.Header = loc["tray.open"];
+        _capture!.Header = loc["tray.capture"];
+        _pickColor!.Header = loc["tray.pick_color"];
         _pause!.Header = store.Settings.Paused ? loc["tray.resume"] : loc["tray.pause"];
         _quit!.Header = loc["tray.quit"];
         var drag = store.Settings.Triggers.FirstOrDefault(t => t.Enabled && t.Kind == TriggerKind.Drag);
         _tray.ToolTipText = store.Settings.Paused
             ? loc["triggers.paused"]
             : loc.Format("tray.tooltip", drag is null ? "—" : GestureText.Modifiers(drag.Modifiers));
+    }
+
+    /// <summary>
+    /// Starts a screen tool for a tray menu item: after a short wait, so the menu has gone and isn't in the picture,
+    /// and at the last cursor position the input hook saw.
+    /// </summary>
+    internal async Task StartAfterMenuClosesAsync(Action<PixelPoint> start)
+    {
+        await Task.Delay(150);
+        var (x, y) = triggers.LastCursor;
+        start(new PixelPoint(x, y));
     }
 
     public void Dispose() => _tray?.Dispose();
