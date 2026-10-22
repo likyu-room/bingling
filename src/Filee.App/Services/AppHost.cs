@@ -63,6 +63,7 @@ public static class AppHost
         services.AddSingleton<ConversionService>();
         services.AddSingleton<WatchFolderService>();
         services.AddSingleton<TriggerService>();
+        services.AddSingleton<CaptureOutput>();
         services.AddSingleton<IScreenTools, ScreenTools>();
         services.AddSingleton<RadialController>();
         services.AddSingleton<TrayService>();

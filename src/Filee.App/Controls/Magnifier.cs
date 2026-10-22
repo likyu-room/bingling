@@ -75,6 +75,18 @@ public sealed class Magnifier : Control
         return new Point(x, y);
     }
 
+    /// <summary>
+    /// Magnifies the picture's <paramref name="pixel"/> and moves beside the <paramref name="cursor"/> on the canvas it is on,
+    /// an <paramref name="area"/> big (DIPs).
+    /// </summary>
+    public void Follow(Point cursor, PixelPoint pixel, Size area)
+    {
+        Pixel = pixel;
+        var at = PlaceBeside(cursor, area);
+        Canvas.SetLeft(this, at.X);
+        Canvas.SetTop(this, at.Y);
+    }
+
     public override void Render(DrawingContext context)
     {
         if (_shot is not { } shot)

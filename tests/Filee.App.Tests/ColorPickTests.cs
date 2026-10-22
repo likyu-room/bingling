@@ -24,7 +24,7 @@ namespace Filee.App.Tests;
 public class ColorPickTests
 {
     /// <summary>The colour the fake screen has at the desktop pixel (<paramref name="x"/>, <paramref name="y"/>).</summary>
-    private static Color ScreenColor(int x, int y) => Color.FromRgb((byte)x, (byte)y, 0x7A);
+    internal static Color ScreenColor(int x, int y) => Color.FromRgb((byte)x, (byte)y, 0x7A);
 
     /// <summary>What the clipboard holds, read through a window of its own (the headless clipboard is one for all).</summary>
     private static async Task<string?> ClipboardText()
@@ -42,7 +42,7 @@ public class ColorPickTests
     }
 
     /// <summary>Runs the UI thread until <paramref name="done"/> or a second has gone by.</summary>
-    private static async Task Until(Func<bool> done)
+    internal static async Task Until(Func<bool> done)
     {
         for (var i = 0; i < 100 && !done(); i++)
         {
@@ -56,7 +56,7 @@ public class ColorPickTests
     public async Task Picking_a_pixel_copies_its_hex_and_the_card_shows_its_codes()
     {
         TestServices.EnsureInitialized("ko");
-        var tools = new ScreenTools(new FakeScreen(), new ToolsLog());
+        var tools = new ScreenTools(new FakeScreen(), new ToolsLog(), AppHost.Get<CaptureOutput>());
 
         tools.StartColorPick(new PixelPoint(100, 100));
         var picker = Assert.IsType<PickColorWindow>(tools.Picker);
@@ -79,7 +79,7 @@ public class ColorPickTests
     public async Task Esc_or_a_right_click_closes_the_eyedropper_and_copies_nothing()
     {
         TestServices.EnsureInitialized("ko");
-        var tools = new ScreenTools(new FakeScreen(), new ToolsLog());
+        var tools = new ScreenTools(new FakeScreen(), new ToolsLog(), AppHost.Get<CaptureOutput>());
 
         tools.StartColorPick(new PixelPoint(100, 100));
         var picker = tools.Picker!;
@@ -180,9 +180,9 @@ public class ColorPickTests
         TestServices.EnsureInitialized("en");
         var log = new ToolsLog();
 
-        new ScreenTools(new FakeScreen { Black = true }, log).StartColorPick(new PixelPoint(100, 100));
-        new ScreenTools(new FakeScreen { None = true }, log).StartColorPick(new PixelPoint(100, 100));
-        var throwing = new ScreenTools(new FakeScreen { Throws = true }, log);
+        new ScreenTools(new FakeScreen { Black = true }, log, AppHost.Get<CaptureOutput>()).StartColorPick(new PixelPoint(100, 100));
+        new ScreenTools(new FakeScreen { None = true }, log, AppHost.Get<CaptureOutput>()).StartColorPick(new PixelPoint(100, 100));
+        var throwing = new ScreenTools(new FakeScreen { Throws = true }, log, AppHost.Get<CaptureOutput>());
         throwing.StartColorPick(new PixelPoint(100, 100)); // never throws: the tray calls it from async void
 
         Assert.Null(throwing.Picker);
@@ -195,7 +195,7 @@ public class ColorPickTests
     {
         TestServices.EnsureInitialized("en");
         var screen = new FakeScreen();
-        var tools = new ScreenTools(screen, new ToolsLog());
+        var tools = new ScreenTools(screen, new ToolsLog(), AppHost.Get<CaptureOutput>());
 
         tools.StartColorPick(new PixelPoint(-5000, -5000));
 
@@ -209,7 +209,7 @@ public class ColorPickTests
     {
         TestServices.EnsureInitialized("en");
         var screen = new FakeScreen();
-        var tools = new ScreenTools(screen, new ToolsLog());
+        var tools = new ScreenTools(screen, new ToolsLog(), AppHost.Get<CaptureOutput>());
 
         tools.StartColorPick(new PixelPoint(100, 100));
         var first = tools.Picker;
@@ -237,7 +237,7 @@ public class ColorPickTests
         TestServices.EnsureInitialized("en");
         ColorCardWindow? card = null;
         var screen = new FakeScreen { Watch = () => card?.IsVisible == true };
-        var tools = new ScreenTools(screen, new ToolsLog());
+        var tools = new ScreenTools(screen, new ToolsLog(), AppHost.Get<CaptureOutput>());
         tools.StartColorPick(new PixelPoint(100, 100));
         tools.Picker!.MouseDown(new Point(10, 10), MouseButton.Left);
         card = tools.Card!;
@@ -309,7 +309,7 @@ public class ColorPickTests
     public async Task Esc_closes_the_card()
     {
         TestServices.EnsureInitialized("ko");
-        var tools = new ScreenTools(new FakeScreen(), new ToolsLog());
+        var tools = new ScreenTools(new FakeScreen(), new ToolsLog(), AppHost.Get<CaptureOutput>());
         tools.StartColorPick(new PixelPoint(100, 100));
         tools.Picker!.MouseDown(new Point(10, 10), MouseButton.Left);
         var card = tools.Card!;
@@ -324,7 +324,7 @@ public class ColorPickTests
         Assert.Null(tools.Card);
     }
 
-    private static Color Pixel(Avalonia.Media.Imaging.Bitmap frame, Point at)
+    internal static Color Pixel(Avalonia.Media.Imaging.Bitmap frame, Point at)
     {
         var bytes = new byte[4];
         var handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
@@ -343,7 +343,7 @@ public class ColorPickTests
     /// A screen whose pixel at (x, y) of the desktop is <see cref="ScreenColor"/>. <see cref="Black"/> hands back a black
     /// picture (DRM video, the secure desktop), <see cref="None"/> no picture, <see cref="Throws"/> an error.
     /// </summary>
-    private sealed class FakeScreen : IPlatformServices
+    internal sealed class FakeScreen : IPlatformServices
     {
         public bool Black { get; init; }
         public bool None { get; init; }
@@ -390,7 +390,7 @@ public class ColorPickTests
     }
 
     /// <summary>The screen tools' log, kept.</summary>
-    private sealed class ToolsLog : ILogger<ScreenTools>
+    internal sealed class ToolsLog : ILogger<ScreenTools>
     {
         private readonly ListLogger _lines = new();
         public List<(LogLevel Level, string Message)> Lines => _lines.Lines;

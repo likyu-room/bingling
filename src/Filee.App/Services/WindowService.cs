@@ -219,9 +219,10 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
     /// <summary>
     /// Opens the window of image tool <paramref name="tool"/> on <paramref name="files"/>, centred on
     /// <paramref name="cursor"/> (screen pixels), and returns what the user applied; null when they closed it without
-    /// (or when the tool has no window yet).
+    /// (or when the tool has no window yet). <paramref name="footer"/>: what the footer says for one file instead of "the
+    /// original stays" (a capture: the folder it is saved in).
     /// </summary>
-    public virtual async Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
+    public virtual async Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor, string? footer = null)
     {
         var log = services.GetService<ILogger<ImageToolViewModel>>();
         using var vm = ImageToolViewModel.Create(tool, files, services.GetRequiredService<UserDataStore>(), loc, log);
@@ -230,6 +231,7 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
             log?.LogWarning("The {Tool} tool has no window yet; nothing opens", tool);
             return null;
         }
+        vm.FooterNote = footer;
         Motion.Refresh();
         var window = new ImageToolWindow { DataContext = vm };
         // Annotate: throw the drawings away? Asked after "Cancel" or Esc, so it can't answer with another "Cancel".

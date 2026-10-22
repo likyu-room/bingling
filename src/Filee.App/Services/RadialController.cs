@@ -380,15 +380,7 @@ public sealed class RadialController(
                 }
                 if (picked.Count == 0 || await windows.EditImageAsync(preset.Tool, picked, cursor) is not { } result)
                     return;
-                if (result.PerFile is { } perFile)
-                {
-                    // Each file its own edit (annotate): one job of the files that have one, in the order they were dropped.
-                    conversions.Start(picked, preset, perFile);
-                    return;
-                }
-                var run = preset.Clone();
-                run.Image.Edit = result.Shared;
-                conversions.Start(picked, run);
+                conversions.StartTool(picked, preset, result);
             }
             catch (Exception ex)
             {

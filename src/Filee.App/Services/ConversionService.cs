@@ -90,6 +90,21 @@ public sealed class ConversionService
     }
 
     /// <summary>
+    /// Runs what an image tool window handed back (<paramref name="result"/>) on its <paramref name="files"/>: each file with
+    /// its own edit (annotate: one job of the files that have one, in their order), or the one edit for all of them on a
+    /// copy of <paramref name="preset"/> (the stored preset keeps none).
+    /// </summary>
+    /// <returns>The job's view model, or null when there was nothing to convert.</returns>
+    public JobViewModel? StartTool(IReadOnlyList<string> files, Preset preset, ToolResult result)
+    {
+        if (result.PerFile is { } perFile)
+            return Start(files, preset, perFile);
+        var run = preset.Clone();
+        run.Image.Edit = result.Shared;
+        return Start(files, run);
+    }
+
+    /// <summary>
     /// Converts a watch folder's files again (rule id, files, preset as the job ran it): WatchFolderService sets it, so
     /// a retry also does what the folder does afterwards (moving originals).
     /// </summary>
@@ -140,8 +155,12 @@ public sealed class ConversionService
                 _watchJobs[started.Job.Id] = watchRuleId;
             return started;
         });
-        if (vm is null)
-            return null;
+        return vm is null ? null : await FinishedAsync(vm);
+    }
+
+    /// <summary>Completes when the job of <paramref name="vm"/> has finished (at once when it has). Callable from any thread.</summary>
+    public async Task<ConversionJob> FinishedAsync(JobViewModel vm)
+    {
         var finished = _waiting.GetOrAdd(vm.Job.Id, _ => new TaskCompletionSource<ConversionJob>(TaskCreationOptions.RunContinuationsAsynchronously));
         // The job may have finished before the wait was registered.
         if (vm.Job.State is not (JobState.Queued or JobState.Running))

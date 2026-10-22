@@ -29,6 +29,13 @@ public sealed record ScreenShot(SKImage Image, PixelRect Bounds, double Scaling)
         return Color.FromRgb(color.Red, color.Green, color.Blue);
     }
 
+    /// <summary>A copy of the picture's <paramref name="area"/> (its pixels, inside it): one of its own, kept once the shot is let go of.</summary>
+    public SKImage Crop(PixelRect area)
+    {
+        using var part = _pixels.ExtractSubset(new SKRectI(area.X, area.Y, area.Right, area.Bottom));
+        return SKImage.FromPixelCopy(part);
+    }
+
     public void Dispose()
     {
         _pixels.Dispose();

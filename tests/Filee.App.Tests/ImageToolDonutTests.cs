@@ -208,7 +208,7 @@ public class ImageToolDonutTests
         /// <summary>The messages shown (answered at once, as if OK was pressed).</summary>
         public List<string> Messages { get; } = [];
 
-        public override Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor)
+        public override Task<ToolResult?> EditImageAsync(ImageToolKind tool, IReadOnlyList<string> files, PixelPoint cursor, string? footer = null)
         {
             Opened.Add((tool, [.. files], cursor));
             return Task.FromResult(answer);

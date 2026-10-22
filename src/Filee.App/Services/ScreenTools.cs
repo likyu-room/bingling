@@ -1,6 +1,6 @@
-// The screen tools a shortcut or the tray starts (IScreenTools): the instant eyedropper and the colour card it leaves.
-// Their public methods never throw: the tray calls them from async void handlers. Where the platform takes no picture
-// of the screen (macOS, Linux) nothing opens; their shortcuts and tray items are Windows-only anyway.
+// The screen tools a shortcut or the tray starts (IScreenTools): the capture window, the instant eyedropper and the colour
+// card an eyedropper leaves. Their public methods never throw: the tray calls them from async void handlers. Where the
+// platform takes no picture of the screen (macOS, Linux) nothing opens; their shortcuts and tray items are Windows-only anyway.
 
 using Avalonia;
 using Avalonia.Controls;
@@ -12,39 +12,53 @@ using Microsoft.Extensions.Logging;
 
 namespace Filee.App.Services;
 
-public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools> log) : IScreenTools
+public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools> log, CaptureOutput output) : IScreenTools
 {
-    /// <summary>How long a colour card still up gets to leave the screen before the eyedropper takes its picture.</summary>
+    /// <summary>How long a colour card still up gets to leave the screen before the next picture of it is taken.</summary>
     private static readonly TimeSpan CardGoneAfter = TimeSpan.FromMilliseconds(150);
 
     // UI thread only.
-    private PickColorWindow? _picker;
+    private ScreenCoverWindow? _cover; // the capture window or the eyedropper: one at a time
     private ColorCardWindow? _card;
-    private bool _starting; // waiting for a card to go: the shortcut again does nothing meanwhile
+    private bool _starting; // waiting for a card to go: a shortcut again does nothing meanwhile
 
     /// <summary>The eyedropper's window while it is open.</summary>
-    internal PickColorWindow? Picker => _picker;
+    internal PickColorWindow? Picker => _cover as PickColorWindow;
+
+    /// <summary>The capture window while it is open.</summary>
+    internal CaptureWindow? Capture => _cover as CaptureWindow;
 
     /// <summary>The colour card while it is open; one at a time.</summary>
     internal ColorCardWindow? Card => _card;
 
-    public void StartCapture(PixelPoint cursor)
-    {
-        // The capture window comes in the next step (Bingling 1.3, task 4).
-    }
+    /// <summary>
+    /// Takes a picture of the screen under <paramref name="cursor"/> and covers it with the capture window, the picture
+    /// frozen: a drag picks an area to edit, copy or save, and its eyedropper picks a colour as the instant one does.
+    /// </summary>
+    public void StartCapture(PixelPoint cursor) => Start<CaptureWindow>(cursor, "screen capture", (window, shot) =>
+        window.Open(new CaptureViewModel(shot, output)
+        {
+            CopyPicture = picture => window.Clipboard is { } clipboard ? ResultClipboard.CopyPictureAsync(clipboard, picture, log) : Task.FromResult(false),
+        }, cursor));
 
     /// <summary>
     /// Takes a picture of the screen under <paramref name="cursor"/> and covers it with the eyedropper; a click there copies
-    /// that pixel's HEX code and shows the colour card. A card still up closes first, a moment before the picture. While the
-    /// eyedropper is open (or waiting for the card), starting it again does nothing; when the screen can't be taken (or is
-    /// black) nothing opens and the log says so.
+    /// that pixel's HEX code and shows the colour card.
     /// </summary>
-    public async void StartColorPick(PixelPoint cursor)
+    public void StartColorPick(PixelPoint cursor) => Start<PickColorWindow>(cursor, "colour picker", (window, shot) => window.Open(shot, cursor));
+
+    /// <summary>
+    /// Takes the picture and opens <typeparamref name="TWindow"/> over it (<paramref name="open"/>); the picture is let go of
+    /// when the window closes. A card still up closes first, a moment before the picture. While a screen tool is open (or
+    /// waiting for the card), starting one again does nothing; when the screen can't be taken (or is black) nothing opens
+    /// and the log says so.
+    /// </summary>
+    private async void Start<TWindow>(PixelPoint cursor, string tool, Action<TWindow, ScreenShot> open) where TWindow : ScreenCoverWindow, new()
     {
-        if (_picker is not null || _starting)
+        if (_cover is not null || _starting)
             return;
         _starting = true;
-        PickColorWindow? picker = null;
+        TWindow? window = null;
         ScreenShot? shot = null;
         try
         {
@@ -55,30 +69,30 @@ public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools>
                 card.Close();
                 await Task.Delay(CardGoneAfter);
             }
-            picker = new PickColorWindow();
-            shot = ScreenGrab.Grab(platform, picker.Screens, cursor);
+            window = new TWindow();
+            shot = ScreenGrab.Grab(platform, window.Screens, cursor);
             if (shot is null)
             {
-                log.LogInformation("No colour to pick: the screen at {Cursor} could not be taken, or came out black", cursor);
-                picker.Close();
+                log.LogInformation("The {Tool} does not open: the screen at {Cursor} could not be taken, or came out black", tool, cursor);
+                window.Close();
                 return;
             }
             var taken = shot;
-            _picker = picker;
-            picker.Closed += (_, _) =>
+            _cover = window;
+            window.Closed += (_, _) =>
             {
-                _picker = null;
+                _cover = null;
                 taken.Dispose();
             };
-            picker.Picked += ShowCard;
-            picker.Open(shot, cursor);
-            RaiseTopmost(picker);
+            window.Picked += ShowCard;
+            open(window, shot);
+            RaiseTopmost(window);
         }
         catch (Exception ex) when (ex is not OutOfMemoryException)
         {
-            log.LogWarning(ex, "Could not start the colour picker at {Cursor}", cursor);
-            _picker = null;
-            picker?.Close();
+            log.LogWarning(ex, "Could not start the {Tool} at {Cursor}", tool, cursor);
+            _cover = null;
+            window?.Close();
             shot?.Dispose();
         }
         finally

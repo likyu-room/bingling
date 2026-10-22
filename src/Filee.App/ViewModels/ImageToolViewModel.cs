@@ -89,7 +89,13 @@ public abstract partial class ImageToolViewModel : ObservableObject, IDisposable
     /// The note left of the buttons: "Applies to all 3 files", or for one file that the original stays and the result is a
     /// new file beside it (people hesitate to save when they fear the original is overwritten).
     /// </summary>
-    public virtual string FooterText => HasMany ? Loc.Format("tool.applies_to_all", Count) : Loc["tool.original_kept"];
+    public virtual string FooterText => HasMany ? Loc.Format("tool.applies_to_all", Count) : FooterNote ?? Loc["tool.original_kept"];
+
+    /// <summary>
+    /// What the footer says for one file instead of "the original stays", where the result goes elsewhere (a capture: the
+    /// folder it is saved in). Set before the window opens.
+    /// </summary>
+    public string? FooterNote { get; set; }
 
     /// <summary>
     /// Asks the user a yes / no question, such as whether to throw drawings away (the window service sets it: a dialog over

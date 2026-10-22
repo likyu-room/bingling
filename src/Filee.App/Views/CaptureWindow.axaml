@@ -1,0 +1,75 @@
+<!--
+  The capture window (ScreenTools.StartCapture): covers the screen the cursor is on with the picture taken of it, frozen and
+  dimmed. A drag picks an area, shown bright with its size in pixels above it and Edit / Copy / Save below it. The toolbar
+  at the top picks an area, the whole screen or the eyedropper (the magnifier on the frozen screen), or closes.
+  Esc or a right click closes it; Enter or Ctrl+C copies, Ctrl+S saves.
+-->
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:Filee.App.Controls"
+        xmlns:vm="using:Filee.App.ViewModels"
+        x:Class="Filee.App.Views.CaptureWindow"
+        x:DataType="vm:CaptureViewModel"
+        Title="{DynamicResource tray.capture}"
+        WindowDecorations="None"
+        Background="Black"
+        Topmost="True"
+        ShowInTaskbar="False"
+        CanResize="False">
+  <Window.Styles>
+    <Style Selector="ListBox.chips ListBoxItem">
+      <Setter Property="Margin" Value="0,0,4,0" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="FontSize" Value="13" />
+    </Style>
+  </Window.Styles>
+  <Panel>
+    <!-- The frozen screen; a press on it starts a drag (or picks a colour). The layers above it let the pointer through. -->
+    <Image x:Name="Frozen" Stretch="Fill" Cursor="Cross" />
+    <Path x:Name="Dim" Fill="#100C0A" IsHitTestVisible="False" />
+    <Canvas>
+      <Border x:Name="Frame" BorderBrush="White" BorderThickness="1.5" IsHitTestVisible="False" />
+      <Border x:Name="SizeTag" Height="20" Padding="6,0" CornerRadius="6" Background="#D9140F0E" IsHitTestVisible="False">
+        <TextBlock x:Name="SizeLabel" Foreground="White" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+      </Border>
+      <!-- On a card of their own: plain buttons are see-through, and the screen behind them can be anything. -->
+      <Border x:Name="Actions" Classes="card" Padding="6">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <Button Classes="accent" Content="{DynamicResource capture.edit}" Command="{Binding EditCommand}" />
+          <Button Content="{DynamicResource toast.copy}" Command="{Binding CopyCommand}" ToolTip.Tip="Enter, Ctrl+C" />
+          <Button Content="{DynamicResource tool.save}" Command="{Binding SaveCommand}" ToolTip.Tip="Ctrl+S" />
+        </StackPanel>
+      </Border>
+      <c:Magnifier x:Name="Lens" />
+    </Canvas>
+    <TextBlock Text="{DynamicResource capture.hint}" IsVisible="{Binding ShowsHint}" Foreground="White" FontSize="18"
+               FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+
+    <Border Classes="card" Padding="6" Margin="0,20,0,0" HorizontalAlignment="Center" VerticalAlignment="Top">
+      <StackPanel Orientation="Horizontal" Spacing="2">
+        <!-- In the order of CaptureMode. -->
+        <ListBox Classes="chips" SelectedIndex="{Binding ModeIndex}">
+          <ListBox.ItemsPanel>
+            <ItemsPanelTemplate>
+              <StackPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ListBox.ItemsPanel>
+          <ListBoxItem Content="{DynamicResource capture.mode.region}" />
+          <ListBoxItem Content="{DynamicResource capture.mode.screen}" />
+          <ListBoxItem Content="{DynamicResource capture.mode.color}" />
+        </ListBox>
+        <Button Classes="ghost" Padding="12,6" Command="{Binding CloseCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBlock Text="{DynamicResource common.close}" FontSize="13" />
+            <TextBlock Classes="caption" Text="Esc" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </Border>
+
+    <Border IsVisible="{Binding SaysCopied}" Padding="18,8" CornerRadius="999" Background="#E6140F0E"
+            HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+      <TextBlock Text="{DynamicResource capture.copied}" Foreground="White" FontSize="15" FontWeight="SemiBold" />
+    </Border>
+  </Panel>
+</Window>

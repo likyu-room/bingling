@@ -1,6 +1,6 @@
 // Puts a finished job's results on the clipboard for the toast card's Copy button: one picture as a picture (to paste in a
 // chat or a document), anything else as files (to paste in a folder or an attachment). The image tool window's Copy puts
-// its edited picture there the same way, without writing a file.
+// its edited picture there the same way, without writing a file, and so does the capture window with the area it took.
 
 using Avalonia;
 using Avalonia.Input.Platform;
@@ -12,6 +12,7 @@ using Filee.Core.Presets;
 using Filee.Engines.Magick;
 using ImageMagick;
 using Microsoft.Extensions.Logging;
+using SkiaSharp;
 
 namespace Filee.App.Services;
 
@@ -91,6 +92,31 @@ public static class ResultClipboard
             log?.LogWarning(ex, "Could not copy the edited picture to the clipboard ({Path})", path);
             return false;
         }
+    }
+
+    /// <summary>The capture window's Copy: a picture in memory (<paramref name="picture"/>) goes on the clipboard. Never throws.</summary>
+    /// <returns>True when it was copied; false (and a line in <paramref name="log"/>) when the clipboard is busy.</returns>
+    public static async Task<bool> CopyPictureAsync(IClipboard clipboard, SKImage picture, ILogger? log)
+    {
+        try
+        {
+            await clipboard.SetBitmapAsync(ToBitmap(picture)); // a copy of its own; not disposed, as in CopyAsync
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log?.LogWarning(ex, "Could not copy the {Width} × {Height} picture to the clipboard", picture.Width, picture.Height);
+            return false;
+        }
+    }
+
+    /// <summary>A copy of <paramref name="picture"/>, a picture in memory (a screen's: BGRA or RGBA), as a bitmap.</summary>
+    internal static Bitmap ToBitmap(SKImage picture)
+    {
+        using var pixels = picture.PeekPixels() ?? throw new ArgumentException("The picture is not in memory", nameof(picture));
+        return new Bitmap(pixels.ColorType == SKColorType.Rgba8888 ? PixelFormats.Rgba8888 : PixelFormats.Bgra8888,
+            pixels.AlphaType == SKAlphaType.Unpremul ? AlphaFormat.Unpremul : AlphaFormat.Premul, pixels.GetPixels(),
+            new PixelSize(pixels.Width, pixels.Height), new Vector(96, 96), pixels.RowBytes);
     }
 
     /// <summary>
