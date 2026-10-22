@@ -719,6 +719,7 @@ public class ToastWindowTests
     public async Task A_picture_made_by_the_ring_at_once_goes_on_a_card_too()
     {
         // RadialController shows such a job in the toast (HasPictureResult): its picture, to see, copy or open it.
+        TestServices.EnsureInitialized("ko");
         using var dir = new TempFolder();
         var picture = await RunToTheEnd(dir.NoisyPicture("photo.png", 600, 400), "to-jpg");
         Assert.True(picture.HasPictureResult);
