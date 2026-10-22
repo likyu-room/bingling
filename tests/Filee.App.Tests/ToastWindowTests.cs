@@ -1,5 +1,6 @@
 // The bottom-right progress cards: one card per job.
 
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
@@ -517,8 +518,7 @@ public class ToastWindowTests
 
         Assert.Contains(copy.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "복사됨" && t.IsEffectivelyVisible);
         Assert.DoesNotContain(copy.GetVisualDescendants().OfType<TextBlock>(), t => t.Text == "복사" && t.IsEffectivelyVisible);
-        using var bitmap = await shown.Toast.Clipboard!.TryGetBitmapAsync();
-        Assert.Equal((600, 400), (bitmap!.PixelSize.Width, bitmap.PixelSize.Height));
+        Assert.Equal((600, 400), await ClipboardPictureSize(shown.Toast.Clipboard!));
         shown.Save("toast-copied.png");
 
         await Until(() => !vm.JustCopied, seconds: 5); // back to "Copy" by itself
@@ -771,6 +771,61 @@ public class ToastWindowTests
             return Task.FromResult<IReadOnlyList<string>>([path]);
         }
     }
+
+    /// <summary>
+    /// The size of the picture on the clipboard. On Windows the card puts it on the system's clipboard itself (as a DIB),
+    /// not on Avalonia's, so it is read there.
+    /// </summary>
+    private static async Task<(int Width, int Height)> ClipboardPictureSize(IClipboard clipboard)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            using var bitmap = await clipboard.TryGetBitmapAsync();
+            return (bitmap!.PixelSize.Width, bitmap.PixelSize.Height);
+        }
+        // Clipboard listeners (Windows' clipboard history among them) open it to read the new picture: wait for them.
+        var opened = false;
+        for (var attempt = 0; attempt < 40 && !(opened = OpenClipboard(0)); attempt++)
+            await Task.Delay(50);
+        Assert.True(opened);
+        try
+        {
+            var memory = GetClipboardData(8); // CF_DIB
+            Assert.NotEqual(0, memory);
+            var header = GlobalLock(memory);
+            Assert.NotEqual(0, header);
+            try
+            {
+                return (Marshal.ReadInt32(header, 4), Marshal.ReadInt32(header, 8));
+            }
+            finally
+            {
+                GlobalUnlock(memory);
+            }
+        }
+        finally
+        {
+            CloseClipboard();
+        }
+    }
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool OpenClipboard(nint owner);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
+    private static extern nint GetClipboardData(uint format);
+
+    [DllImport("kernel32.dll")]
+    private static extern nint GlobalLock(nint memory);
+
+    [DllImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GlobalUnlock(nint memory);
 
     /// <summary>WCAG contrast ratio of two colours.</summary>
     private static double Contrast(Color a, Color b)
