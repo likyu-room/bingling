@@ -27,7 +27,7 @@ namespace Filee.App.ViewModels.Tools;
 public sealed record BackgroundSwatch(string Id, string Label, IBrush Brush, BackgroundKind Kind, string Value);
 
 /// <summary>The add background tool: one backdrop, padding, corner, shadow and shape, kept over every file.</summary>
-public sealed partial class BackgroundToolViewModel : ImageToolViewModel
+public sealed partial class BackgroundToolViewModel : ColorToolViewModel
 {
     /// <summary>The shapes of the result, in the order the chips show them (<see cref="BackgroundEdit.Aspect"/>).</summary>
     internal static readonly IReadOnlyList<string> AspectIds = ["auto", "1:1", "16:9", "9:16", "4:5", "4:3"];
@@ -145,6 +145,18 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
     }
 
     private bool CanUsePictureColor => PreviewImage is not null;
+
+    /// <summary>The backdrop when it is one colour (a chip's or a typed one), which the copy button copies; a gradient or a picture is none.</summary>
+    protected override string? ColorHex => _edit.Kind == BackgroundKind.Solid ? HexColor(_edit.Value) : null;
+
+    /// <summary>A colour picked off the picture: the backdrop, the box showing it, as a typed colour is (one undo step).</summary>
+    protected override void UseColor(string hex)
+    {
+        CustomColorHex = hex;
+        // Again, not only through the box: when it shows this very colour already (from before a chip was picked), a text
+        // that does not change sets nothing. When the box did the work, this is no second step.
+        Change(e => (e.Kind, e.Value, e.ImagePath) = (BackgroundKind.Solid, hex, null));
+    }
 
     /// <summary>The typed colour as a chip's paint; nothing while it is not a whole code.</summary>
     public IBrush CustomColorBrush => HexColor(_hex) is { } hex ? new SolidColorBrush(Color.Parse(hex)) : Brushes.Transparent;
@@ -335,6 +347,7 @@ public sealed partial class BackgroundToolViewModel : ImageToolViewModel
             nameof(OutputText),
         })
             OnPropertyChanged(name);
+        NotifyColorChanged();
     }
 
     /// <summary>The edit the preview draws: <see cref="_edit"/>, but with the copy of the user's picture where it has one.</summary>

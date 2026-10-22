@@ -49,6 +49,20 @@ public class ImageToolWindowTests
             return path;
         }
 
+        /// <summary>Vertical bands side by side, one colour each and equally wide: a pick tells which band it landed on.</summary>
+        public static string Bands(int width, int height, params string[] colors)
+        {
+            var path = Path.Combine(Folder(), "bands.png");
+            using var image = new MagickImage(MagickColors.Black, (uint)width, (uint)height);
+            for (var i = 0; i < colors.Length; i++)
+            {
+                using var band = new MagickImage(new MagickColor(colors[i]), (uint)(width / colors.Length), (uint)height);
+                image.Composite(band, i * (width / colors.Length), 0, CompositeOperator.Over);
+            }
+            image.Write(path, MagickFormat.Png);
+            return path;
+        }
+
         /// <summary>A JPEG stored as <paramref name="width"/> × <paramref name="height"/> that a phone turned: EXIF orientation 6.</summary>
         public static string TurnedJpeg(int width, int height)
         {

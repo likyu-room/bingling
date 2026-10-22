@@ -78,6 +78,8 @@ public partial class ImageToolWindow : Window
             _ => ((Control?, PictureView?))(null, null),
         };
         PictureHost.Child = _picture;
+        if (_picture is not null && _model is ColorToolViewModel colors)
+            _picture.ColorPicked += colors.PickColor;
     }
 
     /// <summary>The crop box over the preview bitmap; a double click in it saves.</summary>
@@ -98,6 +100,7 @@ public partial class ImageToolWindow : Window
         [!PictureView.PictureProperty] = CompiledBinding.Create<ImageToolViewModel, SKImage?>(vm => vm.PreviewImage),
         [!PictureView.FullShortSideProperty] = CompiledBinding.Create<ImageToolViewModel, int>(vm => vm.FullShortSide),
         [!PictureView.EditProperty] = CompiledBinding.Create<BackgroundToolViewModel, ImageEdit?>(vm => vm.PreviewEdit),
+        [!PictureView.EyedropperProperty] = CompiledBinding.Create<ColorToolViewModel, bool>(vm => vm.IsEyedropperOn),
     };
 
     /// <summary>The preview picture with the redact boxes, which are drawn, picked, moved and resized on it.</summary>
@@ -119,6 +122,7 @@ public partial class ImageToolWindow : Window
         [!AnnotateCanvas.ToolProperty] = CompiledBinding.Create<AnnotateToolViewModel, AnnotationKind?>(vm => vm.DrawingTool),
         [!AnnotateCanvas.ColorProperty] = CompiledBinding.Create<AnnotateToolViewModel, string>(vm => vm.Color),
         [!AnnotateCanvas.StrokeWidthProperty] = CompiledBinding.Create<AnnotateToolViewModel, StrokeLevel>(vm => vm.StrokeWidth),
+        [!PictureView.EyedropperProperty] = CompiledBinding.Create<ColorToolViewModel, bool>(vm => vm.IsEyedropperOn),
     };
 
     private void OnFinished(object? sender, EventArgs e)
@@ -219,6 +223,9 @@ public partial class ImageToolWindow : Window
                 break;
             case Key.Enter:
                 vm.SaveCommand.Execute(null);
+                break;
+            case Key.Escape when vm is ColorToolViewModel { IsEyedropperOn: true } colors:
+                colors.IsEyedropperOn = false; // only the eyedropper; the window stays
                 break;
             case Key.Escape:
                 vm.CancelCommand.Execute(null);

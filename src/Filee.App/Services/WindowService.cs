@@ -3,9 +3,11 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input.Platform;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Filee.App.ViewModels;
+using Filee.App.ViewModels.Tools;
 using Filee.App.Views;
 using Filee.Core.Localization;
 using Filee.Core.Presets;
@@ -238,6 +240,8 @@ public class WindowService(ILocalizer loc, IServiceProvider services, MemoryTrim
         vm.Ask = question => ConfirmAsync(window, question, yes: loc["tool.discard"], no: loc["tool.keep_editing"]);
         vm.CopyPicture = (path, edit) =>
             window.Clipboard is { } clipboard ? ResultClipboard.CopyEditedAsync(clipboard, path, edit, log) : Task.FromResult(false);
+        if (vm is ColorToolViewModel colors) // the copy button of the custom colour
+            colors.SetClipboardText = text => window.Clipboard?.SetTextAsync(text) ?? throw new InvalidOperationException("The editor window has no clipboard");
         window.PlaceNear(cursor);
         var closed = new TaskCompletionSource();
         window.Closed += (_, _) => closed.TrySetResult();

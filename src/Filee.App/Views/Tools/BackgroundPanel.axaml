@@ -1,9 +1,11 @@
 <!-- The add background tool's side of the image tool window: the backdrop chips (gradients, colours, a typed colour, a
-     picture of the user's), the padding / corner / shadow sliders with their pixels on the file shown, and the shape. -->
+     picture of the user's, with the eyedropper and copy buttons under the colour box), the padding / corner / shadow sliders
+     with their pixels on the file shown, and the shape. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Filee.App.ViewModels"
              xmlns:tools="using:Filee.App.ViewModels.Tools"
+             xmlns:views="using:Filee.App.Views.Tools"
              x:Class="Filee.App.Views.Tools.BackgroundPanel"
              x:DataType="tools:BackgroundToolViewModel">
   <StackPanel Spacing="14">
@@ -36,6 +38,7 @@
                   BorderBrush="{DynamicResource SubtleBorderBrush}" />
         </Border>
       </StackPanel>
+      <views:ColorToolButtons Margin="0,6,0,0" />
 
       <!-- Both buttons take the backdrop from the picture: one asks for a picture of the user's, the other takes the picture's own
            colour (a pastel of it; the colour then shows in the box and the ring above, as a typed one does). The row wraps, so a

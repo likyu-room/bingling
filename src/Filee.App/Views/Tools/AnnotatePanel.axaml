@@ -1,10 +1,11 @@
 <!-- The annotate tool's side of the image tool window: the ten tools (select and the nine ways of drawing, each with its
      key in its tip, and a line on how the one in use works), the button that deletes the picked drawing, the colours with
-     one typed in, and the thickness. -->
+     one typed in (with the eyedropper and copy buttons under its box), and the thickness. -->
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Filee.App.ViewModels"
              xmlns:tools="using:Filee.App.ViewModels.Tools"
+             xmlns:views="using:Filee.App.Views.Tools"
              x:Class="Filee.App.Views.Tools.AnnotatePanel"
              x:DataType="tools:AnnotateToolViewModel">
   <UserControl.Styles>
@@ -109,6 +110,7 @@
                   BorderBrush="{DynamicResource SubtleBorderBrush}" />
         </Border>
       </StackPanel>
+      <views:ColorToolButtons Margin="0,6,0,0" />
     </StackPanel>
 
     <StackPanel>

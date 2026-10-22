@@ -7,9 +7,11 @@ using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Automation;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
@@ -1226,6 +1228,244 @@ public class AnnotateToolTests
         var (inside, outside) = (PixelAt(frame, In(-4)), PixelAt(frame, In(8)));
         Assert.True(Math.Abs(inside.R - outside.R) < 12 && Math.Abs(inside.G - outside.G) < 12 && Math.Abs(inside.B - outside.B) < 12,
             $"the box shows {inside} where the picture has {outside}");
+        window.Close();
+        vm.Dispose();
+    }
+
+    // ───────── The eyedropper and the copy button ─────────
+
+    private static string FourBands() =>
+        ImageToolWindowTests.TestImages.Bands(400, 200, "#2A6FB5", "#B5362A", "#3AA856", "#8E44AD");
+
+    private static Point Centre(Window window, Control c) => c.TranslatePoint(new Point(c.Bounds.Width / 2, c.Bounds.Height / 2), window)!.Value;
+
+    [AvaloniaFact]
+    public void The_I_key_and_the_button_turn_the_eyedropper_on_and_Esc_turns_only_it_off()
+    {
+        var (window, vm) = Open();
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        var button = window.GetVisualDescendants().OfType<ToggleButton>().Single();
+        Assert.Equal((false, false), (vm.IsEyedropperOn, button.IsChecked));
+
+        Key(window, PhysicalKey.I);
+        Assert.Equal((true, true), (vm.IsEyedropperOn, button.IsChecked)); // the button shows it
+        Key(window, PhysicalKey.I);
+        Assert.False(vm.IsEyedropperOn);
+        Key(window, PhysicalKey.I, RawInputModifiers.Shift); // I with another key held is not the eyedropper's
+        Key(window, PhysicalKey.I, RawInputModifiers.Control);
+        Assert.False(vm.IsEyedropperOn);
+
+        window.MouseDown(Centre(window, button), MouseButton.Left);
+        window.MouseUp(Centre(window, button), MouseButton.Left);
+        Assert.True(vm.IsEyedropperOn);
+        Assert.IsType<AnnotateCanvas>(window.FocusManager!.GetFocusedElement()); // the keys stay with the picture
+
+        // Esc turns the eyedropper off and nothing more: the window stays, with nothing asked.
+        Key(window, PhysicalKey.Escape);
+        Assert.False(vm.IsEyedropperOn);
+        Assert.False(closed);
+
+        // A text being typed keeps the I: it is a letter there.
+        Key(window, PhysicalKey.T);
+        Click(window, At(window, .3, .4));
+        window.KeyTextInput("i");
+        Assert.False(vm.IsEyedropperOn);
+        Assert.Equal("i", Editor(window)!.Text);
+        Key(window, PhysicalKey.Escape); // the text box's own Esc
+        Assert.False(closed);
+
+        Key(window, PhysicalKey.Escape); // the eyedropper is off: Esc closes as it did
+        Assert.True(closed);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_eyedropper_picks_the_colour_under_the_press_instead_of_drawing()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        Assert.Equal(AnnotationKind.Pen, vm.DrawingTool); // a press would draw
+
+        Key(window, PhysicalKey.I);
+        Click(window, At(window, .4, .5)); // the second band
+        Assert.Equal(("#B5362A", "#B5362A"), (vm.CustomColorHex, vm.Color));
+        Assert.True(vm.IsCustomColor);
+        Assert.False(vm.IsEyedropperOn);
+        Assert.Empty(vm.Annotations);
+
+        // Off again after one pick: the next press draws.
+        Drag(window, At(window, .1, .2), At(window, .6, .8));
+        Assert.Single(vm.Annotations);
+        vm.UndoCommand.Execute(null);
+
+        // On a part of the window that is not the picture, it picks nothing and stays on.
+        Key(window, PhysicalKey.I);
+        Click(window, Shown(window).TopLeft - new Point(8, 8));
+        Assert.Equal(("#B5362A", true), (vm.CustomColorHex, vm.IsEyedropperOn));
+        Click(window, At(window, .9, .2));
+        Assert.Equal(("#8E44AD", false), (vm.CustomColorHex, vm.IsEyedropperOn));
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_magnifier_follows_the_pointer_while_the_eyedropper_is_on_and_leaves_with_it()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        var canvas = Canvas(window);
+        // The pointer on the first pixel of the second band: the cell left of the magnifier's middle one is the first band's.
+        var pointer = At(window, 100.5 / 400, .5);
+        var lens = Magnifier.PlaceBeside(window.TranslatePoint(pointer, canvas)!.Value, canvas.Bounds.Size);
+        const double cell = Magnifier.Diameter / Magnifier.Cells;
+        Point Cell(double dx) => canvas.TranslatePoint(lens + new Point(6.5 * cell + dx * cell, 6.5 * cell), window)!.Value;
+        Avalonia.Media.Color Seen()
+        {
+            Dispatcher.UIThread.RunJobs();
+            AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+            using var frame = window.CaptureRenderedFrame()!;
+            return PixelAt(frame, Cell(-1));
+        }
+
+        window.MouseMove(pointer);
+        Assert.NotEqual(Avalonia.Media.Color.Parse("#2A6FB5"), Seen()); // not before it is on
+        Key(window, PhysicalKey.I);
+        window.MouseMove(pointer + new Point(.1, 0));
+        window.MouseMove(pointer);
+        Assert.Equal(Avalonia.Media.Color.Parse("#2A6FB5"), Seen());
+        using (var frame = window.CaptureRenderedFrame()!)
+        using (var stream = File.Create(Path.Combine(TestServices.ScreenshotDirectory, "tool-annotate-eyedropper-ko.png")))
+            frame.Save(stream, new PngBitmapEncoderOptions());
+
+        Key(window, PhysicalKey.Escape);
+        Assert.NotEqual(Avalonia.Media.Color.Parse("#2A6FB5"), Seen()); // gone with the eyedropper
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_eyedropper_picks_what_is_seen_with_the_drawings_on_it()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        // A spotlight over the left half: the right half is under the renderer's black at 55 %.
+        vm.Annotations =
+        [
+            new Annotation
+            {
+                Kind = AnnotationKind.Spotlight,
+                Color = "#FF3B30",
+                Width = StrokeLevel.Normal,
+                Points = [new EditPoint { X = 0, Y = 0 }, new EditPoint { X = .5, Y = 1 }],
+            },
+        ];
+
+        Key(window, PhysicalKey.I);
+        Click(window, At(window, .9, .5));
+        var dimmed = Avalonia.Media.Color.Parse(vm.CustomColorHex);
+        Assert.True(Math.Abs(dimmed.R - 0x8E * .451) < 2 && Math.Abs(dimmed.G - 0x44 * .451) < 2 && Math.Abs(dimmed.B - 0xAD * .451) < 2,
+            $"the band under the spotlight's dimming, not {vm.CustomColorHex}");
+
+        Key(window, PhysicalKey.I);
+        Click(window, At(window, .1, .5)); // inside the box: as the picture has it
+        Assert.Equal("#2A6FB5", vm.CustomColorHex);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void A_picked_colour_goes_to_the_picked_drawing_as_one_undo_step()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        vm.Annotations = [Arrow()];
+        vm.SelectedIndex = 0;
+
+        Key(window, PhysicalKey.I);
+        Click(window, At(window, .4, .5));
+        Assert.Equal(("#B5362A", "#B5362A"), (vm.Annotations[0].Color, vm.CustomColorHex));
+
+        vm.UndoCommand.Execute(null);
+        Assert.Equal("#FF3B30", vm.Annotations[0].Color);
+        Assert.Equal("#FF3B30", vm.Color);
+        vm.RedoCommand.Execute(null);
+        Assert.Equal("#B5362A", vm.Annotations[0].Color);
+
+        // The colour the box already shows, picked again after a chip: the colour is the picked one again, not the chip's.
+        vm.SelectedColor = vm.Colors.Single(c => c.Hex == "#FFFFFF");
+        Assert.Equal("#FFFFFF", vm.Color);
+        Key(window, PhysicalKey.I);
+        Click(window, At(window, .4, .5));
+        Assert.Equal(("#B5362A", "#B5362A", "#B5362A"), (vm.Color, vm.CustomColorHex, vm.Annotations[0].Color));
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_eyedropper_picks_the_same_point_at_any_zoom_and_scale()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        var canvas = Canvas(window);
+        var at = At(window, .1, .5); // the first band, fitted
+        window.MouseWheel(canvas.TranslatePoint(new Point(canvas.Bounds.Width / 2, canvas.Bounds.Height / 2), window)!.Value, new Vector(0, 6));
+        // About three times as large around the middle: the same window point is at .5 - .4 / 3 = .37 of the picture now.
+        Key(window, PhysicalKey.I);
+        Click(window, at);
+        Assert.Equal("#B5362A", vm.CustomColorHex);
+        window.Close();
+        vm.Dispose();
+
+        // At 200 %: the picture's pixels are twice as many per DIP, the point under the pointer the same.
+        var scaled = Annotate([FourBands()], TestStore());
+        window = new ImageToolWindow { DataContext = scaled, Width = 900, Height = 600 };
+        window.SetRenderScaling(2);
+        window.Show();
+        WaitForPreview(scaled);
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        Key(window, PhysicalKey.I);
+        Click(window, At(window, .6, .5));
+        Assert.Equal("#3AA856", scaled.CustomColorHex);
+        window.Close();
+        scaled.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task The_copy_button_puts_the_colour_code_on_the_clipboard_and_says_copied_for_a_moment()
+    {
+        var (window, vm) = Open();
+        var copied = new List<string>();
+        vm.SetClipboardText = text =>
+        {
+            copied.Add(text);
+            return Task.CompletedTask;
+        };
+        vm.CopiedHold = TimeSpan.FromMilliseconds(40);
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.CopyColorCommand);
+        string Label() => button.GetVisualDescendants().OfType<TextBlock>().Single(t => t.IsEffectivelyVisible).Text!;
+        Assert.Equal("복사", Label());
+
+        // The colour in use, a chip's too.
+        window.MouseDown(Centre(window, button), MouseButton.Left);
+        window.MouseUp(Centre(window, button), MouseButton.Left);
+        Assert.Equal(["#FF3B30"], copied);
+        Assert.Equal("복사됨", Label());
+        await ColorPickTests.Until(() => !vm.ColorCopied);
+        Assert.Equal("복사", Label());
+
+        vm.CustomColorHex = "12ab34";
+        window.MouseDown(Centre(window, button), MouseButton.Left);
+        window.MouseUp(Centre(window, button), MouseButton.Left);
+        Assert.Equal(["#FF3B30", "#12AB34"], copied);
+
+        // The window's own clipboard, as the window service hands it over.
+        await ColorPickTests.Until(() => !vm.ColorCopied);
+        vm.SetClipboardText = text => window.Clipboard!.SetTextAsync(text);
+        await vm.CopyColorCommand.ExecuteAsync(null);
+        Assert.Equal("#12AB34", await window.Clipboard!.TryGetTextAsync());
+
+        // A clipboard another program holds: nothing says "Copied", nothing is thrown.
+        await ColorPickTests.Until(() => !vm.ColorCopied);
+        vm.SetClipboardText = _ => throw new COMException("The clipboard is open in another program");
+        await vm.CopyColorCommand.ExecuteAsync(null);
+        Assert.False(vm.ColorCopied);
         window.Close();
         vm.Dispose();
     }

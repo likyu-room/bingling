@@ -1,7 +1,7 @@
 // The picture in the image tool window, the part every tool shares: fitted to the control, zoomed with the wheel around
 // the pointer, panned with Space + drag or the middle button, Fit (Ctrl+0) and actual size (Ctrl+1). It draws the
 // preview picture with the tool's edit through the renderer that saves it; a tool's canvas (the crop box, say) inherits
-// it and adds what it drags.
+// it and adds what it drags. With the eyedropper on (PictureView.Eyedropper.cs) a press picks a colour instead.
 //
 // The geometry is in small static methods (ImageToolWindowTests).
 
@@ -15,7 +15,7 @@ using SkiaSharp;
 namespace Filee.App.Controls;
 
 /// <summary>Shows a picture (and an edit on it) that can be zoomed and panned.</summary>
-public class PictureView : Control
+public partial class PictureView : Control
 {
     /// <summary>Defines <see cref="Picture"/>.</summary>
     public static readonly StyledProperty<SKImage?> PictureProperty =
@@ -136,6 +136,8 @@ public class PictureView : Control
     {
         InvalidateVisual();
         InvalidateArrange();
+        if (Eyedropper)
+            UpdateLens(); // the pixel under the pointer is another now
     }
 
     // ───────── Geometry ─────────
@@ -174,7 +176,10 @@ public class PictureView : Control
         Focus();
         var point = e.GetCurrentPoint(this);
         if (ContentSize.Width <= 0 || !(point.Properties.IsMiddleButtonPressed || (point.Properties.IsLeftButtonPressed && PanKeyDown)))
+        {
+            PressEyedropper(e, point);
             return;
+        }
         _panning = (point.Position, _pan);
         e.Pointer.Capture(this);
         e.Handled = true;
@@ -183,6 +188,7 @@ public class PictureView : Control
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
+        TrackEyedropper(e);
         if (_panning is not { } panning)
             return;
         _pan = panning.Pan + (e.GetPosition(this) - panning.Start);
@@ -212,6 +218,7 @@ public class PictureView : Control
         var content = ContentSize;
         if (content.Width <= 0)
             return;
+        TrackEyedropper(e);
         var zoom = Math.Clamp(_zoom * Math.Pow(1.2, e.Delta.Y), MinZoom, MaxZoom);
         _pan = ZoomAt(Bounds.Size, content, _zoom, _pan, e.GetPosition(this), zoom);
         _zoom = zoom;
@@ -226,5 +233,6 @@ public class PictureView : Control
         context.FillRectangle(Brushes.Transparent, new Rect(Bounds.Size)); // takes the pointer everywhere, also off the picture
         if (Picture is { } picture)
             context.Custom(new EditPreviewDrawOperation(PictureRect, picture, EditToDraw ?? NoEdit, FullShortSide));
+        DrawLens(context);
     }
 }

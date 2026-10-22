@@ -672,6 +672,124 @@ public class BackgroundToolTests
         vm.Dispose();
     }
 
+    // ───────── The eyedropper and the copy button ─────────
+
+    private static string FourBands() =>
+        ImageToolWindowTests.TestImages.Bands(400, 200, "#2A6FB5", "#B5362A", "#3AA856", "#8E44AD");
+
+    /// <summary>The window's point at (<paramref name="x"/>, <paramref name="y"/>) as fractions of the result, <paramref name="result"/> big.</summary>
+    private static Point At(Window window, double x, double y, Size result)
+    {
+        var canvas = window.GetVisualDescendants().OfType<BackgroundCanvas>().Single();
+        var image = PictureView.ImageRect(canvas.Bounds.Size, result, 1, default);
+        return canvas.TranslatePoint(new Point(image.X + x * image.Width, image.Y + y * image.Height), window)!.Value;
+    }
+
+    private static void Click(Window window, Point at)
+    {
+        window.MouseDown(at, MouseButton.Left);
+        window.MouseUp(at, MouseButton.Left);
+    }
+
+    [AvaloniaFact]
+    public void The_I_key_and_the_button_turn_the_eyedropper_on_and_Esc_turns_only_it_off()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        var closed = false;
+        window.Closed += (_, _) => closed = true;
+        var button = window.GetVisualDescendants().OfType<ToggleButton>().Single();
+
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.None);
+        Assert.Equal((true, true), (vm.IsEyedropperOn, button.IsChecked));
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.None);
+        Assert.False(vm.IsEyedropperOn);
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.Shift);
+        Assert.False(vm.IsEyedropperOn);
+
+        Click(window, button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value);
+        Assert.True(vm.IsEyedropperOn);
+        Assert.IsType<BackgroundCanvas>(window.FocusManager!.GetFocusedElement()); // the keys stay with the picture
+
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.False(vm.IsEyedropperOn);
+        Assert.False(closed); // only the eyedropper went
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        Assert.True(closed);
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public void The_eyedropper_picks_the_colour_of_the_result_backdrop_included()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        vm.SelectedSwatch = vm.Swatches.Single(s => s.Id == "solid-sky");
+        vm.Padding = 20; // 40 px round a 400 × 200 picture: a result of 480 × 280
+        vm.Shadow = 0;
+        vm.Corner = 0;
+        Dispatcher.UIThread.RunJobs();
+        AvaloniaHeadlessPlatform.ForceRenderTimerTick();
+        var result = new Size(480, 280);
+
+        // On the backdrop, at the corner: the backdrop's colour, which no picture has.
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.None);
+        Click(window, At(window, .03, .04, result));
+        Assert.Equal("#BEE3FF", vm.CustomColorHex);
+        Assert.False(vm.IsEyedropperOn);
+
+        // On the picture: the picture's colour, which becomes the backdrop (one undo step).
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.None);
+        Click(window, At(window, .5, .5, result)); // 200 px into the picture: the third band
+        Assert.Equal("#3AA856", vm.CustomColorHex);
+        Assert.Equal((BackgroundKind.Solid, "#3AA856"), (vm.PreviewEdit.Background!.Kind, vm.PreviewEdit.Background.Value));
+        vm.UndoCommand.Execute(null);
+        Assert.Equal("solid-sky", vm.SelectedSwatch!.Id);
+
+        // Zoomed: the window point that was on the first band, without the zoom, is on the second now.
+        var canvas = window.GetVisualDescendants().OfType<BackgroundCanvas>().Single();
+        var at = At(window, .2, .5, result); // 96 px in, 56 px into the picture: the first band
+        window.MouseWheel(canvas.TranslatePoint(new Point(canvas.Bounds.Width / 2, canvas.Bounds.Height / 2), window)!.Value, new Vector(0, 6));
+        window.KeyPressQwerty(PhysicalKey.I, RawInputModifiers.None);
+        Click(window, at);
+        // About 3 times as large around the middle: .5 - .3 / 3 = .4 of the result, 192 px in, 152 px into the picture: the second band.
+        Assert.Equal("#B5362A", vm.CustomColorHex);
+        window.Close();
+        vm.Dispose();
+    }
+
+    [AvaloniaFact]
+    public async Task The_copy_button_copies_a_plain_background_colour_and_waits_for_one()
+    {
+        var (window, vm) = Open(TestStore(), FourBands());
+        var copied = new List<string>();
+        vm.SetClipboardText = text =>
+        {
+            copied.Add(text);
+            return Task.CompletedTask;
+        };
+        vm.CopiedHold = TimeSpan.FromMilliseconds(40);
+        var button = window.GetVisualDescendants().OfType<Button>().Single(b => b.Command == vm.CopyColorCommand);
+        Point Centre() => button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
+
+        // A gradient is no one colour: the button is off, as a button with nothing to copy should look.
+        Assert.False(button.IsEffectivelyEnabled);
+
+        vm.SelectedSwatch = vm.Swatches.Single(s => s.Id == "solid-peach");
+        Assert.True(button.IsEffectivelyEnabled);
+        Click(window, Centre());
+        Assert.Equal(["#FFD8BE"], copied);
+        Assert.True(vm.ColorCopied);
+        await ColorPickTests.Until(() => !vm.ColorCopied);
+
+        vm.CustomColorHex = "12ab34";
+        Click(window, Centre());
+        Assert.Equal(["#FFD8BE", "#12AB34"], copied);
+
+        vm.SelectedSwatch = vm.Swatches.First(s => s.Kind == BackgroundKind.Gradient);
+        Assert.False(button.IsEffectivelyEnabled);
+        window.Close();
+        vm.Dispose();
+    }
+
     [AvaloniaFact]
     public void After_a_slider_is_used_with_the_mouse_the_arrow_keys_switch_files_again()
     {

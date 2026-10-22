@@ -156,6 +156,8 @@ public sealed class AnnotateCanvas : PictureView
     protected override void OnPropertyChanged(AvaloniaPropertyChangedEventArgs change)
     {
         base.OnPropertyChanged(change);
+        if (change.Property == EyedropperProperty)
+            _cursor = null; // the eyedropper set the cursor, or took it away: the next move sets this canvas's own again
         // This canvas sets the drawings only once its drag or its text is over: a change now is someone else's.
         if (change.Property == AnnotationsProperty)
         {

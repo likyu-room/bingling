@@ -21,7 +21,7 @@ namespace Filee.App.ViewModels.Tools;
 public sealed record ColorSwatch(string Hex, string Label, IBrush Brush);
 
 /// <summary>The annotate tool: each file's own drawings, and the tool, colour and thickness they are drawn with.</summary>
-public sealed partial class AnnotateToolViewModel : ImageToolViewModel
+public sealed partial class AnnotateToolViewModel : ColorToolViewModel
 {
     /// <summary>The tool keys in the order of the panel's cells: V the select tool, then the <see cref="AnnotationKind"/>s in order.</summary>
     private static readonly Key[] ToolKeys = [Key.V, Key.P, Key.H, Key.A, Key.L, Key.R, Key.E, Key.T, Key.N, Key.S];
@@ -249,7 +249,10 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
     /// <summary>How many files have something drawn on them.</summary>
     private int Marked => _drawings.Count(d => d.Count > 0);
 
-    /// <summary>V, P, H, A, L, R, E, T, N and S pick a tool; [ and ] change the thickness; Delete or Backspace removes the picked drawing.</summary>
+    /// <summary>
+    /// V, P, H, A, L, R, E, T, N and S pick a tool; [ and ] change the thickness; Delete or Backspace removes the picked
+    /// drawing; I turns the eyedropper on and off.
+    /// </summary>
     public override bool HandleKey(Key key, KeyModifiers modifiers)
     {
         if (modifiers != KeyModifiers.None)
@@ -267,7 +270,7 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
         }
         var cell = Array.IndexOf(ToolKeys, key);
         if (cell < 0)
-            return false;
+            return base.HandleKey(key, modifiers);
         ToolIndex = cell;
         return true;
     }
@@ -344,6 +347,18 @@ public sealed partial class AnnotateToolViewModel : ImageToolViewModel
             OnPropertyChanged(nameof(CustomColorBrush));
             OnPropertyChanged(nameof(HasCustomColor));
         }
+    }
+
+    /// <summary>The colour in use, which the copy button copies (a chip's too).</summary>
+    protected override string? ColorHex => _color;
+
+    /// <summary>A colour picked off the picture: in the box, and the colour as a typed one is.</summary>
+    protected override void UseColor(string hex)
+    {
+        CustomColorHex = hex;
+        // Again, not only through the box: when it shows this very colour already (from before a chip was picked), a text
+        // that does not change sets nothing.
+        SetColor(hex);
     }
 
     private void SetColor(string hex)
