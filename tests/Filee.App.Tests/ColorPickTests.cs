@@ -175,6 +175,28 @@ public class ColorPickTests
     }
 
     [AvaloniaFact]
+    public async Task Closing_a_screen_tool_asks_for_the_memory_of_its_picture_to_be_given_back()
+    {
+        TestServices.EnsureInitialized("ko");
+        using var trimmer = new MemoryTrimmer(() => false, () => { }, TimeSpan.FromMilliseconds(50));
+        var tools = new ScreenTools(new FakeScreen(), new ToolsLog(), AppHost.Get<CaptureOutput>(), trimmer);
+
+        tools.StartColorPick(new PixelPoint(100, 100));
+        await Task.Delay(250); // open: the picture is in use, nothing is asked
+        Assert.Equal(0, trimmer.Trims);
+        tools.Picker!.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        await Until(() => trimmer.Trims == 1);
+        Assert.Equal(1, trimmer.Trims);
+
+        tools.StartCapture(new PixelPoint(100, 100)); // the capture window too
+        await Task.Delay(250);
+        Assert.Equal(1, trimmer.Trims);
+        tools.Capture!.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
+        await Until(() => trimmer.Trims == 2);
+        Assert.Equal(2, trimmer.Trims);
+    }
+
+    [AvaloniaFact]
     public void The_eyedropper_shows_the_picture_it_picks_from_as_it_is()
     {
         // What shows is what is picked: the screen frozen as it was taken (a video playing on beneath would show other

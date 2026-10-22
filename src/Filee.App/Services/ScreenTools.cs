@@ -12,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Filee.App.Services;
 
-public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools> log, CaptureOutput output) : IScreenTools
+public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools> log, CaptureOutput output, MemoryTrimmer? trimmer = null) : IScreenTools
 {
     /// <summary>How long a colour card still up gets to leave the screen before the next picture of it is taken.</summary>
     private static readonly TimeSpan CardGoneAfter = TimeSpan.FromMilliseconds(150);
@@ -51,7 +51,8 @@ public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools>
     /// Takes the picture and opens <typeparamref name="TWindow"/> over it (<paramref name="open"/>); the picture is let go of
     /// when the window closes. A card still up closes first, a moment before the picture. While a screen tool is open (or
     /// waiting for the card), starting one again does nothing; when the screen can't be taken (or is black) nothing opens
-    /// and the log says so.
+    /// and the log says so. Once the window has closed the memory is given back (the trimmer, as after the editor windows): a
+    /// 4K screen is about a hundred MB of pictures.
     /// </summary>
     private async void Start<TWindow>(PixelPoint cursor, string tool, Action<TWindow, ScreenShot> open) where TWindow : ScreenCoverWindow, new()
     {
@@ -83,6 +84,7 @@ public sealed class ScreenTools(IPlatformServices platform, ILogger<ScreenTools>
             {
                 _cover = null;
                 taken.Dispose();
+                trimmer?.Request();
             };
             window.Picked += ShowCard;
             open(window, shot);
